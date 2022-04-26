@@ -25,17 +25,11 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
-type analyzer interface {
-	analysis.Analyzer
-	Name() string
-}
-
-var analyzers = map[string]analyzer{}
+var analyzers = map[string]*analysis.Analyzer{}
 
 var analyzerNamePattern = regexp.MustCompile(`\w+`)
 
-func registerAnalyzer(a analyzer) {
-	name := a.Name()
+func registerAnalyzer(name string, analyzer *analysis.Analyzer) {
 	if _, ok := analyzers[name]; ok {
 		panic(fmt.Errorf("analyzer already exists: %s", name))
 	}
@@ -45,5 +39,5 @@ func registerAnalyzer(a analyzer) {
 
 	}
 
-	analyzers[name] = a
+	analyzers[name] = analyzer
 }
