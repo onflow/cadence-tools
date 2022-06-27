@@ -1,4 +1,4 @@
-module github.com/onflow/cadence/tools/contract-analyzer
+module github.com/onflow/cadence-lint
 
 go 1.18
 

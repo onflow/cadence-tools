@@ -1,5 +1,5 @@
 /*
- * Cadence - The resource-oriented smart contract programming language
+ * Cadence-lint - The Cadence linter
  *
  * Copyright 2019-2022 Dapper Labs, Inc.
  *
@@ -41,7 +41,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/tools/analysis"
-	"github.com/onflow/cadence/tools/contract-analyzer/analyzers"
+
+	"github.com/onflow/cadence-lint/analyzers"
 )
 
 var errorPrettyPrinter = pretty.NewErrorPrettyPrinter(os.Stdout, true)

@@ -1,5 +1,5 @@
 /*
- * Cadence - The resource-oriented smart contract programming language
+ * Cadence-lint - The Cadence linter
  *
  * Copyright 2019-2022 Dapper Labs, Inc.
  *
