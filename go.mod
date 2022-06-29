@@ -9,7 +9,6 @@ require (
 	github.com/onflow/flow-go-sdk v0.26.1
 	github.com/spf13/afero v1.8.2
 	github.com/stretchr/testify v1.7.3
-	golang.org/x/tools v0.1.10
 )
 
 require (

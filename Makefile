@@ -2,6 +2,11 @@ VERSION ?= $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 
 BINARY ?= cadence-analyzer
 
+LINTERS :=
+ifneq ($(linters),)
+	LINTERS = -E $(linters)
+endif
+
 .PHONY: test
 test:
 	go test -v -parallel 4 ./...
@@ -32,3 +37,21 @@ publish:
 clean:
 	rm -f cadence-analyzer*
 
+.PHONY: check-capabilities
+check-capabilities:
+	go install github.com/cugu/gocap@v0.1.0
+	go mod download
+	gocap check .
+
+.PHONY: generate
+generate:
+	go generate -v ./...
+
+.PHONY: check-headers
+check-headers:
+	@./check-headers.sh
+
+.PHONY: check-tidy
+check-tidy: generate
+	go mod tidy
+	git diff --exit-code
