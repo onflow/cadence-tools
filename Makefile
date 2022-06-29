@@ -37,12 +37,6 @@ publish:
 clean:
 	rm -f cadence-analyzer*
 
-.PHONY: check-capabilities
-check-capabilities:
-	go install github.com/cugu/gocap@v0.1.0
-	go mod download
-	gocap check .
-
 .PHONY: generate
 generate:
 	go generate -v ./...
