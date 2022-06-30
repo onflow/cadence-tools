@@ -316,7 +316,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 
 func init() {
 	registerAnalyzer(
-		"cast-analysis",
+		"redundant-cast",
 		RedundantCastAnalyzer,
 	)
 }
