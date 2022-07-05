@@ -1,6 +1,6 @@
 VERSION ?= $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 
-BINARY ?= cadence-analyzer
+BINARY ?= cadence-lint
 
 LINTERS :=
 ifneq ($(linters),)
