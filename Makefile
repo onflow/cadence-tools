@@ -1,6 +1,11 @@
 VERSION ?= $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 
-BINARY ?= cadence-analyzer
+BINARY ?= cadence-lint
+
+LINTERS :=
+ifneq ($(linters),)
+	LINTERS = -E $(linters)
+endif
 
 .PHONY: test
 test:
@@ -32,3 +37,15 @@ publish:
 clean:
 	rm -f cadence-analyzer*
 
+.PHONY: generate
+generate:
+	go generate -v ./...
+
+.PHONY: check-headers
+check-headers:
+	@./check-headers.sh
+
+.PHONY: check-tidy
+check-tidy: generate
+	go mod tidy
+	git diff --exit-code
