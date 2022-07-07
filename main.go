@@ -47,7 +47,7 @@ import (
 
 var errorPrettyPrinter = pretty.NewErrorPrettyPrinter(os.Stdout, true)
 
-func printErr(err error, location common.Location, codes map[common.LocationID]string) {
+func printErr(err error, location common.Location, codes map[common.Location]string) {
 	printErr := errorPrettyPrinter.PrettyPrintError(err, location, codes)
 	if printErr != nil {
 		panic(printErr)
@@ -139,7 +139,7 @@ func analyzeAccount(address string, networkName string, analyzers []*analysis.An
 		panic(err)
 	}
 
-	codes := map[common.LocationID]string{}
+	codes := map[common.Location]string{}
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
@@ -193,7 +193,7 @@ func analyzeTransaction(transactionID string, networkName string, analyzers []*a
 		panic(err)
 	}
 
-	codes := map[common.LocationID]string{}
+	codes := map[common.Location]string{}
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
@@ -206,7 +206,7 @@ func analyzeTransaction(transactionID string, networkName string, analyzers []*a
 	}
 
 	flowTransactionID := flow.HexToID(transactionID)
-	transactionLocation := common.TransactionLocation(flowTransactionID[:])
+	transactionLocation := common.TransactionLocation(flowTransactionID)
 
 	locations := []common.Location{
 		transactionLocation,
@@ -217,7 +217,7 @@ func analyzeTransaction(transactionID string, networkName string, analyzers []*a
 		panic(err)
 	}
 
-	codes[transactionLocation.ID()] = string(transaction.Script)
+	codes[transactionLocation] = string(transaction.Script)
 
 	analysisConfig := analysis.NewSimpleConfig(
 		analysis.NeedTypes,
@@ -303,11 +303,11 @@ func readDirectoryEntries(
 	entries []os.DirEntry,
 ) (
 	locations []common.Location,
-	codes map[common.LocationID]string,
+	codes map[common.Location]string,
 	contractNames map[common.Address][]string,
 ) {
 
-	codes = map[common.LocationID]string{}
+	codes = map[common.Location]string{}
 	contractNames = map[common.Address][]string{}
 
 	for _, entry := range entries {
@@ -342,7 +342,7 @@ func readDirectoryEntries(
 		code := string(rawCode)
 
 		locations = append(locations, location)
-		codes[location.ID()] = code
+		codes[location] = code
 
 		if addressLocation, ok := location.(common.AddressLocation); ok {
 			contractNames[addressLocation.Address] = append(
@@ -358,7 +358,7 @@ func readDirectoryEntries(
 func analyze(
 	config *analysis.Config,
 	locations []common.Location,
-	codes map[common.LocationID]string,
+	codes map[common.Location]string,
 	analyzers []*analysis.Analyzer,
 ) {
 	programs := make(analysis.Programs, len(locations))
@@ -389,7 +389,7 @@ func analyze(
 
 	if len(analyzers) > 0 {
 		for _, location := range locations {
-			program := programs[location.ID()]
+			program := programs[location]
 			if program == nil {
 				continue
 			}
@@ -405,12 +405,12 @@ func readCSV(
 	r io.Reader,
 ) (
 	locations []common.Location,
-	codes map[common.LocationID]string,
+	codes map[common.Location]string,
 	contractNames map[common.Address][]string,
 ) {
 	reader := csv.NewReader(r)
 
-	codes = map[common.LocationID]string{}
+	codes = map[common.Location]string{}
 	contractNames = map[common.Address][]string{}
 
 	var record []string
@@ -441,7 +441,7 @@ func readCSV(
 		code := record[1]
 
 		locations = append(locations, location)
-		codes[location.ID()] = code
+		codes[location] = code
 
 		if addressLocation, ok := location.(common.AddressLocation); ok {
 			contractNames[addressLocation.Address] = append(
