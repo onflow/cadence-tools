@@ -35,7 +35,7 @@ func ReplacementHint(
 	return &analysis.Diagnostic{
 		Location: location,
 		Range:    r,
-		Category: "lint",
+		Category: "replacement-hint",
 		Message:  fmt.Sprintf("consider replacing with: `%s`", expr),
 	}
 }

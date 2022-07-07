@@ -62,7 +62,7 @@ var UnnecessaryForceAnalyzer = (func() *analysis.Analyzer {
 							analysis.Diagnostic{
 								Location: location,
 								Range:    ast.NewRangeFromPositioned(nil, element),
-								Category: "lint",
+								Category: "removal-hint",
 								Message:  "unnecessary force operator",
 							},
 						)
