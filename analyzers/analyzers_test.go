@@ -34,8 +34,8 @@ func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) [
 
 	config := analysis.NewSimpleConfig(
 		analysis.NeedTypes,
-		map[common.LocationID]string{
-			testLocationID: code,
+		map[common.Location]string{
+			testLocation: code,
 		},
 		nil,
 		nil,
@@ -46,7 +46,7 @@ func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) [
 
 	var diagnostics []analysis.Diagnostic
 
-	programs[testLocationID].Run(
+	programs[testLocation].Run(
 		analyzers,
 		func(diagnostic analysis.Diagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
