@@ -69,7 +69,7 @@ var ReferenceOperatorAnalyzer = (func() *analysis.Analyzer {
 						analysis.Diagnostic{
 							Location: location,
 							Range:    ast.NewRangeFromPositioned(nil, element),
-							Category: "update recommended",
+							Category: UpdateCategory,
 							Message:  "incorrect reference operator used",
 							SecondaryMessage: fmt.Sprintf(
 								"use the '%s' operator",

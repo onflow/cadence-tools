@@ -33,7 +33,7 @@ func ReplacementHint(
 	return &analysis.Diagnostic{
 		Location:         location,
 		Range:            r,
-		Category:         "replacement-hint",
+		Category:         ReplacementCategory,
 		Message:          "consider replacing with:",
 		SecondaryMessage: expr.String(),
 	}
