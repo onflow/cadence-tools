@@ -28,7 +28,7 @@ var _ ast.ExpressionVisitor = &DuplicateCaseChecker{}
 var _ ast.TypeEqualityChecker = &DuplicateCaseChecker{}
 
 type DuplicateCaseChecker struct {
-	runtime.TypeEqualityChecker
+	runtime.TypeComparator
 	expr ast.Expression
 }
 
@@ -36,7 +36,7 @@ func NewDuplicateCaseChecker(program *ast.Program) DuplicateCaseChecker {
 	rootDeclIdentifier := getRootDeclarationIdentifier(program)
 
 	return DuplicateCaseChecker{
-		TypeEqualityChecker: runtime.TypeEqualityChecker{
+		TypeComparator: runtime.TypeComparator{
 			RootDeclIdentifier: rootDeclIdentifier,
 		},
 	}
