@@ -23,35 +23,41 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/tools/analysis"
+
+	"github.com/onflow/cadence-lint/analyzers"
 )
 
-var testLocation = common.StringLocation("test")
-var testLocationID = testLocation.ID()
+func TestReferenceOperatorAnalyzer(t *testing.T) {
 
-func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
+	t.Parallel()
 
-	config := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
-		map[common.Location]string{
-			testLocation: code,
-		},
-		nil,
-		nil,
+	diagnostics := testAnalyzers(t,
+		`
+          pub contract Test {
+              pub fun test() {
+                  let ref = &1 as! &Int
+              }
+          }
+        `,
+		analyzers.ReferenceOperatorAnalyzer,
 	)
 
-	programs, err := analysis.Load(config, testLocation)
-	require.NoError(t, err)
-
-	var diagnostics []analysis.Diagnostic
-
-	programs[testLocation].Run(
-		analyzers,
-		func(diagnostic analysis.Diagnostic) {
-			diagnostics = append(diagnostics, diagnostic)
+	require.Equal(
+		t,
+		[]analysis.Diagnostic{
+			{
+				Range: ast.Range{
+					StartPos: ast.Position{Offset: 90, Line: 4, Column: 28},
+					EndPos:   ast.Position{Offset: 100, Line: 4, Column: 38},
+				},
+				Location:         testLocation,
+				Category:         "update recommended",
+				Message:          "incorrect reference operator used",
+				SecondaryMessage: "use the 'as' operator",
+			},
 		},
+		diagnostics,
 	)
-
-	return diagnostics
 }
