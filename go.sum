@@ -499,8 +499,8 @@ github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1
 github.com/onflow/atree v0.4.0 h1:+TbNisavAkukAKhgQ4plWnvR9o5+SkwPIsi3jaeAqKs=
 github.com/onflow/atree v0.4.0/go.mod h1:7Qe1xaW0YewvouLXrugzMFUYXNoRQ8MT/UsVAWx1Ndo=
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
-github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a h1:Wr7+zfFj7ehr3nwNtQ9LXGpwS3MWDsUvnlX78aOnnZY=
-github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a/go.mod h1:g19FlFrcQsiegiZDe6wYtUCBO8O1hM1x/+l68aVO07k=
+github.com/onflow/cadence v0.24.2-0.20220708165614-068f4ab5b436 h1:Z5P1RqgKDHNB65VsXQHUnE99uuajNgdHAODdksKKr34=
+github.com/onflow/cadence v0.24.2-0.20220708165614-068f4ab5b436/go.mod h1:g19FlFrcQsiegiZDe6wYtUCBO8O1hM1x/+l68aVO07k=
 github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20220707150752-86437e3fe607 h1:UcRseim7d9wb0PVdP6E9UniYLkFoOAFb5yPnQ2fLHBQ=
 github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20220707150752-86437e3fe607/go.mod h1:o3cep2V/P22xopmOiRPYdpotoZ8s6SLrvqH7w+r7CeI=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220620142725-49b5accb2a84 h1:VKIZufzFyxfeMbKeDIyttN2CmFYCzHOimr4xNFimVpA=
