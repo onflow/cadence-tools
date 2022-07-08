@@ -55,7 +55,7 @@ To analyze all contracts in a directory, specify the path.
 For example:
 
 ```bash
-cadence-lint -directory contracts
+./cadence-lint -directory contracts
 ```
 
 The files must be named with the `.cdc` extension and by their location ID of the program:
