@@ -38,6 +38,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("multiple duplicates", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let s: String? = nil
@@ -86,6 +88,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("simple literals", func(t *testing.T) {
+		t.Parallel()
+
 		type test struct {
 			name string
 			expr string
@@ -113,6 +117,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 		for _, testCase := range expressions {
 
 			t.Run(testCase.name, func(t *testing.T) {
+				t.Parallel()
+
 				diagnostics := testAnalyzers(t,
 					fmt.Sprintf(`
                         pub fun test(): Int {
@@ -152,6 +158,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("identifier", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x = 5
@@ -187,6 +195,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("member access", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x = Foo()
@@ -230,6 +240,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("index access", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x: [Int] = [1, 2, 3]
@@ -267,6 +279,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("conditional", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 switch "foo" {
@@ -304,6 +318,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("unary", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x = 5
@@ -339,6 +355,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("binary", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 switch 4 {
@@ -376,6 +394,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("cast", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x = 5
@@ -413,6 +433,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("create", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := checker.ParseAndCheck(t, `
             pub fun test() {
                 let x <- create Foo()
@@ -428,6 +450,7 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("destroy", func(t *testing.T) {
+		t.Parallel()
 
 		_, err := checker.ParseAndCheck(t, `
           pub fun test() {
@@ -443,6 +466,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("reference", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x: Int = 5
@@ -478,6 +503,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("force", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 let x: Int? = 5
@@ -513,6 +540,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("path", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := checker.ParseAndCheck(t, `
             pub fun test() {
                 switch /public/somepath {
@@ -525,6 +554,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("invocation", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 switch "hello" {
@@ -547,6 +578,8 @@ func TestCheckSwitchStatementDuplicateCases(t *testing.T) {
 	})
 
 	t.Run("default", func(t *testing.T) {
+		t.Parallel()
+
 		diagnostics := testAnalyzers(t, `
             pub fun test(): Int {
                 switch "hello" {
