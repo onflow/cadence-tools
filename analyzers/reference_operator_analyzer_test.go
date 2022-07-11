@@ -53,7 +53,7 @@ func TestReferenceOperatorAnalyzer(t *testing.T) {
 					EndPos:   ast.Position{Offset: 100, Line: 4, Column: 38},
 				},
 				Location:         testLocation,
-				Category:         "update recommended",
+				Category:         analyzers.UpdateCategory,
 				Message:          "incorrect reference operator used",
 				SecondaryMessage: "use the 'as' operator",
 			},

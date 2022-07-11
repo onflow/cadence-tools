@@ -58,7 +58,7 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 						EndPos:   ast.Position{Offset: 74, Line: 5, Column: 14},
 					},
 					Location: testLocation,
-					Category: "lint",
+					Category: analyzers.RemovalCategory,
 					Message:  "unnecessary force operator",
 				},
 			},

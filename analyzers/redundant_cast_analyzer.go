@@ -268,7 +268,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 							analysis.Diagnostic{
 								Location: location,
 								Range:    ast.NewRangeFromPositioned(nil, castingExpression.TypeAnnotation),
-								Category: "lint",
+								Category: UnnecessaryCastCategory,
 								Message:  fmt.Sprintf("cast to `%s` is redundant", redundantType.TargetType),
 							},
 						)
@@ -283,7 +283,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 								analysis.Diagnostic{
 									Location: location,
 									Range:    ast.NewRangeFromPositioned(nil, castingExpression),
-									Category: "lint",
+									Category: UnnecessaryCastCategory,
 									Message: fmt.Sprintf("failable cast ('%s') from `%s` to `%s` always succeeds",
 										ast.OperationFailableCast.Symbol(),
 										alwaysSucceedingTypes.Left,
@@ -295,7 +295,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 								analysis.Diagnostic{
 									Location: location,
 									Range:    ast.NewRangeFromPositioned(nil, castingExpression),
-									Category: "lint",
+									Category: UnnecessaryCastCategory,
 									Message: fmt.Sprintf("force cast ('%s') from `%s` to `%s` always succeeds",
 										ast.OperationForceCast.Symbol(),
 										alwaysSucceedingTypes.Left,

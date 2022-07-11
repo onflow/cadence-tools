@@ -19,8 +19,6 @@
 package analyzers
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
@@ -33,10 +31,11 @@ func ReplacementHint(
 	r ast.Range,
 ) *analysis.Diagnostic {
 	return &analysis.Diagnostic{
-		Location: location,
-		Range:    r,
-		Category: "lint",
-		Message:  fmt.Sprintf("consider replacing with: `%s`", expr),
+		Location:         location,
+		Range:            r,
+		Category:         ReplacementCategory,
+		Message:          "consider replacing with:",
+		SecondaryMessage: expr.String(),
 	}
 }
 

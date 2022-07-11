@@ -82,7 +82,7 @@ var DeprecatedKeyFunctionsAnalyzer = (func() *analysis.Analyzer {
 						analysis.Diagnostic{
 							Location: location,
 							Range:    ast.NewRangeFromPositioned(nil, memberExpression.Identifier),
-							Category: "update recommended",
+							Category: UpdateCategory,
 							Message: fmt.Sprintf(
 								"deprecated function '%s' will get removed",
 								functionName,
