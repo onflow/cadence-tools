@@ -27,15 +27,15 @@ versioned-binaries:
 
 .PHONY: versioned-binary
 versioned-binary:
-	GOOS=$(OS) GOARCH=$(ARCH) $(MAKE) BINARY=cadence-analyzer-$(or ${ARCHNAME},${ARCHNAME},${ARCH})-$(OS)-$(VERSION) binary
+	GOOS=$(OS) GOARCH=$(ARCH) $(MAKE) BINARY=cadence-lint-$(or ${ARCHNAME},${ARCHNAME},${ARCH})-$(OS)-$(VERSION) binary
 
 .PHONY: publish
 publish:
-	gsutil -m cp cadence-analyzer-*-$(VERSION) gs://flow-cli
+	gsutil -m cp cadence-lint-*-$(VERSION) gs://flow-cli
 
 .PHONY: clean
 clean:
-	rm -f cadence-analyzer*
+	rm -f cadence-lint*
 
 .PHONY: generate
 generate:
