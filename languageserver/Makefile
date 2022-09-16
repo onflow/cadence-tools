@@ -48,3 +48,12 @@ e2e-test:
 .PHONY: wasm
 wasm:
 	GOARCH=wasm GOOS=js go build -o languageserver.wasm  ./cmd/languageserver
+
+.PHONY: check-headers
+check-headers:
+	@../check-headers.sh
+
+.PHONY: check-tidy
+check-tidy: generate
+	go mod tidy
+	git diff --exit-code
