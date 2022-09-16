@@ -21,27 +21,27 @@ package analyzers_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/tools/analysis"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence-lint/analyzers"
 )
 
-func TestDeprecatedKeyFunctionsAnalyzer(t *testing.T) {
+func TestReferenceOperatorAnalyzer(t *testing.T) {
 
 	t.Parallel()
 
 	diagnostics := testAnalyzers(t,
 		`
           pub contract Test {
-              pub fun test(account: AuthAccount) {
-                  account.addPublicKey([])
-                  account.removePublicKey(0)
+              pub fun test() {
+                  let ref = &1 as! &Int
               }
           }
         `,
-		analyzers.DeprecatedKeyFunctionsAnalyzer,
+		analyzers.ReferenceOperatorAnalyzer,
 	)
 
 	require.Equal(
@@ -49,23 +49,13 @@ func TestDeprecatedKeyFunctionsAnalyzer(t *testing.T) {
 		[]analysis.Diagnostic{
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 108, Line: 4, Column: 26},
-					EndPos:   ast.Position{Offset: 119, Line: 4, Column: 37},
+					StartPos: ast.Position{Offset: 90, Line: 4, Column: 28},
+					EndPos:   ast.Position{Offset: 100, Line: 4, Column: 38},
 				},
 				Location:         testLocation,
-				Category:         "update recommended",
-				Message:          "deprecated function 'addPublicKey' will get removed",
-				SecondaryMessage: "replace with 'keys.add'",
-			},
-			{
-				Range: ast.Range{
-					StartPos: ast.Position{Offset: 151, Line: 5, Column: 26},
-					EndPos:   ast.Position{Offset: 165, Line: 5, Column: 40},
-				},
-				Location:         testLocation,
-				Category:         "update recommended",
-				Message:          "deprecated function 'removePublicKey' will get removed",
-				SecondaryMessage: "replace with 'keys.revoke'",
+				Category:         analyzers.UpdateCategory,
+				Message:          "incorrect reference operator used",
+				SecondaryMessage: "use the 'as' operator",
 			},
 		},
 		diagnostics,

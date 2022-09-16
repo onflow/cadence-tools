@@ -25,6 +25,13 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
+const (
+	ReplacementCategory     string = "replacement-hint"
+	RemovalCategory         string = "removal-hint"
+	UpdateCategory          string = "update recommended"
+	UnnecessaryCastCategory string = "unnecessary-cast-hint"
+)
+
 var Analyzers = map[string]*analysis.Analyzer{}
 
 var analyzerNamePattern = regexp.MustCompile(`\w+`)
