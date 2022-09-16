@@ -1,0 +1,6 @@
+.DS_Store
+
+# IDE related files
+.idea
+.vscode
+git
