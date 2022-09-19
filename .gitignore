@@ -4,3 +4,10 @@
 .idea
 .vscode
 git
+
+# Language server artifacts
+/languageserver/languageserver
+languageserver/test/languageserver
+
+# Since there are tools that uses node
+node_modules
