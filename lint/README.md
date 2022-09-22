@@ -1,6 +1,6 @@
 # Cadence-lint
 
-A tool to lint Cadence programs.
+The linter for Cadence. Find programming errors, bugs, stylistic errors and suspicious constructs.
 
 ## How to Build
 
