@@ -45,6 +45,8 @@ import (
 	"github.com/onflow/cadence-lint/analyzers"
 )
 
+const loadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
+
 var errorPrettyPrinter = pretty.NewErrorPrettyPrinter(os.Stdout, true)
 
 func printErr(err error, location common.Location, codes map[common.Location]string) {
@@ -169,7 +171,7 @@ func analyzeAccount(address string, networkName string, analyzers []*analysis.An
 	}
 
 	analysisConfig := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
+		loadMode,
 		codes,
 		contractNames,
 		func(address common.Address) (map[string]string, error) {
@@ -220,7 +222,7 @@ func analyzeTransaction(transactionID string, networkName string, analyzers []*a
 	codes[transactionLocation] = string(transaction.Script)
 
 	analysisConfig := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
+		loadMode,
 		codes,
 		contractNames,
 		func(address common.Address) (map[string]string, error) {
@@ -273,7 +275,7 @@ func analyzeCSV(path string, analyzers []*analysis.Analyzer) {
 
 	locations, codes, contractNames := readCSV(csvFile)
 	analysisConfig := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
+		loadMode,
 		codes,
 		contractNames,
 		nil,
@@ -290,7 +292,7 @@ func analyzeDirectory(directory string, analyzers []*analysis.Analyzer) {
 
 	locations, codes, contractNames := readDirectoryEntries(directory, entries)
 	analysisConfig := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
+		loadMode,
 		codes,
 		contractNames,
 		nil,
