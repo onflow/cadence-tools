@@ -49,7 +49,7 @@ import (
 	"github.com/onflow/cadence/languageserver/jsonrpc2"
 	"github.com/onflow/cadence/languageserver/protocol"
 
-	linter "github.com/onflow/cadence-lint/analyzers"
+	linter "github.com/onflow/cadence-tools/lint/analyzers"
 )
 
 // Document represents an open document on the client. It contains all cached
@@ -166,7 +166,7 @@ type InitializationOptionsHandler func(initializationOptions any) error
 
 type Server struct {
 	protocolServer       *protocol.Server
-	checkers             map[common.LocationID]*sema.Checker
+	checkers             map[common.Location]*sema.Checker
 	documents            map[protocol.DocumentURI]Document
 	memberResolvers      map[protocol.DocumentURI]map[string]sema.MemberResolver
 	ranges               map[protocol.DocumentURI]map[string]sema.Range
@@ -282,7 +282,7 @@ const ParseEntryPointArgumentsCommand = "cadence.server.parseEntryPointArguments
 
 func NewServer() (*Server, error) {
 	server := &Server{
-		checkers:             make(map[common.LocationID]*sema.Checker),
+		checkers:             make(map[common.Location]*sema.Checker),
 		documents:            make(map[protocol.DocumentURI]Document),
 		memberResolvers:      make(map[protocol.DocumentURI]map[string]sema.MemberResolver),
 		ranges:               make(map[protocol.DocumentURI]map[string]sema.Range),
@@ -329,7 +329,7 @@ func (s *Server) Stop() error {
 
 func (s *Server) checkerForDocument(uri protocol.DocumentURI) *sema.Checker {
 	location := uriToLocation(uri)
-	return s.checkers[location.ID()]
+	return s.checkers[location]
 }
 
 func (s *Server) Initialize(
@@ -702,7 +702,7 @@ func (s *Server) Definition(
 }
 
 func (s *Server) SignatureHelp(
-	conn protocol.Conn,
+	_ protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.SignatureHelp, error) {
 
@@ -1192,7 +1192,7 @@ var containerCompletionItems = []*protocol.CompletionItem{
 // Completion is called to compute completion items at a given cursor position.
 //
 func (s *Server) Completion(
-	conn protocol.Conn,
+	_ protocol.Conn,
 	params *protocol.CompletionParams,
 ) (
 	items []*protocol.CompletionItem,
@@ -1808,7 +1808,7 @@ func (s *Server) getDiagnostics(
 	location := uriToLocation(uri)
 
 	if program == nil {
-		delete(s.checkers, location.ID())
+		delete(s.checkers, location)
 		return
 	}
 
@@ -1842,7 +1842,7 @@ func (s *Server) getDiagnostics(
 		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
 	})
 
-	s.checkers[location.ID()] = checker
+	s.checkers[location] = checker
 
 	if checkError != nil {
 		if parentErr, ok := checkError.(errors.ParentError); ok {
@@ -1868,7 +1868,7 @@ func (s *Server) getDiagnostics(
 		Program:     program,
 		Elaboration: checker.Elaboration,
 		Location:    checker.Location,
-		Code:        text,
+		Code:        []byte(text),
 	}
 
 	var reportLock sync.Mutex
@@ -1952,7 +1952,7 @@ func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Pr
 	defer sentry.RecoverWithContext(ctx)
 
 	start := time.Now()
-	program, err := parser.ParseProgram(code, nil)
+	program, err := parser.ParseProgram([]byte(code), nil)
 	elapsed := time.Since(start)
 
 	log(&protocol.LogMessageParams{
@@ -1994,7 +1994,7 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 		return nil, err
 	}
 
-	return parser.ParseProgram(code, nil)
+	return parser.ParseProgram([]byte(code), nil)
 }
 
 func (s *Server) GetDocument(uri protocol.DocumentURI) (doc Document, ok bool) {
@@ -2822,8 +2822,7 @@ func (s *Server) handleImport(
 			}
 		}
 
-		importedLocationID := importedLocation.ID()
-		importedChecker, ok := s.checkers[importedLocationID]
+		importedChecker, ok := s.checkers[importedLocation]
 		if !ok {
 			importedProgram, err := s.resolveImport(importedLocation)
 			if err != nil {
@@ -2839,7 +2838,7 @@ func (s *Server) handleImport(
 			if err != nil {
 				return nil, err
 			}
-			s.checkers[importedLocationID] = importedChecker
+			s.checkers[importedLocation] = importedChecker
 			err = importedChecker.Check()
 			if err != nil {
 				return nil, err

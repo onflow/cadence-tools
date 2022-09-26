@@ -37,7 +37,7 @@ import (
 )
 
 func buildEntrypoint(t *testing.T, code string) entryPointInfo {
-	program, err := parser.ParseProgram(code, nil)
+	program, err := parser.ParseProgram([]byte(code), nil)
 	require.NoError(t, err)
 
 	location := common.StringLocation("foo")
