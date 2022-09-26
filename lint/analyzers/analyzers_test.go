@@ -33,7 +33,7 @@ var testLocationID = testLocation.ID()
 func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
 
 	config := analysis.NewSimpleConfig(
-		analysis.NeedTypes,
+		analysis.NeedTypes|analysis.NeedExtendedElaboration,
 		map[common.Location]string{
 			testLocation: code,
 		},
