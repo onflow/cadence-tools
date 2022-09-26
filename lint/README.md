@@ -16,7 +16,7 @@ This requires you have the [Flow CLI](https://docs.onflow.org/flow-cli/) install
 For example:
 
 ```shell
-./cadence-lint -network mainnet -address 0x1654653399040a61
+./lint -network mainnet -address 0x1654653399040a61
 ```
 
 ### Analyzing a transaction
@@ -27,7 +27,7 @@ This requires you have the [Flow CLI](https://docs.onflow.org/flow-cli/) install
 For example:
 
 ```shell
-./cadence-lint -network mainnet -transaction 44fd8475eeded90d74e7594b10cf456b0866c78221e7f230fcfd4ba1155c542f
+./lint -network mainnet -transaction 44fd8475eeded90d74e7594b10cf456b0866c78221e7f230fcfd4ba1155c542f
 ```
 
 ### Only running some analyzers
@@ -37,13 +37,13 @@ By default, all available analyzers are run.
 To list all available analyzers, run:
 
 ```shell
-./cadence-lint -help
+./lint -help
 ```
 
 For example, to only run the `reference-to-optional` and the `external-mutation` analyzers, run:
 
 ```shell
-./cadence-lint -network mainnet -address 0x1654653399040a61 \
+./lint -network mainnet -address 0x1654653399040a61 \
     -analyze reference-to-optional \
     -analyze external-mutation
 ```
@@ -55,7 +55,7 @@ To analyze all contracts in a directory, specify the path.
 For example:
 
 ```bash
-./cadence-lint -directory contracts
+./lint -directory contracts
 ```
 
 The files must be named with the `.cdc` extension and by their location ID of the program:
@@ -76,7 +76,7 @@ To analyze all contracts in a CSV file, specify the path to the file.
 For example:
 
 ```shell
-./cadence-lint -csv contracts.csv
+./lint -csv contracts.csv
 ```
 
 The CSV file must be in the following format:
