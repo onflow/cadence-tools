@@ -1,4 +1,4 @@
-module github.com/onflow/cadence/languageserver
+module github.com/onflow/cadence-tools/languageserver
 
 go 1.18
 
