@@ -30,7 +30,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/parser"
 
-	"github.com/onflow/cadence/tools/docgen"
+	"github.com/onflow/cadence-tools/docgen"
 )
 
 // This is a convenient method to generate the doc files given a cadence file.

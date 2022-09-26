@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-lint/analyzers"
+	"github.com/onflow/cadence-tools/lint/analyzers"
 )
 
 func TestCheckNumberConversionReplacementHint(t *testing.T) {

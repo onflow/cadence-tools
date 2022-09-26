@@ -1,4 +1,4 @@
-module github.com/onflow/cadence-lint
+module github.com/onflow/cadence-tools/lint
 
 go 1.19
 

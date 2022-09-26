@@ -27,7 +27,7 @@ import (
 	"runtime/debug"
 	"syscall/js"
 
-	"github.com/onflow/cadence/tools/docgen"
+	"github.com/onflow/cadence-tools/docgen"
 )
 
 const globalFunctionNamePrefix = "CADENCE_DOCGEN"

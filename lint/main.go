@@ -42,7 +42,7 @@ import (
 	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/tools/analysis"
 
-	"github.com/onflow/cadence-lint/analyzers"
+	"github.com/onflow/cadence-tools/lint/analyzers"
 )
 
 const loadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration

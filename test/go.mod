@@ -1,4 +1,4 @@
-module github.com/onflow/cadence-test
+module github.com/onflow/cadence-tools/test
 
 go 1.18
 

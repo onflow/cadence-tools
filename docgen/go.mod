@@ -1,4 +1,4 @@
-module github.com/onflow/cadence/tools/docgen
+module github.com/onflow/cadence-tools/docgen
 
 go 1.18
 

@@ -25,7 +25,7 @@ import (
 
 	"io/ioutil"
 
-	"github.com/onflow/cadence/tools/docgen"
+	"github.com/onflow/cadence-tools/docgen"
 )
 
 func main() {

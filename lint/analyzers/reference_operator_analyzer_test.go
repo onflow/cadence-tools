@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/tools/analysis"
 
-	"github.com/onflow/cadence-lint/analyzers"
+	"github.com/onflow/cadence-tools/lint/analyzers"
 )
 
 func TestReferenceOperatorAnalyzer(t *testing.T) {

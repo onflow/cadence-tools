@@ -32,7 +32,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/parser"
 
-	"github.com/onflow/cadence/tools/docgen/templates"
+	"github.com/onflow/cadence-tools/docgen/templates"
 )
 
 const nameSeparator = "_"
