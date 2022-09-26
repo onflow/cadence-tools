@@ -64,17 +64,14 @@ type Result struct {
 
 // ImportResolver is used to resolve and get the source code for imports.
 // Must be provided by the user of the TestRunner.
-//
 type ImportResolver func(location common.Location) (string, error)
 
 // FileResolver is used to resolve and get local files.
 // Returns the content of the file as a string.
 // Must be provided by the user of the TestRunner.
-//
 type FileResolver func(path string) (string, error)
 
 // TestRunner runs tests.
-//
 type TestRunner struct {
 
 	// importResolver is used to resolve imports of the *test script*.
@@ -107,7 +104,6 @@ func (r *TestRunner) WithFileResolver(fileResolver FileResolver) *TestRunner {
 }
 
 // RunTest runs a single test in the provided test script.
-//
 func (r *TestRunner) RunTest(script string, funcName string) (result *Result, err error) {
 	defer func() {
 		recoverPanics(func(internalErr error) {
@@ -138,7 +134,6 @@ func (r *TestRunner) RunTest(script string, funcName string) (result *Result, er
 }
 
 // RunTests runs all the tests in the provided test script.
-//
 func (r *TestRunner) RunTests(script string) (results Results, err error) {
 	defer func() {
 		recoverPanics(func(internalErr error) {
@@ -412,10 +407,9 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 
 // newScriptEnvironment creates an environment for test scripts to run.
 // Leverages the functionality of FVM.
-//
-func newScriptEnvironment() *fvm.ScriptEnv {
+func newScriptEnvironment() fvm.Environment {
 	vm := fvm.NewVirtualMachine(runtime.NewInterpreterRuntime(runtime.Config{}))
-	ctx := fvm.NewContext(zerolog.Nop())
+	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
 	emptyPrograms := programs.NewEmptyPrograms()
 
 	view := testutil.RootBootstrappedLedger(vm, ctx)
@@ -469,7 +463,6 @@ func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runt
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.
-//
 func PrettyPrintResults(results Results) string {
 	var sb strings.Builder
 	sb.WriteString("Test results:\n")
