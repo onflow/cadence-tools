@@ -56,7 +56,7 @@ func suggestIntegerLiteralConversionReplacement(
 
 		var hintExpression ast.Expression = ast.NewFixedPointExpression(
 			nil,
-			"",
+			nil,
 			negative,
 			common.NewBigIntFromAbsoluteValue(nil, argument.Value),
 			common.NewBigInt(nil),
