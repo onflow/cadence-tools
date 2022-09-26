@@ -28,7 +28,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/parser2"
+	"github.com/onflow/cadence/runtime/parser"
+
 	"github.com/onflow/cadence/tools/docgen"
 )
 
@@ -101,7 +102,7 @@ func TestDocGenErrors(t *testing.T) {
 		_, err := docGen.GenerateInMemory(code)
 
 		require.Error(t, err)
-		assert.IsType(t, err, parser2.Error{})
+		assert.IsType(t, err, parser.Error{})
 	})
 
 	t.Run("invalid output path", func(t *testing.T) {

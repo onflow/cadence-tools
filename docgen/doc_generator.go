@@ -30,7 +30,8 @@ import (
 
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/parser2"
+	"github.com/onflow/cadence/runtime/parser"
+
 	"github.com/onflow/cadence/tools/docgen/templates"
 )
 
@@ -139,7 +140,7 @@ func (gen *DocGenerator) Generate(source string, outputDir string) error {
 	gen.outputDir = outputDir
 	gen.typeNames = make([]string, 0)
 
-	program, err := parser2.ParseProgram(source)
+	program, err := parser.ParseProgram([]byte(source), nil)
 	if err != nil {
 		return err
 	}
@@ -151,7 +152,7 @@ func (gen *DocGenerator) GenerateInMemory(source string) (InMemoryFiles, error) 
 	gen.files = InMemoryFiles{}
 	gen.typeNames = make([]string, 0)
 
-	program, err := parser2.ParseProgram(source)
+	program, err := parser.ParseProgram([]byte(source), nil)
 	if err != nil {
 		return nil, err
 	}
