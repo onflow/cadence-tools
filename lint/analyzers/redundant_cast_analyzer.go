@@ -32,7 +32,7 @@ type CheckCastVisitor struct {
 	targetType       sema.Type
 }
 
-var _ ast.ExpressionVisitor = &CheckCastVisitor{}
+var _ ast.ExpressionVisitor[bool] = &CheckCastVisitor{}
 
 func (d *CheckCastVisitor) IsRedundantCast(expr ast.Expression, exprInferredType, targetType sema.Type) bool {
 	prevInferredType := d.exprInferredType
@@ -46,25 +46,24 @@ func (d *CheckCastVisitor) IsRedundantCast(expr ast.Expression, exprInferredType
 	d.exprInferredType = exprInferredType
 	d.targetType = targetType
 
-	result := expr.AcceptExp(d)
-	return result.(bool)
+	return ast.AcceptExpression[bool](expr, d)
 }
 
-func (d *CheckCastVisitor) VisitBoolExpression(_ *ast.BoolExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitBoolExpression(_ *ast.BoolExpression) bool {
 	return d.isTypeRedundant(sema.BoolType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitNilExpression(_ *ast.NilExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitNilExpression(_ *ast.NilExpression) bool {
 	return d.isTypeRedundant(sema.NilType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitIntegerExpression(_ *ast.IntegerExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitIntegerExpression(_ *ast.IntegerExpression) bool {
 	// For integer expressions, default inferred type is `Int`.
 	// So, if the target type is not `Int`, then the cast is not redundant.
 	return d.isTypeRedundant(sema.IntType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitFixedPointExpression(expr *ast.FixedPointExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitFixedPointExpression(expr *ast.FixedPointExpression) bool {
 	if expr.Negative {
 		// Default inferred type for fixed-point expressions with sign is `Fix64Type`.
 		return d.isTypeRedundant(sema.Fix64Type, d.targetType)
@@ -74,7 +73,7 @@ func (d *CheckCastVisitor) VisitFixedPointExpression(expr *ast.FixedPointExpress
 	return d.isTypeRedundant(sema.UFix64Type, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitArrayExpression(expr *ast.ArrayExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitArrayExpression(expr *ast.ArrayExpression) bool {
 	// If the target type is `ConstantSizedType`, then it is not redundant.
 	// Because array literals are always inferred to be `VariableSizedType`,
 	// unless specified.
@@ -103,7 +102,7 @@ func (d *CheckCastVisitor) VisitArrayExpression(expr *ast.ArrayExpression) ast.R
 	return true
 }
 
-func (d *CheckCastVisitor) VisitDictionaryExpression(expr *ast.DictionaryExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitDictionaryExpression(expr *ast.DictionaryExpression) bool {
 	targetDictionaryType, ok := d.targetType.(*sema.DictionaryType)
 	if !ok {
 		return false
@@ -137,68 +136,68 @@ func (d *CheckCastVisitor) VisitDictionaryExpression(expr *ast.DictionaryExpress
 	return true
 }
 
-func (d *CheckCastVisitor) VisitIdentifierExpression(_ *ast.IdentifierExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitIdentifierExpression(_ *ast.IdentifierExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitInvocationExpression(_ *ast.InvocationExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitInvocationExpression(_ *ast.InvocationExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitMemberExpression(_ *ast.MemberExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitMemberExpression(_ *ast.MemberExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitIndexExpression(_ *ast.IndexExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitIndexExpression(_ *ast.IndexExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitConditionalExpression(conditionalExpr *ast.ConditionalExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitConditionalExpression(conditionalExpr *ast.ConditionalExpression) bool {
 	return d.IsRedundantCast(conditionalExpr.Then, d.exprInferredType, d.targetType) &&
 		d.IsRedundantCast(conditionalExpr.Else, d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitUnaryExpression(_ *ast.UnaryExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitUnaryExpression(_ *ast.UnaryExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitBinaryExpression(_ *ast.BinaryExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitBinaryExpression(_ *ast.BinaryExpression) bool {
 	// Binary expressions are not straight-forward to check.
 	// Hence skip checking redundant casts for now.
 	return false
 }
 
-func (d *CheckCastVisitor) VisitFunctionExpression(_ *ast.FunctionExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitFunctionExpression(_ *ast.FunctionExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitStringExpression(_ *ast.StringExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitStringExpression(_ *ast.StringExpression) bool {
 	return d.isTypeRedundant(sema.StringType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitCastingExpression(_ *ast.CastingExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitCastingExpression(_ *ast.CastingExpression) bool {
 	// This is already covered under Case-I: where expected type is same as casted type.
 	// So skip checking it here to avid duplicate errors.
 	return false
 }
 
-func (d *CheckCastVisitor) VisitCreateExpression(_ *ast.CreateExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitCreateExpression(_ *ast.CreateExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitDestroyExpression(_ *ast.DestroyExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitDestroyExpression(_ *ast.DestroyExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitReferenceExpression(_ *ast.ReferenceExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitReferenceExpression(_ *ast.ReferenceExpression) bool {
 	return false
 }
 
-func (d *CheckCastVisitor) VisitForceExpression(_ *ast.ForceExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitForceExpression(_ *ast.ForceExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
-func (d *CheckCastVisitor) VisitPathExpression(_ *ast.PathExpression) ast.Repr {
+func (d *CheckCastVisitor) VisitPathExpression(_ *ast.PathExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
