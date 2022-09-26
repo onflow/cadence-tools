@@ -309,6 +309,11 @@ func TestImportContract(t *testing.T) {
 	t.Run("nested imports", func(t *testing.T) {
 		t.Parallel()
 
+		testLocation := common.AddressLocation{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Name:    "BarContract",
+		}
+
 		code := `
             import FooContract from "./FooContract"
 
@@ -335,12 +340,12 @@ func TestImportContract(t *testing.T) {
 					return fooContract, nil
 				}
 			case common.AddressLocation:
-				if location.ID() == "A.0000000000000001.BarContract" {
+				if location == testLocation {
 					return barContract, nil
 				}
 			}
 
-			return "", fmt.Errorf("unsupported import %s", location.ID())
+			return "", fmt.Errorf("unsupported import %s", location)
 		}
 
 		runner := NewTestRunner().WithImportResolver(importResolver)
