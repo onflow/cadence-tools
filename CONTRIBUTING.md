@@ -1,6 +1,6 @@
-# Contributing to Cadence-lint
+# Contributing to Cadence Tools
 
-The following is a set of guidelines for contributing to Cadence-lint.
+The following is a set of guidelines for contributing to Cadence Tools.
 These are mostly guidelines, not rules.
 Use your best judgment, and feel free to propose changes to this document in a pull request.
 
@@ -54,7 +54,7 @@ Provide more context by answering these questions:
 
 Include details about your configuration and environment:
 
-- **What is the version of the Cadence-lint you're using**?
+- **What is the version of the Cadence Tools you're using**?
 - **What's the name and version of the Operating System you're using**?
 
 ### Suggesting Enhancements
@@ -75,16 +75,16 @@ Create an issue and provide the following information:
   Include copy/pasteable snippets which you use in those examples,
   as [Markdown code blocks](https://help.github.com/articles/markdown-basics/#multiple-lines).
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why.
-- **Explain why this enhancement would be useful** to Cadence-lint users.
+- **Explain why this enhancement would be useful** to Cadence Tools users.
 
 ### Your First Code Contribution
 
-Unsure where to begin contributing to Cadence-lint?
+Unsure where to begin contributing to Cadence Tools?
 You can start by looking through these "Good first issue" and "Help wanted" issues:
 
-- [Good first issues](https://github.com/onflow/cadence-lint/labels/good%20first%20issue):
+- [Good first issues](https://github.com/onflow/cadence-tools/labels/good%20first%20issue):
   issues which should only require a few lines of code, and a test or two.
-- [Help wanted issues](https://github.com/onflow/cadence-lint/labels/help%20wanted):
+- [Help wanted issues](https://github.com/onflow/cadence-tools/labels/help%20wanted):
   issues which should be a bit more involved than "Good first issue" issues.
 
 Both issue lists are sorted by total number of comments.
@@ -92,7 +92,7 @@ While not perfect, number of comments is a reasonable proxy for impact a given c
 
 #### Dependencies
 
-You need some software installed to build and test Cadence-lint:
+You need some software installed to build and test Cadence Tools:
 
 - [Go](https://golang.org/doc/install)
 
@@ -102,8 +102,8 @@ The process described here has several goals:
 
 - Maintain code quality
 - Fix problems that are important to users
-- Engage the community in working toward the best possible Cadence-lint UX
-- Enable a sustainable system for the Cadence-lint's maintainers to review contributions
+- Engage the community in working toward the best possible Cadence Tools UX
+- Enable a sustainable system for the Cadence Tools's maintainers to review contributions
 
 Please follow the [styleguides](#styleguides) to have your contribution considered by the maintainers.
 Reviewer(s) may ask you to complete additional design work, tests,
@@ -150,4 +150,4 @@ We try to follow the coding guidelines from the Go community.
 
 ## Additional Notes
 
-Thank you for your interest in contributing to Cadence-lint!
+Thank you for your interest in contributing to Cadence Tools!
