@@ -19,10 +19,11 @@
 package conversion
 
 import (
-	"github.com/onflow/cadence/languageserver/protocol"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
+
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 // ASTToProtocolPosition converts an AST position to a LSP position

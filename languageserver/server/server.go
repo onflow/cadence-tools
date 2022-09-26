@@ -45,9 +45,9 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 	"golang.org/x/exp/maps"
 
-	"github.com/onflow/cadence/languageserver/conversion"
-	"github.com/onflow/cadence/languageserver/jsonrpc2"
-	"github.com/onflow/cadence/languageserver/protocol"
+	"github.com/onflow/cadence-tools/languageserver/conversion"
+	"github.com/onflow/cadence-tools/languageserver/jsonrpc2"
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 
 	linter "github.com/onflow/cadence-tools/lint/analyzers"
 )

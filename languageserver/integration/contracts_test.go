@@ -23,7 +23,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/cadence/languageserver/protocol"
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 
 	"github.com/stretchr/testify/assert"
 

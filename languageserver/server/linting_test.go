@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/languageserver/protocol"
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 func checkProgram(t *testing.T, text string) []protocol.Diagnostic {

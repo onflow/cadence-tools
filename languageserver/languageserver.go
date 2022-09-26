@@ -27,8 +27,8 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sourcegraph/jsonrpc2"
 
-	"github.com/onflow/cadence/languageserver/integration"
-	"github.com/onflow/cadence/languageserver/server"
+	"github.com/onflow/cadence-tools/languageserver/integration"
+	"github.com/onflow/cadence-tools/languageserver/server"
 )
 
 func RunWithStdio(enableFlowClient bool) {

@@ -24,7 +24,7 @@ package main
 import (
 	"flag"
 
-	"github.com/onflow/cadence/languageserver"
+	"github.com/onflow/cadence-tools/languageserver"
 )
 
 var enableFlowClientFlag = flag.Bool("enableFlowClient", true, "enable Flow client functionality")

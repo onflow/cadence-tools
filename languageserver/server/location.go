@@ -24,7 +24,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/cadence/languageserver/protocol"
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 func isPathLocation(location common.Location) bool {

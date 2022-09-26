@@ -19,7 +19,7 @@
 package protocol
 
 import (
-	"github.com/onflow/cadence/languageserver/jsonrpc2"
+	"github.com/onflow/cadence-tools/languageserver/jsonrpc2"
 )
 
 // Server implements a layer between the JSONPRC2 server (jsonrpc2 package) and

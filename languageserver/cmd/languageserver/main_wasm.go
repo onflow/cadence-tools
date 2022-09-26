@@ -30,7 +30,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/cadence/languageserver/server"
+	"github.com/onflow/cadence-tools/languageserver/server"
 )
 
 const globalFunctionNamePrefix = "CADENCE_LANGUAGE_SERVER"

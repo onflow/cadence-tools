@@ -24,10 +24,11 @@ import (
 
 	"github.com/onflow/cadence/runtime/sema"
 
-	"github.com/onflow/cadence/languageserver/protocol"
-	"github.com/onflow/cadence/languageserver/server"
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/spf13/afero"
+
+	"github.com/onflow/cadence-tools/languageserver/protocol"
+	"github.com/onflow/cadence-tools/languageserver/server"
 )
 
 func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegration, error) {

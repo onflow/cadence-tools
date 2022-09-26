@@ -23,9 +23,10 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/onflow/cadence/languageserver/server"
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/cadence-tools/languageserver/server"
 )
 
 const (

@@ -27,8 +27,8 @@ import (
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 
-	"github.com/onflow/cadence/languageserver/conversion"
-	"github.com/onflow/cadence/languageserver/protocol"
+	"github.com/onflow/cadence-tools/languageserver/conversion"
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 type contractKind uint8
