@@ -47,7 +47,21 @@ import (
 
 const loadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
 
-var errorPrettyPrinter = pretty.NewErrorPrettyPrinter(os.Stdout, true)
+var csvPathFlag = flag.String("csv", "", "analyze all programs in the given CSV file")
+var directoryPathFlag = flag.String("directory", "", "analyze all programs in the given directory")
+var networkFlag = flag.String("network", "", "name of network")
+var addressFlag = flag.String("address", "", "analyze contracts in the given account")
+var transactionFlag = flag.String("transaction", "", "analyze transaction with given ID")
+var loadOnlyFlag = flag.Bool("load-only", false, "only load (parse and check) programs")
+var silentFlag = flag.Bool("silent", false, "only show parsing/checking success/failure")
+var colorFlag = flag.Bool("color", true, "format using colors")
+var analyzersFlag stringSliceFlag
+
+func init() {
+	flag.Var(&analyzersFlag, "analyze", "enable analyzer")
+}
+
+var errorPrettyPrinter pretty.ErrorPrettyPrinter
 
 func printErr(err error, location common.Location, codes map[common.Location][]byte) {
 	printErr := errorPrettyPrinter.PrettyPrintError(err, location, codes)
@@ -55,16 +69,8 @@ func printErr(err error, location common.Location, codes map[common.Location][]b
 		panic(printErr)
 	}
 }
-func main() {
-	var csvPathFlag = flag.String("csv", "", "analyze all programs in the given CSV file")
-	var directoryPathFlag = flag.String("directory", "", "analyze all programs in the given directory")
-	var networkFlag = flag.String("network", "", "name of network")
-	var addressFlag = flag.String("address", "", "analyze contracts in the given account")
-	var transactionFlag = flag.String("transaction", "", "analyze transaction with given ID")
-	var loadOnlyFlag = flag.Bool("load-only", false, "only load (parse and check) programs")
-	var analyzersFlag stringSliceFlag
-	flag.Var(&analyzersFlag, "analyze", "enable analyzer")
 
+func main() {
 	defaultUsage := flag.Usage
 	flag.Usage = func() {
 		defaultUsage()
@@ -89,6 +95,8 @@ func main() {
 	}
 
 	flag.Parse()
+
+	errorPrettyPrinter = pretty.NewErrorPrettyPrinter(os.Stdout, *colorFlag)
 
 	var enabledAnalyzers []*analysis.Analyzer
 
@@ -349,12 +357,18 @@ func analyze(
 
 	log.Println("Loading ...")
 
+	silent := *silentFlag
+
 	for _, location := range locations {
 		log.Printf("Loading %s", location.Description())
 
 		err := programs.Load(config, location)
 		if err != nil {
-			printErr(err, location, codes)
+			if silent {
+				log.Printf("Failed: %s", location.Description())
+			} else {
+				printErr(err, location, codes)
+			}
 		}
 	}
 
