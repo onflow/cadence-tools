@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers_test
+package lint_test
 
 import (
 	"testing"
@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-tools/lint/analyzers"
+	"github.com/onflow/cadence-tools/lint"
 )
 
 func TestDeprecatedKeyFunctionsAnalyzer(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDeprecatedKeyFunctionsAnalyzer(t *testing.T) {
               }
           }
         `,
-		analyzers.DeprecatedKeyFunctionsAnalyzer,
+		lint.DeprecatedKeyFunctionsAnalyzer,
 	)
 
 	require.Equal(
@@ -53,7 +53,7 @@ func TestDeprecatedKeyFunctionsAnalyzer(t *testing.T) {
 					EndPos:   ast.Position{Offset: 119, Line: 4, Column: 37},
 				},
 				Location:         testLocation,
-				Category:         analyzers.UpdateCategory,
+				Category:         lint.UpdateCategory,
 				Message:          "deprecated function 'addPublicKey' will get removed",
 				SecondaryMessage: "replace with 'keys.add'",
 			},
@@ -63,7 +63,7 @@ func TestDeprecatedKeyFunctionsAnalyzer(t *testing.T) {
 					EndPos:   ast.Position{Offset: 165, Line: 5, Column: 40},
 				},
 				Location:         testLocation,
-				Category:         analyzers.UpdateCategory,
+				Category:         lint.UpdateCategory,
 				Message:          "deprecated function 'removePublicKey' will get removed",
 				SecondaryMessage: "replace with 'keys.revoke'",
 			},

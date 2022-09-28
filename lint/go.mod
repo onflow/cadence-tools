@@ -142,3 +142,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.27.1-0.20220927004400-9eba34e7e0d6

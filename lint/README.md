@@ -5,7 +5,7 @@ The linter for Cadence. Find programming errors, bugs, stylistic errors and susp
 ## How to Build
 
 ```shell
-go build -o .
+go build ./cmd/lint
 ```
 
 ### Analyzing contracts of an account

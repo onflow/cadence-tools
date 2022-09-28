@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers_test
+package lint_test
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/tools/analysis"
 
-	"github.com/onflow/cadence-tools/lint/analyzers"
+	"github.com/onflow/cadence-tools/lint"
 )
 
 func TestForceOperatorAnalyzer(t *testing.T) {
@@ -46,7 +46,7 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			analyzers.UnnecessaryForceAnalyzer,
+			lint.UnnecessaryForceAnalyzer,
 		)
 
 		require.Equal(
@@ -58,7 +58,7 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 						EndPos:   ast.Position{Offset: 74, Line: 5, Column: 14},
 					},
 					Location: testLocation,
-					Category: analyzers.RemovalCategory,
+					Category: lint.RemovalCategory,
 					Message:  "unnecessary force operator",
 				},
 			},
@@ -79,7 +79,7 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			analyzers.UnnecessaryForceAnalyzer,
+			lint.UnnecessaryForceAnalyzer,
 		)
 
 		require.Equal(

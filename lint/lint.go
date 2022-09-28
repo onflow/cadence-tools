@@ -16,20 +16,21 @@
  * limitations under the License.
  */
 
-package main
+package lint
 
 import (
 	"encoding/csv"
-	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path"
-	"sort"
 	"strings"
 	"sync"
 
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/pretty"
+	"github.com/onflow/cadence/tools/analysis"
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/onflow/flow-cli/pkg/flowkit/config"
 	"github.com/onflow/flow-cli/pkg/flowkit/gateway"
@@ -37,119 +38,48 @@ import (
 	"github.com/onflow/flow-cli/pkg/flowkit/services"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/spf13/afero"
-
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/pretty"
-	"github.com/onflow/cadence/tools/analysis"
-
-	"github.com/onflow/cadence-tools/lint/analyzers"
 )
 
-const loadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
+const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
 
-var csvPathFlag = flag.String("csv", "", "analyze all programs in the given CSV file")
-var directoryPathFlag = flag.String("directory", "", "analyze all programs in the given directory")
-var networkFlag = flag.String("network", "", "name of network")
-var addressFlag = flag.String("address", "", "analyze contracts in the given account")
-var transactionFlag = flag.String("transaction", "", "analyze transaction with given ID")
-var loadOnlyFlag = flag.Bool("load-only", false, "only load (parse and check) programs")
-var silentFlag = flag.Bool("silent", false, "only show parsing/checking success/failure")
-var colorFlag = flag.Bool("color", true, "format using colors")
-var analyzersFlag stringSliceFlag
-
-func init() {
-	flag.Var(&analyzersFlag, "analyze", "enable analyzer")
+type Config struct {
+	Analyzers  []*analysis.Analyzer
+	Silent     bool
+	UseColor   bool
+	PrintError func(*Linter, error, common.Location)
 }
 
-var errorPrettyPrinter pretty.ErrorPrettyPrinter
+type Linter struct {
+	Config             Config
+	errorPrettyPrinter pretty.ErrorPrettyPrinter
+	Codes              map[common.Location][]byte
+}
 
-func printErr(err error, location common.Location, codes map[common.Location][]byte) {
-	printErr := errorPrettyPrinter.PrettyPrintError(err, location, codes)
+func NewLinter(config Config) *Linter {
+	if config.PrintError == nil {
+		config.PrintError = (*Linter).PrettyPrintError
+	}
+
+	return &Linter{
+		Config:             config,
+		errorPrettyPrinter: pretty.NewErrorPrettyPrinter(os.Stdout, config.UseColor),
+		Codes:              map[common.Location][]byte{},
+	}
+}
+
+func (l *Linter) PrettyPrintError(err error, location common.Location) {
+	printErr := l.errorPrettyPrinter.PrettyPrintError(err, location, l.Codes)
 	if printErr != nil {
 		panic(printErr)
 	}
 }
 
-func main() {
-	defaultUsage := flag.Usage
-	flag.Usage = func() {
-		defaultUsage()
-		_, _ = fmt.Fprintf(os.Stderr, "\nAvailable analyzers:\n")
-
-		names := make([]string, 0, len(analyzers.Analyzers))
-		for name := range analyzers.Analyzers {
-			names = append(names, name)
-		}
-
-		sort.Strings(names)
-
-		for _, name := range names {
-			analyzer := analyzers.Analyzers[name]
-			_, _ = fmt.Fprintf(
-				os.Stderr,
-				"  - %s:\n      %s\n",
-				name,
-				analyzer.Description,
-			)
-		}
-	}
-
-	flag.Parse()
-
-	errorPrettyPrinter = pretty.NewErrorPrettyPrinter(os.Stdout, *colorFlag)
-
-	var enabledAnalyzers []*analysis.Analyzer
-
-	loadOnly := *loadOnlyFlag
-	if !loadOnly {
-		if len(analyzersFlag) > 0 {
-			for _, analyzerName := range analyzersFlag {
-				analyzer, ok := analyzers.Analyzers[analyzerName]
-				if !ok {
-					log.Panic(fmt.Errorf("unknown analyzer: %s", analyzerName))
-				}
-
-				enabledAnalyzers = append(enabledAnalyzers, analyzer)
-			}
-		} else {
-			for _, analyzer := range analyzers.Analyzers {
-				enabledAnalyzers = append(enabledAnalyzers, analyzer)
-			}
-		}
-	}
-
-	cvsPath := *csvPathFlag
-	directoryPath := *directoryPathFlag
-	address := *addressFlag
-	transaction := *transactionFlag
-
-	switch {
-	case cvsPath != "":
-		analyzeCSV(cvsPath, enabledAnalyzers)
-
-	case directoryPath != "":
-		analyzeDirectory(directoryPath, enabledAnalyzers)
-
-	case address != "":
-		network := *networkFlag
-		analyzeAccount(address, network, enabledAnalyzers)
-
-	case transaction != "":
-		network := *networkFlag
-		analyzeTransaction(transaction, network, enabledAnalyzers)
-
-	default:
-		println("Nothing to do. Please provide -address, -transaction, -directory, or -csv. See -help")
-	}
-}
-
-func analyzeAccount(address string, networkName string, analyzers []*analysis.Analyzer) {
-	err, services := flowKitServices(networkName)
+func (l *Linter) AnalyzeAccount(address string, networkName string) {
+	services, err := newFlowKitServices(networkName)
 	if err != nil {
 		panic(err)
 	}
 
-	codes := map[common.Location][]byte{}
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
@@ -179,23 +109,23 @@ func analyzeAccount(address string, networkName string, analyzers []*analysis.An
 	}
 
 	analysisConfig := analysis.NewSimpleConfig(
-		loadMode,
-		codes,
+		LoadMode,
+		l.Codes,
 		contractNames,
 		func(address common.Address) (map[string][]byte, error) {
 			return getContracts(flow.Address(address))
 		},
 	)
-	analyze(analysisConfig, locations, codes, analyzers)
+
+	l.analyze(analysisConfig, locations)
 }
 
-func analyzeTransaction(transactionID string, networkName string, analyzers []*analysis.Analyzer) {
-	err, services := flowKitServices(networkName)
+func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName string) {
+	services, err := newFlowKitServices(networkName)
 	if err != nil {
 		panic(err)
 	}
 
-	codes := map[common.Location][]byte{}
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
@@ -207,32 +137,31 @@ func analyzeTransaction(transactionID string, networkName string, analyzers []*a
 		return account.Contracts, nil
 	}
 
-	flowTransactionID := flow.HexToID(transactionID)
-	transactionLocation := common.TransactionLocation(flowTransactionID)
+	transactionLocation := common.TransactionLocation(transactionID)
 
 	locations := []common.Location{
 		transactionLocation,
 	}
 
-	transaction, _, err := services.Transactions.GetStatus(flowTransactionID, true)
+	transaction, _, err := services.Transactions.GetStatus(transactionID, true)
 	if err != nil {
 		panic(err)
 	}
 
-	codes[transactionLocation] = transaction.Script
+	l.Codes[transactionLocation] = transaction.Script
 
 	analysisConfig := analysis.NewSimpleConfig(
-		loadMode,
-		codes,
+		LoadMode,
+		l.Codes,
 		contractNames,
 		func(address common.Address) (map[string][]byte, error) {
 			return getContracts(flow.Address(address))
 		},
 	)
-	analyze(analysisConfig, locations, codes, analyzers)
+	l.analyze(analysisConfig, locations)
 }
 
-func flowKitServices(networkName string) (error, *services.Services) {
+func newFlowKitServices(networkName string) (*services.Services, error) {
 	loader := &afero.Afero{Fs: afero.NewOsFs()}
 	state, err := flowkit.Load(config.DefaultPaths(), loader)
 	if err != nil {
@@ -251,11 +180,10 @@ func flowKitServices(networkName string) (error, *services.Services) {
 
 	logger := output.NewStdoutLogger(output.ErrorLog)
 
-	services := services.NewServices(grpcGateway, state, logger)
-	return err, services
+	return services.NewServices(grpcGateway, state, logger), nil
 }
 
-func analyzeCSV(path string, analyzers []*analysis.Analyzer) {
+func (l *Linter) AnalyzeCSV(path string) {
 
 	csvFile, err := os.Open(path)
 	if err != nil {
@@ -265,43 +193,40 @@ func analyzeCSV(path string, analyzers []*analysis.Analyzer) {
 		_ = file.Close()
 	}(csvFile)
 
-	locations, codes, contractNames := readCSV(csvFile)
+	locations, contractNames := l.readCSV(csvFile)
 	analysisConfig := analysis.NewSimpleConfig(
-		loadMode,
-		codes,
+		LoadMode,
+		l.Codes,
 		contractNames,
 		nil,
 	)
-	analyze(analysisConfig, locations, codes, analyzers)
+	l.analyze(analysisConfig, locations)
 }
 
-func analyzeDirectory(directory string, analyzers []*analysis.Analyzer) {
+func (l *Linter) AnalyzeDirectory(directory string) {
 
 	entries, err := os.ReadDir(directory)
 	if err != nil {
 		panic(err)
 	}
 
-	locations, codes, contractNames := readDirectoryEntries(directory, entries)
+	locations, contractNames := l.readDirectoryEntries(directory, entries)
 	analysisConfig := analysis.NewSimpleConfig(
-		loadMode,
-		codes,
+		LoadMode,
+		l.Codes,
 		contractNames,
 		nil,
 	)
-	analyze(analysisConfig, locations, codes, analyzers)
+	l.analyze(analysisConfig, locations)
 }
 
-func readDirectoryEntries(
+func (l *Linter) readDirectoryEntries(
 	directory string,
 	entries []os.DirEntry,
 ) (
 	locations []common.Location,
-	codes map[common.Location][]byte,
 	contractNames map[common.Address][]string,
 ) {
-
-	codes = map[common.Location][]byte{}
 	contractNames = map[common.Address][]string{}
 
 	for _, entry := range entries {
@@ -334,7 +259,7 @@ func readDirectoryEntries(
 		}
 
 		locations = append(locations, location)
-		codes[location] = rawCode
+		l.Codes[location] = rawCode
 
 		if addressLocation, ok := location.(common.AddressLocation); ok {
 			contractNames[addressLocation.Address] = append(
@@ -347,27 +272,25 @@ func readDirectoryEntries(
 	return
 }
 
-func analyze(
+func (l *Linter) analyze(
 	config *analysis.Config,
 	locations []common.Location,
-	codes map[common.Location][]byte,
-	analyzers []*analysis.Analyzer,
 ) {
 	programs := make(analysis.Programs, len(locations))
 
 	log.Println("Loading ...")
 
-	silent := *silentFlag
+	printErr := l.Config.PrintError
 
 	for _, location := range locations {
 		log.Printf("Loading %s", location.Description())
 
 		err := programs.Load(config, location)
 		if err != nil {
-			if silent {
+			if l.Config.Silent {
 				log.Printf("Failed: %s", location.Description())
 			} else {
-				printErr(err, location, codes)
+				printErr(l, err, location)
 			}
 		}
 	}
@@ -379,12 +302,13 @@ func analyze(
 		defer reportLock.Unlock()
 
 		printErr(
+			l,
 			diagnosticErr{diagnostic},
 			diagnostic.Location,
-			codes,
 		)
 	}
 
+	analyzers := l.Config.Analyzers
 	if len(analyzers) > 0 {
 		for _, location := range locations {
 			program := programs[location]
@@ -399,16 +323,14 @@ func analyze(
 	}
 }
 
-func readCSV(
+func (l *Linter) readCSV(
 	r io.Reader,
 ) (
 	locations []common.Location,
-	codes map[common.Location][]byte,
 	contractNames map[common.Address][]string,
 ) {
 	reader := csv.NewReader(r)
 
-	codes = map[common.Location][]byte{}
 	contractNames = map[common.Address][]string{}
 
 	var record []string
@@ -439,7 +361,7 @@ func readCSV(
 		code := record[1]
 
 		locations = append(locations, location)
-		codes[location] = []byte(code)
+		l.Codes[location] = []byte(code)
 
 		if addressLocation, ok := location.(common.AddressLocation); ok {
 			contractNames[addressLocation.Address] = append(

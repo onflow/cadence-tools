@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers_test
+package lint_test
 
 import (
 	"testing"
@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-tools/lint/analyzers"
+	"github.com/onflow/cadence-tools/lint"
 )
 
 func TestRedundantCastAnalyzer(t *testing.T) {
@@ -44,7 +44,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			analyzers.RedundantCastAnalyzer,
+			lint.RedundantCastAnalyzer,
 		)
 
 		require.Equal(
@@ -56,7 +56,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 						EndPos:   ast.Position{Offset: 69, Line: 4, Column: 24},
 					},
 					Location: testLocation,
-					Category: analyzers.UnnecessaryCastCategory,
+					Category: lint.UnnecessaryCastCategory,
 					Message:  "cast to `Bool` is redundant",
 				},
 			},
@@ -76,7 +76,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			analyzers.RedundantCastAnalyzer,
+			lint.RedundantCastAnalyzer,
 		)
 
 		require.Equal(
@@ -88,7 +88,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 						EndPos:   ast.Position{Offset: 70, Line: 4, Column: 25},
 					},
 					Location: testLocation,
-					Category: analyzers.UnnecessaryCastCategory,
+					Category: lint.UnnecessaryCastCategory,
 					Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
 				},
 			},
@@ -108,7 +108,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			analyzers.RedundantCastAnalyzer,
+			lint.RedundantCastAnalyzer,
 		)
 
 		require.Equal(
@@ -120,7 +120,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 						EndPos:   ast.Position{Offset: 70, Line: 4, Column: 25},
 					},
 					Location: testLocation,
-					Category: analyzers.UnnecessaryCastCategory,
+					Category: lint.UnnecessaryCastCategory,
 					Message:  "failable cast ('as?') from `Bool` to `Bool` always succeeds",
 				},
 			},

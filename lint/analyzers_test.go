@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers_test
+package lint_test
 
 import (
 	"testing"
@@ -25,6 +25,8 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/tools/analysis"
+
+	"github.com/onflow/cadence-tools/lint"
 )
 
 var testLocation = common.StringLocation("test")
@@ -32,7 +34,7 @@ var testLocation = common.StringLocation("test")
 func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
 
 	config := analysis.NewSimpleConfig(
-		analysis.NeedTypes|analysis.NeedExtendedElaboration,
+		lint.LoadMode,
 		map[common.Location][]byte{
 			testLocation: []byte(code),
 		},
