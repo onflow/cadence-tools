@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers_test
+package lint_test
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/tools/analysis"
 
-	"github.com/onflow/cadence-tools/lint/analyzers"
+	"github.com/onflow/cadence-tools/lint"
 )
 
 func TestReferenceOperatorAnalyzer(t *testing.T) {
@@ -41,7 +41,7 @@ func TestReferenceOperatorAnalyzer(t *testing.T) {
               }
           }
         `,
-		analyzers.ReferenceOperatorAnalyzer,
+		lint.ReferenceOperatorAnalyzer,
 	)
 
 	require.Equal(
@@ -53,7 +53,7 @@ func TestReferenceOperatorAnalyzer(t *testing.T) {
 					EndPos:   ast.Position{Offset: 100, Line: 4, Column: 38},
 				},
 				Location:         testLocation,
-				Category:         analyzers.UpdateCategory,
+				Category:         lint.UpdateCategory,
 				Message:          "incorrect reference operator used",
 				SecondaryMessage: "use the 'as' operator",
 			},

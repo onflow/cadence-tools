@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers_test
+package lint_test
 
 import (
 	"testing"
@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence-tools/lint/analyzers"
+	"github.com/onflow/cadence-tools/lint"
 )
 
 func TestCheckNumberConversionReplacementHint(t *testing.T) {
@@ -46,7 +46,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 					let x = Fix64(1)
 				}
 			}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -58,7 +58,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 65, Line: 4, Column: 20},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "1.0 as Fix64",
 				},
@@ -76,7 +76,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = UFix64(1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -88,7 +88,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 63, Line: 4, Column: 20},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "1.0",
 				},
@@ -106,7 +106,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Fix64(-1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -118,7 +118,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 63, Line: 4, Column: 20},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "-1.0",
 				},
@@ -138,7 +138,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = UFix64(1.2)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -150,7 +150,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 65, Line: 4, Column: 22},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "1.2",
 				},
@@ -168,7 +168,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Fix64(-1.2)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -180,7 +180,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 65, Line: 4, Column: 22},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "-1.2",
 				},
@@ -202,7 +202,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = UInt8(1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -214,7 +214,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 62, Line: 4, Column: 19},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "1 as UInt8",
 				},
@@ -232,7 +232,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int8(1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -244,7 +244,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 61, Line: 4, Column: 18},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "1 as Int8",
 				},
@@ -263,7 +263,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int8(-1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -275,7 +275,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 62, Line: 4, Column: 19},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "-1 as Int8",
 				},
@@ -293,7 +293,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int(1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -305,7 +305,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 60, Line: 4, Column: 17},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "1",
 				},
@@ -323,7 +323,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int(-1)
 			}
 		}`,
-			analyzers.NumberFunctionArgumentAnalyzer,
+			lint.NumberFunctionArgumentAnalyzer,
 		)
 
 		require.Equal(
@@ -335,7 +335,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 						EndPos:   ast.Position{Offset: 61, Line: 4, Column: 18},
 					},
 					Location:         testLocation,
-					Category:         analyzers.ReplacementCategory,
+					Category:         lint.ReplacementCategory,
 					Message:          "consider replacing with:",
 					SecondaryMessage: "-1",
 				},

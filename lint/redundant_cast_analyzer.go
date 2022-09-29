@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers
+package lint
 
 import (
 	"fmt"
@@ -216,8 +216,8 @@ func (d *CheckCastVisitor) isTypeRedundant(exprType, targetType sema.Type) bool 
 
 // isRedundantCast checks whether a simple cast is redundant.
 // Checks for two cases:
-//    - Case I: Contextually expected type is same as the casted type (target type).
-//    - Case II: Expression is self typed, and is same as the casted type (target type).
+//   - Case I: Contextually expected type is same as the casted type (target type).
+//   - Case II: Expression is self typed, and is same as the casted type (target type).
 func isRedundantCast(expr ast.Expression, exprInferredType, targetType, expectedType sema.Type) bool {
 	if expectedType != nil &&
 		!expectedType.IsInvalidType() &&

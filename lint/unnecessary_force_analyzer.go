@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package analyzers
+package lint
 
 import (
 	"github.com/onflow/cadence/runtime/ast"
