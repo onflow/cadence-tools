@@ -49,6 +49,10 @@ func (d *CheckCastVisitor) IsRedundantCast(expr ast.Expression, exprInferredType
 	return ast.AcceptExpression[bool](expr, d)
 }
 
+func (d *CheckCastVisitor) VisitVoidExpression(_ *ast.VoidExpression) bool {
+	return d.isTypeRedundant(sema.VoidType, d.targetType)
+}
+
 func (d *CheckCastVisitor) VisitBoolExpression(_ *ast.BoolExpression) bool {
 	return d.isTypeRedundant(sema.BoolType, d.targetType)
 }

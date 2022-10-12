@@ -91,7 +91,7 @@ func (e *EmulatorBackend) RunScript(code string, args []interpreter.Value) *stdl
 
 	arguments := make([][]byte, 0, len(args))
 	for _, arg := range args {
-		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.ReturnEmptyLocationRange)
+		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
 		if err != nil {
 			return &stdlib.ScriptResult{
 				Error: err,
@@ -123,7 +123,7 @@ func (e *EmulatorBackend) RunScript(code string, args []interpreter.Value) *stdl
 		}
 	}
 
-	value, err := runtime.ImportValue(inter, interpreter.ReturnEmptyLocationRange, result.Value, nil)
+	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, result.Value, nil)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
@@ -185,7 +185,7 @@ func (e *EmulatorBackend) AddTransaction(
 	}
 
 	for _, arg := range args {
-		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.ReturnEmptyLocationRange)
+		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
 		if err != nil {
 			return err
 		}
@@ -325,7 +325,7 @@ func (e *EmulatorBackend) DeployContract(
 	var txArgsBuilder, addArgsBuilder strings.Builder
 
 	for i, arg := range args {
-		cadenceArg, err := runtime.ExportValue(arg, inter, interpreter.ReturnEmptyLocationRange)
+		cadenceArg, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
 		if err != nil {
 			return err
 		}

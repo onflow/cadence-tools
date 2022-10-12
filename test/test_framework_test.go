@@ -273,7 +273,7 @@ func TestImportContract(t *testing.T) {
 		_, err := runner.RunTest(code, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 
 		importedProgramError := &sema.ImportedProgramError{}
 		assert.ErrorAs(t, errs[0], &importedProgramError)
@@ -297,7 +297,7 @@ func TestImportContract(t *testing.T) {
 		_, err := runner.RunTest(code, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 
 		importedProgramError := &sema.ImportedProgramError{}
 		require.ErrorAs(t, errs[0], &importedProgramError)
@@ -1525,7 +1525,7 @@ func TestInterpretMatcher(t *testing.T) {
 		runner := NewTestRunner()
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
-		errs := checker.ExpectCheckerErrors(t, err, 1)
+		errs := checker.RequireCheckerErrors(t, err, 1)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
@@ -1568,7 +1568,7 @@ func TestInterpretMatcher(t *testing.T) {
 		runner := NewTestRunner()
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeParameterTypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -1666,7 +1666,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -1703,7 +1703,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeParameterTypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -1827,7 +1827,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 4)
+		errs := checker.RequireCheckerErrors(t, err, 4)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
@@ -1860,7 +1860,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 3)
+		errs := checker.RequireCheckerErrors(t, err, 3)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
@@ -1955,7 +1955,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		runner := NewTestRunner()
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeParameterTypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -1979,7 +1979,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 2)
+		errs := checker.RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -2004,7 +2004,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 1)
+		errs := checker.RequireCheckerErrors(t, err, 1)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
@@ -2028,7 +2028,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.ExpectCheckerErrors(t, err, 1)
+		errs := checker.RequireCheckerErrors(t, err, 1)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 }

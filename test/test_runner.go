@@ -21,6 +21,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/fvm/environment"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -407,20 +408,20 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 
 // newScriptEnvironment creates an environment for test scripts to run.
 // Leverages the functionality of FVM.
-func newScriptEnvironment() fvm.Environment {
-	vm := fvm.NewVirtualMachine(runtime.NewInterpreterRuntime(runtime.Config{}))
+func newScriptEnvironment() environment.Environment {
+	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
 	emptyPrograms := programs.NewEmptyPrograms()
 
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	v := view.NewChild()
 
-	sth := state.NewStateTransaction(
+	sth := state.NewTransactionState(
 		v,
 		state.DefaultParameters(),
 	)
 
-	return fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, emptyPrograms)
+	return fvm.NewScriptEnv(context.Background(), ctx, sth, emptyPrograms)
 }
 
 func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runtime.Context) (*ast.Program, *sema.Elaboration, error) {
