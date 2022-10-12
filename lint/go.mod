@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/onflow/cadence v0.28.0
-	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20220926143050-dfd5770b1cd7
+	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221012181819-8d43a4be0028
 	github.com/onflow/flow-go-sdk v0.29.0
 	github.com/spf13/afero v1.9.0
 	github.com/stretchr/testify v1.8.0
