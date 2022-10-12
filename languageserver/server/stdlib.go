@@ -35,6 +35,7 @@ var _ stdlib.UnsafeRandomGenerator = standardLibrary{}
 var _ stdlib.BlockAtHeightProvider = standardLibrary{}
 var _ stdlib.CurrentBlockProvider = standardLibrary{}
 var _ stdlib.PublicAccountHandler = standardLibrary{}
+var _ stdlib.AccountCreator = standardLibrary{}
 
 func (standardLibrary) ProgramLog(_ string) error {
 	// Implementation should never be called,
@@ -112,7 +113,7 @@ func (standardLibrary) EmitEvent(
 	_ *interpreter.Interpreter,
 	_ *sema.CompositeType,
 	_ []interpreter.Value,
-	_ func() interpreter.LocationRange,
+	_ interpreter.LocationRange,
 ) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
