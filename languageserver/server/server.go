@@ -49,7 +49,7 @@ import (
 	"github.com/onflow/cadence-tools/languageserver/jsonrpc2"
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 
-	linter "github.com/onflow/cadence-tools/lint/analyzers"
+	linter "github.com/onflow/cadence-tools/lint"
 )
 
 // Document represents an open document on the client. It contains all cached
@@ -137,31 +137,24 @@ func (d Document) HasAnyPrecedingStringsAtPosition(options []string, line, colum
 type CommandHandler func(args ...json2.RawMessage) (interface{}, error)
 
 // AddressImportResolver is a function that is used to resolve address imports
-//
 type AddressImportResolver func(location common.AddressLocation) (string, error)
 
 // AddressContractNamesResolver is a function that is used to resolve contract names of an address
-//
 type AddressContractNamesResolver func(address common.Address) ([]string, error)
 
 // StringImportResolver is a function that is used to resolve string imports
-//
 type StringImportResolver func(location common.StringLocation) (string, error)
 
 // CodeLensProvider is a function that is used to provide code lenses for the given checker
-//
 type CodeLensProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.CodeLens, error)
 
 // DiagnosticProvider is a function that is used to provide diagnostics for the given checker
-//
 type DiagnosticProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]protocol.Diagnostic, error)
 
 // DocumentSymbolProvider is a function that is used to provide document symbols for the given checker
-//
 type DocumentSymbolProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.DocumentSymbol, error)
 
 // InitializationOptionsHandler is a function that is used to handle initialization options sent by the client
-//
 type InitializationOptionsHandler func(initializationOptions any) error
 
 type Server struct {
@@ -205,7 +198,6 @@ type Command struct {
 // to the set of commands provided by the server to the client.
 //
 // If a command with the given name already exists, the option fails.
-//
 func WithCommand(command Command) Option {
 	return func(s *Server) error {
 		if _, ok := s.commands[command.Name]; ok {
@@ -218,7 +210,6 @@ func WithCommand(command Command) Option {
 
 // WithAddressImportResolver returns a server option that sets the given function
 // as the function that is used to resolve address imports
-//
 func WithAddressImportResolver(resolver AddressImportResolver) Option {
 	return func(s *Server) error {
 		s.resolveAddressImport = resolver
@@ -228,7 +219,6 @@ func WithAddressImportResolver(resolver AddressImportResolver) Option {
 
 // WithAddressContractNamesResolver returns a server option that sets the given function
 // as the function that is used to resolve contract names of an address
-//
 func WithAddressContractNamesResolver(resolver AddressContractNamesResolver) Option {
 	return func(s *Server) error {
 		s.resolveAddressContractNames = resolver
@@ -238,7 +228,6 @@ func WithAddressContractNamesResolver(resolver AddressContractNamesResolver) Opt
 
 // WithStringImportResolver returns a server option that sets the given function
 // as the function that is used to resolve string imports
-//
 func WithStringImportResolver(resolver StringImportResolver) Option {
 	return func(s *Server) error {
 		s.resolveStringImport = resolver
@@ -248,7 +237,6 @@ func WithStringImportResolver(resolver StringImportResolver) Option {
 
 // WithCodeLensProvider returns a server option that adds the given function
 // as a function that is used to generate code lenses
-//
 func WithCodeLensProvider(provider CodeLensProvider) Option {
 	return func(s *Server) error {
 		s.codeLensProviders = append(s.codeLensProviders, provider)
@@ -258,7 +246,6 @@ func WithCodeLensProvider(provider CodeLensProvider) Option {
 
 // WithDiagnosticProvider returns a server option that adds the given function
 // as a function that is used to generate diagnostics
-//
 func WithDiagnosticProvider(provider DiagnosticProvider) Option {
 	return func(s *Server) error {
 		s.diagnosticProviders = append(s.diagnosticProviders, provider)
@@ -268,7 +255,6 @@ func WithDiagnosticProvider(provider DiagnosticProvider) Option {
 
 // WithInitializationOptionsHandler returns a server option that adds the given function
 // as a function that is used to handle initialization options sent by the client
-//
 func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Option {
 	return func(s *Server) error {
 		s.initializationOptionsHandlers = append(s.initializationOptionsHandlers, handler)
@@ -1091,7 +1077,6 @@ var readAccessOptionsCommaSeparated = strings.Join(readAccessOptions, ",")
 // for the access modifier.
 //
 // Start placeholders at index 2!
-//
 var declarationCompletionItems = []*protocol.CompletionItem{
 	{
 		Kind:             protocol.KeywordCompletion,
@@ -1163,7 +1148,6 @@ var declarationCompletionItems = []*protocol.CompletionItem{
 // for the access modifier.
 //
 // Start placeholders at index 2!
-//
 var containerCompletionItems = []*protocol.CompletionItem{
 	{
 		Kind:             protocol.KeywordCompletion,
@@ -1190,7 +1174,6 @@ var containerCompletionItems = []*protocol.CompletionItem{
 }
 
 // Completion is called to compute completion items at a given cursor position.
-//
 func (s *Server) Completion(
 	_ protocol.Conn,
 	params *protocol.CompletionParams,
@@ -1487,7 +1470,6 @@ func declarationKindCommitCharacters(kind common.DeclarationKind) []string {
 }
 
 // ResolveCompletionItem is called to compute completion items at a given cursor position.
-//
 func (s *Server) ResolveCompletionItem(
 	_ protocol.Conn,
 	item *protocol.CompletionItem,
@@ -2022,7 +2004,7 @@ func (s *Server) defaultCommands() []Command {
 // getEntryPointParameters returns the script or transaction parameters of the source document.
 //
 // There should be exactly 1 argument:
-//   * the DocumentURI of the file to submit
+//   - the DocumentURI of the file to submit
 func (s *Server) getEntryPointParameters(args ...json2.RawMessage) (interface{}, error) {
 
 	err := CheckCommandArgumentCount(args, 1)
@@ -2053,7 +2035,7 @@ func (s *Server) getEntryPointParameters(args ...json2.RawMessage) (interface{},
 // or none if no initializer is declared, or the program contains none or more than one contract declaration.
 //
 // There should be exactly 1 argument:
-//   * the DocumentURI of the file to submit
+//   - the DocumentURI of the file to submit
 func (s *Server) getContractInitializerParameters(args ...json2.RawMessage) (interface{}, error) {
 
 	err := CheckCommandArgumentCount(args, 1)
@@ -2095,8 +2077,8 @@ func (s *Server) getContractInitializerParameters(args ...json2.RawMessage) (int
 // parseEntryPointArguments returns the values for the given arguments (literals) for the entry point.
 //
 // There should be exactly 2 arguments:
-//   * the DocumentURI of the file to submit
-//   * the array of arguments
+//   - the DocumentURI of the file to submit
+//   - the array of arguments
 func (s *Server) parseEntryPointArguments(args ...json2.RawMessage) (interface{}, error) {
 
 	err := CheckCommandArgumentCount(args, 2)
@@ -2171,7 +2153,6 @@ type insertionPosition struct {
 
 // convertError converts a checker error to a diagnostic
 // and an optional code action to resolve the error.
-//
 func (s *Server) convertError(
 	err convertibleError,
 	uri protocol.DocumentURI,
@@ -3110,7 +3091,6 @@ func fieldDeclarationCodeActions(
 
 // convertDiagnostic converts a linter diagnostic to a languagserver
 // and an optional code action to resolve the diagnostic.
-//
 func convertDiagnostic(
 	linterDiagnostic analysis.Diagnostic,
 	uri protocol.DocumentURI,
