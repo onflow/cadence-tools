@@ -3,7 +3,7 @@ module github.com/onflow/cadence-tools/test
 go 1.18
 
 require (
-	github.com/onflow/cadence v0.28.0
+	github.com/onflow/cadence v0.28.1-0.20221017183505-4cb5613cb0fc
 	github.com/onflow/flow-emulator v0.38.0
 	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20221011174222-54840e416e81
 	github.com/onflow/flow-go-sdk v0.29.0

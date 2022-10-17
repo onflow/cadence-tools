@@ -175,6 +175,64 @@ func TestExecuteScript(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
 	})
+
+	t.Run("array returns", func(t *testing.T) {
+		t.Parallel()
+
+		code := ` pub fun main(): [UInt64] { return [1, 2, 3]} `
+
+		testScript := fmt.Sprintf(
+			`
+                import Test
+
+                pub fun test() {
+                    var blockchain = Test.newEmulatorBlockchain()
+                    var result = blockchain.executeScript("%s", [])
+
+                    assert(result.status == Test.ResultStatus.succeeded)
+
+                    let resultArray = result.returnValue! as! [UInt64]
+                    assert(resultArray.length == 3)
+                    assert(resultArray[0] == 1)
+                    assert(resultArray[1] == 2)
+                    assert(resultArray[2] == 3)
+            }`,
+			code,
+		)
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(testScript, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("dictionary returns", func(t *testing.T) {
+		t.Parallel()
+
+		code := ` pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}} `
+
+		testScript := fmt.Sprintf(
+			`
+                import Test
+
+                pub fun test() {
+                    var blockchain = Test.newEmulatorBlockchain()
+                    var result = blockchain.executeScript("%s", [])
+
+                    assert(result.status == Test.ResultStatus.succeeded)
+
+                    let dictionary = result.returnValue! as! {String: Int}
+                    assert(dictionary["foo"] == 5)
+                    assert(dictionary["bar"] == 10)
+            }`,
+			code,
+		)
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(testScript, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
 }
 
 func TestImportContract(t *testing.T) {
@@ -923,6 +981,34 @@ func TestExecutingTransactions(t *testing.T) {
 
 		require.Error(t, result.Error)
 		assert.Contains(t, result.Error.Error(), "is currently being executed")
+	})
+
+	t.Run("transaction with array typed args", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+            import Test
+
+            pub fun test() {
+                var blockchain = Test.newEmulatorBlockchain()
+                var account = blockchain.createAccount()
+
+                let tx = Test.Transaction(
+                    code: "transaction(a: [Int]) { execute{ assert(a[0] == a[1]) } }",
+                    authorizers: [],
+                    signers: [account],
+                    arguments: [[4, 4]],
+                )
+
+                let result = blockchain.executeTransaction(tx)
+                assert(result.status == Test.ResultStatus.succeeded)
+            }
+        `
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
 	})
 }
 

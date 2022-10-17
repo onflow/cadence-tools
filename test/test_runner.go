@@ -185,8 +185,7 @@ func (r *TestRunner) runTestSetup(inter *interpreter.Interpreter) error {
 }
 
 func hasSetup(inter *interpreter.Interpreter) bool {
-	_, ok := inter.Globals.Get(setupFunctionName)
-	return ok
+	return inter.Globals.Contains(setupFunctionName)
 }
 
 func (r *TestRunner) runTestTearDown(inter *interpreter.Interpreter) error {
@@ -198,8 +197,7 @@ func (r *TestRunner) runTestTearDown(inter *interpreter.Interpreter) error {
 }
 
 func hasTearDown(inter *interpreter.Interpreter) bool {
-	_, ok := inter.Globals.Get(tearDownFunctionName)
-	return ok
+	return inter.Globals.Contains(tearDownFunctionName)
 }
 
 func (r *TestRunner) invokeTestFunction(inter *interpreter.Interpreter, funcName string) (err error) {
