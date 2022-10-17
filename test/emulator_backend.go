@@ -34,19 +34,15 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/activations"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/cadence/runtime/tests/utils"
 )
 
 var _ stdlib.TestFramework = &EmulatorBackend{}
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
-//
 type EmulatorBackend struct {
 	blockchain *emulator.Blockchain
 
@@ -81,13 +77,11 @@ func NewEmulatorBackend(fileResolver FileResolver) *EmulatorBackend {
 	}
 }
 
-func (e *EmulatorBackend) RunScript(code string, args []interpreter.Value) *stdlib.ScriptResult {
-	inter, err := newInterpreter()
-	if err != nil {
-		return &stdlib.ScriptResult{
-			Error: err,
-		}
-	}
+func (e *EmulatorBackend) RunScript(
+	inter *interpreter.Interpreter,
+	code string,
+	args []interpreter.Value,
+) *stdlib.ScriptResult {
 
 	arguments := make([][]byte, 0, len(args))
 	for _, arg := range args {
@@ -169,6 +163,7 @@ func (e EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 }
 
 func (e *EmulatorBackend) AddTransaction(
+	inter *interpreter.Interpreter,
 	code string,
 	authorizers []common.Address,
 	signers []*stdlib.Account,
@@ -178,11 +173,6 @@ func (e *EmulatorBackend) AddTransaction(
 	code = e.replaceImports(code)
 
 	tx := e.newTransaction(code, authorizers)
-
-	inter, err := newInterpreter()
-	if err != nil {
-		return err
-	}
 
 	for _, arg := range args {
 		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
@@ -196,7 +186,7 @@ func (e *EmulatorBackend) AddTransaction(
 		}
 	}
 
-	err = e.signTransaction(tx, signers)
+	err := e.signTransaction(tx, signers)
 	if err != nil {
 		return err
 	}
@@ -298,6 +288,7 @@ func (e *EmulatorBackend) CommitBlock() error {
 }
 
 func (e *EmulatorBackend) DeployContract(
+	inter *interpreter.Interpreter,
 	name string,
 	code string,
 	account *stdlib.Account,
@@ -314,11 +305,6 @@ func (e *EmulatorBackend) DeployContract(
 	code = e.replaceImports(code)
 
 	hexEncodedCode := hex.EncodeToString([]byte(code))
-
-	inter, err := newInterpreter()
-	if err != nil {
-		return err
-	}
 
 	cadenceArgs := make([]cadence.Value, 0, len(args))
 
@@ -351,13 +337,13 @@ func (e *EmulatorBackend) DeployContract(
 	tx := e.newTransaction(script, []common.Address{account.Address})
 
 	for _, arg := range cadenceArgs {
-		err = tx.AddArgument(arg)
+		err := tx.AddArgument(arg)
 		if err != nil {
 			return err
 		}
 	}
 
-	err = e.signTransaction(tx, []*stdlib.Account{account})
+	err := e.signTransaction(tx, []*stdlib.Account{account})
 	if err != nil {
 		return err
 	}
@@ -405,49 +391,6 @@ func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
 
 func (e *EmulatorBackend) UseConfiguration(configuration *stdlib.Configuration) {
 	e.configuration = configuration
-}
-
-// newInterpreter creates an interpreter instance needed for the value conversion.
-//
-func newInterpreter() (*interpreter.Interpreter, error) {
-	// TODO: maybe re-use interpreter? Only needed for value conversion
-	// TODO: Deal with imported/composite types
-
-	baseActivation := activations.NewActivation[*interpreter.Variable](nil, interpreter.BaseActivation)
-
-	return interpreter.NewInterpreter(
-		nil,
-		utils.TestLocation,
-		&interpreter.Config{
-			BaseActivation: baseActivation,
-			ImportLocationHandler: func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
-				switch location {
-				case stdlib.CryptoChecker.Location:
-					program := interpreter.ProgramFromChecker(stdlib.CryptoChecker)
-					subInterpreter, err := inter.NewSubInterpreter(program, location)
-					if err != nil {
-						panic(err)
-					}
-					return interpreter.InterpreterImport{
-						Interpreter: subInterpreter,
-					}
-
-				case stdlib.TestContractLocation:
-					program := interpreter.ProgramFromChecker(stdlib.TestContractChecker)
-					subInterpreter, err := inter.NewSubInterpreter(program, location)
-					if err != nil {
-						panic(err)
-					}
-					return interpreter.InterpreterImport{
-						Interpreter: subInterpreter,
-					}
-
-				default:
-					panic(errors.NewUnexpectedError("importing of programs not implemented"))
-				}
-			},
-		},
-	)
 }
 
 func (e *EmulatorBackend) replaceImports(code string) string {
