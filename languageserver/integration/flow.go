@@ -208,9 +208,8 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	account := createSigner(address, service)
 	_, err = f.services.Accounts.AddContract(
-		account,
+		createSigner(address, service),
 		&services.Contract{
 			Name:     name,
 			Source:   code,
@@ -242,41 +241,28 @@ func (f *flowkitClient) SendTransaction(
 		return nil, nil, err
 	}
 
-	tx, err := f.services.Transactions.Build(
-		service.Address(),
-		authorizers,
-		service.Address(),
-		service.Key().Index(),
-		code,
-		codeFilename,
-		flow.DefaultTransactionGasLimit,
-		args,
-		config.DefaultEmulatorNetwork().Name,
-		true,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// sign with all authorizers
-	for _, auth := range authorizers {
-		tx, err = sign(createSigner(auth, service), tx)
+	authAccs := make([]*flowkit.Account, len(authorizers))
+	for i, auth := range authorizers {
+		authAccs[i] = createSigner(auth, service)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	// sign with service as payer
-	signed, err := sign(service, tx)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	transaction, res, err := f.services.Transactions.SendSigned(
-		[]byte(fmt.Sprintf("%x", signed.FlowTransaction().Encode())),
-		true,
+	return f.services.Transactions.Send(
+		&services.TransactionAccounts{
+			Proposer:    service,
+			Authorizers: authAccs,
+			Payer:       service,
+		},
+		&services.Script{
+			Code:     code,
+			Args:     args,
+			Filename: codeFilename,
+		},
+		flow.DefaultTransactionGasLimit,
+		config.DefaultEmulatorNetwork().Name,
 	)
-
-	return transaction, res, err
 }
 
 func (f *flowkitClient) GetAccount(address flow.Address) (*flow.Account, error) {
@@ -328,21 +314,6 @@ func createSigner(address flow.Address, account *flowkit.Account) *flowkit.Accou
 	signer.SetAddress(address)
 	signer.SetKey(account.Key())
 	return signer
-}
-
-// sign sets the signer on a transaction and calls the sign method.
-func sign(signer *flowkit.Account, tx *flowkit.Transaction) (*flowkit.Transaction, error) {
-	err := tx.SetSigner(signer)
-	if err != nil {
-		return nil, err
-	}
-
-	tx, err = tx.Sign()
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
 }
 
 // resolveFilename helper converts the transaction file to a relative location to config file
