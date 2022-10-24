@@ -249,12 +249,13 @@ func (f *flowkitClient) SendTransaction(
 		}
 	}
 
+	accs, err := services.NewTransactionAccounts(service, service, authAccs)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return f.services.Transactions.Send(
-		&services.TransactionAccounts{
-			Proposer:    service,
-			Authorizers: authAccs,
-			Payer:       service,
-		},
+		accs,
 		&services.Script{
 			Code:     code,
 			Args:     args,
