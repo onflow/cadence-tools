@@ -3,9 +3,9 @@
 ```cadence
 struct interface SomeInterface {
 
-    x:  String
+    x: String
 
-    y:  {Int: AnyStruct}
+    y: {Int: AnyStruct}
 }
 ```
 

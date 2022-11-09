@@ -3,7 +3,7 @@ module github.com/onflow/cadence-tools/docgen
 go 1.18
 
 require (
-	github.com/onflow/cadence v0.27.0
+	github.com/onflow/cadence v0.28.0
 	github.com/stretchr/testify v1.7.3
 )
 

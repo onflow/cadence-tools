@@ -5,9 +5,9 @@
 ```cadence
 struct interface SomeInterface {
 
-    x:  String
+    x: String
 
-    y:  {Int: AnyStruct}
+    y: {Int: AnyStruct}
 }
 ```
 
@@ -21,9 +21,9 @@ struct interface SomeInterface {
 ```cadence
 struct SomeStruct {
 
-    x:  String
+    x: String
 
-    y:  {Int: AnyStruct}
+    y: {Int: AnyStruct}
 }
 ```
 This is some struct. It has
@@ -63,7 +63,7 @@ This is an Enum, with explicit type conformance.
 ### fun `foo()`
 
 ```cadence
-func foo(a Int, b String)
+func foo(a: Int, b: String)
 ```
 
 ---
@@ -71,7 +71,7 @@ func foo(a Int, b String)
 ### fun `bar()`
 
 ```cadence
-func bar(name String, bytes [Int8]): bool
+func bar(name: String, bytes: [Int8]): bool
 ```
 This is a bar function, with a return type
 
@@ -90,12 +90,20 @@ func noDocsFunction()
 ```
 
 ---
+
+### fun `noLabel()`
+
+```cadence
+func noLabel(_: Int)
+```
+
+---
 ## Events
 
 ### event `TestEvent`
 
 ```cadence
-event TestEvent(x Int, y Int)
+event TestEvent(x: Int, y: Int)
 ```
 An event.
 Events are special values that can be emitted during the execution of a program.

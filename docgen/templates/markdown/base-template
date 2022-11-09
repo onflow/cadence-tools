@@ -6,7 +6,7 @@
 {{- end}}
 {{end -}}
 
-{{$structAndResourceDecls := structsAndResources .CompositeDeclarations -}}
+{{$structAndResourceDecls := structsAndResources .Declarations -}}
 {{if gt (len $structAndResourceDecls) 0 -}}
 ## Structs & Resources
 {{- range $structAndResourceDecls}}
@@ -15,7 +15,7 @@
 {{- end}}
 {{end -}}
 
-{{$enumDecls := enums .CompositeDeclarations -}}
+{{$enumDecls := enums .Declarations -}}
 {{if gt (len $enumDecls) 0 -}}
 ## Enums
 {{- range $enumDecls}}
@@ -32,7 +32,7 @@
 {{- end}}
 {{end -}}
 
-{{$eventDecls := events .CompositeDeclarations -}}
+{{$eventDecls := events .Declarations -}}
 {{if gt (len $eventDecls) 0 -}}
 ## Events
 {{- range $eventDecls}}

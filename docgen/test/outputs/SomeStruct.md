@@ -3,9 +3,9 @@
 ```cadence
 struct SomeStruct {
 
-    x:  String
+    x: String
 
-    y:  {Int: AnyStruct}
+    y: {Int: AnyStruct}
 }
 ```
 
@@ -31,9 +31,9 @@ func init()
 ```cadence
 struct InnerStruct {
 
-    a:  Int
+    a: Int
 
-    b:  String
+    b: String
 }
 ```
 This is a nested struct.
