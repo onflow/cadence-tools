@@ -4,9 +4,9 @@ go 1.19
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v0.29.1-0.20221109211444-9bbf0052ac4e
-	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221109171205-88adeea8bdd0
-	github.com/onflow/flow-go-sdk v0.29.1-0.20221108002506-202a45f4bc82
+	github.com/onflow/cadence v0.29.0-stable-cadence-4
+	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221110210220-b8864dd91c71
+	github.com/onflow/flow-go-sdk v0.29.0-stable-cadence-4
 	github.com/spf13/afero v1.9.0
 	github.com/stretchr/testify v1.8.0
 )
@@ -104,12 +104,12 @@ require (
 	github.com/multiformats/go-multihash v0.2.1 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
-	github.com/onflow/cadence-tools/test v0.2.1-0.20221110000357-ecacb6c02246 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221105003204-7b5540cf5fc2 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221102180244-3ac018c412f2 // indirect
-	github.com/onflow/flow-emulator v0.39.0-stable-cadence-3 // indirect
+	github.com/onflow/cadence-tools/test v0.2.1-0.20221110205900-3d71ce79e213 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221110195343-f8d357b82aa9 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221110195343-f8d357b82aa9 // indirect
+	github.com/onflow/flow-emulator v0.39.0-stable-cadence-4 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
-	github.com/onflow/flow-go v0.29.0-stable-cadence-3 // indirect
+	github.com/onflow/flow-go v0.29.0-stable-cadence-4 // indirect
 	github.com/onflow/flow-go/crypto v0.24.4 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.1 // indirect
 	github.com/onflow/sdks v0.4.4 // indirect
