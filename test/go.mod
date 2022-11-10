@@ -3,10 +3,10 @@ module github.com/onflow/cadence-tools/test
 go 1.18
 
 require (
-	github.com/onflow/cadence v0.28.1-0.20221017183505-4cb5613cb0fc
-	github.com/onflow/flow-emulator v0.38.0
-	github.com/onflow/flow-go v0.26.14-test-synchronization.0.20221011174222-54840e416e81
-	github.com/onflow/flow-go-sdk v0.29.0
+	github.com/onflow/cadence v0.29.1-0.20221109211444-9bbf0052ac4e
+	github.com/onflow/flow-emulator v0.39.0-stable-cadence-3
+	github.com/onflow/flow-go v0.29.0-stable-cadence-3
+	github.com/onflow/flow-go-sdk v0.29.1-0.20221108002506-202a45f4bc82
 	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.8.0
 )
@@ -84,8 +84,8 @@ require (
 	github.com/multiformats/go-multihash v0.2.1 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221105003204-7b5540cf5fc2 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221102180244-3ac018c412f2 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow-go/crypto v0.24.4 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.1 // indirect
@@ -97,6 +97,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
+	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
@@ -131,6 +132,7 @@ require (
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
+	gonum.org/v1/gonum v0.11.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
 	google.golang.org/grpc v1.46.2 // indirect

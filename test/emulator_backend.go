@@ -44,7 +44,8 @@ var _ stdlib.TestFramework = &EmulatorBackend{}
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
-	blockchain *emulator.Blockchain
+	blockchain             *emulator.Blockchain
+	standardLibraryHandler stdlib.StandardLibraryHandler
 
 	// blockOffset is the offset for the sequence number of the next transaction.
 	// This is equal to the number of transactions in the current block.
@@ -63,17 +64,25 @@ type EmulatorBackend struct {
 	configuration *stdlib.Configuration
 }
 
+func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler {
+	return e.standardLibraryHandler
+}
+
 type keyInfo struct {
 	accountKey *sdk.AccountKey
 	signer     crypto.Signer
 }
 
-func NewEmulatorBackend(fileResolver FileResolver) *EmulatorBackend {
+func NewEmulatorBackend(
+	standardLibraryHandler stdlib.StandardLibraryHandler,
+	fileResolver FileResolver,
+) *EmulatorBackend {
 	return &EmulatorBackend{
-		blockchain:   newBlockchain(),
-		blockOffset:  0,
-		accountKeys:  map[common.Address]map[string]keyInfo{},
-		fileResolver: fileResolver,
+		standardLibraryHandler: standardLibraryHandler,
+		blockchain:             newBlockchain(),
+		blockOffset:            0,
+		accountKeys:            map[common.Address]map[string]keyInfo{},
+		fileResolver:           fileResolver,
 	}
 }
 
@@ -117,7 +126,7 @@ func (e *EmulatorBackend) RunScript(
 		}
 	}
 
-	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, result.Value, nil)
+	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, e.StandardLibraryHandler(), result.Value, nil)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
@@ -129,7 +138,7 @@ func (e *EmulatorBackend) RunScript(
 	}
 }
 
-func (e EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
+func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 	// Also generate the keys. So that users don't have to do this in two steps.
 	// Store the generated keys, so that it could be looked-up, given the address.
 

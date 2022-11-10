@@ -21,8 +21,9 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/fvm/environment"
 	"strings"
+
+	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/rs/zerolog"
 
@@ -233,13 +234,18 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		Environment: env,
 	}
 
+	testFramework := NewEmulatorBackend(
+		env,
+		r.fileResolver,
+	)
+
 	// Checker configs
 	env.CheckerConfig.ImportHandler = r.checkerImportHandler(ctx)
-	env.CheckerConfig.ContractValueHandler = contractValueHandler
+	env.CheckerConfig.ContractValueHandler = stdlib.TestCheckerContractValueHandler
 
 	// Interpreter configs
 	env.InterpreterConfig.ImportLocationHandler = r.interpreterImportHandler(ctx)
-	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler
+	env.InterpreterConfig.ContractValueHandler = stdlib.NewTestInterpreterContractValueHandler(testFramework)
 	// TODO: The default injected fields handler only supports 'address' locations.
 	//   However, during tests, it is possible to get non-address locations. e.g: file paths.
 	//   Thus, need to properly handle them. Make this nil for now.
@@ -295,66 +301,6 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 		return sema.ElaborationImport{
 			Elaboration: elaboration,
 		}, nil
-	}
-}
-
-func contractValueHandler(
-	checker *sema.Checker,
-	declaration *ast.CompositeDeclaration,
-	compositeType *sema.CompositeType,
-) sema.ValueDeclaration {
-	constructorType, constructorArgumentLabels := sema.CompositeConstructorType(
-		checker.Elaboration,
-		declaration,
-		compositeType,
-	)
-
-	return stdlib.StandardLibraryValue{
-		Name:           declaration.Identifier.Identifier,
-		Type:           constructorType,
-		DocString:      declaration.DocString,
-		Kind:           declaration.DeclarationKind(),
-		Position:       &declaration.Identifier.Pos,
-		ArgumentLabels: constructorArgumentLabels,
-	}
-}
-
-func (r *TestRunner) interpreterContractValueHandler(
-	inter *interpreter.Interpreter,
-	compositeType *sema.CompositeType,
-	constructorGenerator func(common.Address) *interpreter.HostFunctionValue,
-	invocationRange ast.Range,
-) interpreter.ContractValue {
-
-	switch compositeType.Location {
-	case stdlib.CryptoChecker.Location:
-		contract, err := stdlib.NewCryptoContract(
-			inter,
-			constructorGenerator(common.Address{}),
-			invocationRange,
-		)
-		if err != nil {
-			panic(err)
-		}
-		return contract
-
-	case stdlib.TestContractLocation:
-		testFramework := NewEmulatorBackend(r.fileResolver)
-		contract, err := stdlib.NewTestContract(
-			inter,
-			testFramework,
-			constructorGenerator(common.Address{}),
-			invocationRange,
-		)
-		if err != nil {
-			panic(err)
-		}
-		return contract
-
-	default:
-		// During tests, imported contracts can be constructed using the constructor,
-		// similar to structs. Therefore, generate a constructor function.
-		return constructorGenerator(common.Address{})
 	}
 }
 
@@ -450,7 +396,7 @@ func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runt
 		return nil, fmt.Errorf("nested imports are not supported")
 	}
 
-	env.CheckerConfig.ContractValueHandler = contractValueHandler
+	env.CheckerConfig.ContractValueHandler = stdlib.TestCheckerContractValueHandler
 
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
