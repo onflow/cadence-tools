@@ -1,13 +1,13 @@
 ## Interfaces
 
-### struct interface `SomeInterface`
+### `SomeInterface`
 
 ```cadence
 struct interface SomeInterface {
 
-    x: String
+    var x: String
 
-    y: {Int: AnyStruct}
+    var y: {Int: AnyStruct}
 }
 ```
 
@@ -16,14 +16,14 @@ struct interface SomeInterface {
 ---
 ## Structs & Resources
 
-### struct `SomeStruct`
+### `SomeStruct`
 
 ```cadence
 struct SomeStruct {
 
-    x: String
+    var x: String
 
-    y: {Int: AnyStruct}
+    var y: {Int: AnyStruct}
 }
 ```
 This is some struct. It has
@@ -60,7 +60,7 @@ This is an Enum, with explicit type conformance.
 ---
 ## Functions
 
-### fun `foo()`
+### `foo()`
 
 ```cadence
 fun foo(a: Int, b: String)
@@ -68,7 +68,7 @@ fun foo(a: Int, b: String)
 
 ---
 
-### fun `bar()`
+### `bar()`
 
 ```cadence
 fun bar(name: String, bytes: [Int8]): bool
@@ -83,7 +83,7 @@ Returns: Validity of the content
 
 ---
 
-### fun `noDocsFunction()`
+### `noDocsFunction()`
 
 ```cadence
 fun noDocsFunction()
@@ -91,7 +91,7 @@ fun noDocsFunction()
 
 ---
 
-### fun `noLabel()`
+### `noLabel()`
 
 ```cadence
 fun noLabel(_: Int)
@@ -100,7 +100,7 @@ fun noLabel(_: Int)
 ---
 ## Events
 
-### event `TestEvent`
+### `TestEvent`
 
 ```cadence
 event TestEvent(x: Int, y: Int)
@@ -116,7 +116,7 @@ Parameters:
 
 ---
 
-### event `FooEvent`
+### `FooEvent`
 
 ```cadence
 event FooEvent()
@@ -125,7 +125,7 @@ An event without params
 
 ---
 
-### event `EventWithoutDocs`
+### `EventWithoutDocs`
 
 ```cadence
 event EventWithoutDocs()

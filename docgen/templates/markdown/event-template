@@ -1,8 +1,8 @@
 {{define "event"}}
-### {{declKeyword .}} `{{.DeclarationIdentifier}}`
+### `{{.DeclarationIdentifier}}`
 
 ```cadence
-{{declKeyword .}} {{.DeclarationIdentifier}}(
+{{declKeywords .}} {{.DeclarationIdentifier}}(
 {{- $specialFunc := index .Members.SpecialFunctions  0}}
 {{- range $index, $param := $specialFunc.FunctionDeclaration.ParameterList.Parameters}}
     {{- if $index}}, {{end -}}

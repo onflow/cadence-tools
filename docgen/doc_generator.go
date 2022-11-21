@@ -265,7 +265,7 @@ func (gen *DocGenerator) currentFileName() string {
 type ElementTemplateFunctions[T any] interface {
 	HasConformance(T) bool
 	IsEnum(T) bool
-	DeclKeyword(T) string
+	DeclKeywords(T) string
 	DeclTypeTitle(T) string
 	GenInitializer(T) bool
 	Enums(declarations []T) []T
@@ -293,8 +293,26 @@ func (ASTDeclarationTemplateFunctions) IsEnum(declaration ast.Declaration) bool 
 	return declaration.DeclarationKind() == common.DeclarationKindEnum
 }
 
-func (ASTDeclarationTemplateFunctions) DeclKeyword(declaration ast.Declaration) string {
-	return declaration.DeclarationKind().Keywords()
+func (ASTDeclarationTemplateFunctions) DeclKeywords(declaration ast.Declaration) string {
+	var parts []string
+
+	accessKeyword := declaration.DeclarationAccess().Keyword()
+	if len(accessKeyword) > 0 {
+		parts = append(parts, accessKeyword)
+	}
+
+	var kindKeyword string
+	kind := declaration.DeclarationKind()
+	if kind == common.DeclarationKindField {
+		kindKeyword = declaration.(*ast.FieldDeclaration).VariableKind.Keyword()
+	} else {
+		kindKeyword = kind.Keywords()
+	}
+	if len(kindKeyword) > 0 {
+		parts = append(parts, kindKeyword)
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func (ASTDeclarationTemplateFunctions) DeclTypeTitle(declaration ast.Declaration) string {
@@ -353,7 +371,7 @@ func newTemplateFunctions[T any](
 	return template.FuncMap{
 		"hasConformance":      elementFunctions.HasConformance,
 		"isEnum":              elementFunctions.IsEnum,
-		"declKeyword":         elementFunctions.DeclKeyword,
+		"declKeywords":        elementFunctions.DeclKeywords,
 		"declTypeTitle":       elementFunctions.DeclTypeTitle,
 		"genInitializer":      elementFunctions.GenInitializer,
 		"enums":               elementFunctions.Enums,

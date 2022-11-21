@@ -1,5 +1,5 @@
 {{define "function"}}
-### fun `{{.DeclarationIdentifier}}()`
+### `{{.DeclarationIdentifier}}()`
 
 ```cadence
 fun {{.DeclarationIdentifier}}(

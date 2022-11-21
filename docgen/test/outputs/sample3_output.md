@@ -1,6 +1,6 @@
 ## Functions
 
-### fun `func_1()`
+### `func_1()`
 
 ```cadence
 fun func_1(name: String, bytes: [Int8]): bool
@@ -15,7 +15,7 @@ Returns: Validity of the content
 
 ---
 
-### fun `func_2()`
+### `func_2()`
 
 ```cadence
 fun func_2(name: String, bytes: [Int8]): bool
@@ -34,7 +34,7 @@ Returns: Validity of the content
 
 ---
 
-### fun `func_3()`
+### `func_3()`
 
 ```cadence
 fun func_3()

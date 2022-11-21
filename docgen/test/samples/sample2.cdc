@@ -11,14 +11,14 @@ pub contract NFT: Token {
     event TestEvent(x: Int, y: Int)
 
     /// A variable fields
-    var field1: Int
+    pub var field1: Int
 
     /// A constant field
     let field2: String
 
     /// This is a foo function,
     /// This doesn't have a return type.
-    fun foo(a: Int, b: String) {
+    priv fun foo(a: Int, b: String) {
     }
 
     /// This is a bar function, with a return type

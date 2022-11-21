@@ -1,11 +1,11 @@
 # Contract `NFT`
 
 ```cadence
-contract NFT {
+pub contract NFT {
 
-    field1: Int
+    pub var field1: Int
 
-    field2: String
+    let field2: String
 }
 ```
 
@@ -16,14 +16,14 @@ Implemented Interfaces:
 
 ## Structs & Resources
 
-### struct `SomeStruct`
+### `SomeStruct`
 
 ```cadence
 struct SomeStruct {
 
-    x: String
+    var x: String
 
-    y: {Int: AnyStruct}
+    var y: {Int: AnyStruct}
 }
 ```
 This is some struct. It has
@@ -60,7 +60,7 @@ This is an Enum, with explicit type conformance.
 ---
 ## Functions
 
-### fun `foo()`
+### `foo()`
 
 ```cadence
 fun foo(a: Int, b: String)
@@ -70,7 +70,7 @@ This doesn't have a return type.
 
 ---
 
-### fun `bar()`
+### `bar()`
 
 ```cadence
 fun bar(name: String, bytes: [Int8]): bool
@@ -85,7 +85,7 @@ Returns: Validity of the content
 
 ---
 
-### fun `noDocsFunction()`
+### `noDocsFunction()`
 
 ```cadence
 fun noDocsFunction()
@@ -94,7 +94,7 @@ fun noDocsFunction()
 ---
 ## Events
 
-### event `TestEvent`
+### `TestEvent`
 
 ```cadence
 event TestEvent(x: Int, y: Int)

@@ -3,15 +3,15 @@
 ```cadence
 struct interface SomeInterface {
 
-    x: String
+    var x: String
 
-    y: {Int: AnyStruct}
+    var y: {Int: AnyStruct}
 }
 ```
 
 ## Functions
 
-### fun `foo()`
+### `foo()`
 
 ```cadence
 fun foo()

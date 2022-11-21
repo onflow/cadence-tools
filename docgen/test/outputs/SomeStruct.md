@@ -3,9 +3,9 @@
 ```cadence
 struct SomeStruct {
 
-    x: String
+    var x: String
 
-    y: {Int: AnyStruct}
+    var y: {Int: AnyStruct}
 }
 ```
 
@@ -26,14 +26,14 @@ init()
 
 ## Structs & Resources
 
-### struct `InnerStruct`
+### `InnerStruct`
 
 ```cadence
 struct InnerStruct {
 
-    a: Int
+    var a: Int
 
-    b: String
+    var b: String
 }
 ```
 This is a nested struct.

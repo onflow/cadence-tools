@@ -3,9 +3,9 @@
 ```cadence
 struct InnerStruct {
 
-    a: Int
+    var a: Int
 
-    b: String
+    var b: String
 }
 ```
 
