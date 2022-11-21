@@ -1,6 +1,6 @@
 {{define "initializer"}}
 ```cadence
-fun {{.DeclarationIdentifier}}(
+{{.DeclarationIdentifier}}(
 {{- range $index, $param := .ParameterList.Parameters}}
     {{- if $index}}, {{end -}}
     {{.EffectiveArgumentLabel}}: {{.TypeAnnotation.Type.String -}}

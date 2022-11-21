@@ -14,7 +14,7 @@ struct interface SomeInterface {
 ### fun `foo()`
 
 ```cadence
-func foo()
+fun foo()
 ```
 Everyone must implement the `foo` function.
 

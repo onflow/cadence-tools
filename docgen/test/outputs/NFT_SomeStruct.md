@@ -3,9 +3,9 @@
 ```cadence
 struct SomeStruct {
 
-    x:  String
+    x: String
 
-    y:  {Int: AnyStruct}
+    y: {Int: AnyStruct}
 }
 ```
 
@@ -16,7 +16,7 @@ This is some struct. It has
 ### Initializer
 
 ```cadence
-func init()
+init()
 ```
 
 
@@ -27,9 +27,9 @@ func init()
 ```cadence
 struct InnerStruct {
 
-    a:  Int
+    a: Int
 
-    b:  String
+    b: String
 }
 ```
 This is a nested struct.

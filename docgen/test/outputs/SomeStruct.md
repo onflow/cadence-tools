@@ -20,7 +20,7 @@ Implemented Interfaces:
 ### Initializer
 
 ```cadence
-func init()
+init()
 ```
 
 

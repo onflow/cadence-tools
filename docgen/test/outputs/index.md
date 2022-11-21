@@ -63,7 +63,7 @@ This is an Enum, with explicit type conformance.
 ### fun `foo()`
 
 ```cadence
-func foo(a: Int, b: String)
+fun foo(a: Int, b: String)
 ```
 
 ---
@@ -71,7 +71,7 @@ func foo(a: Int, b: String)
 ### fun `bar()`
 
 ```cadence
-func bar(name: String, bytes: [Int8]): bool
+fun bar(name: String, bytes: [Int8]): bool
 ```
 This is a bar function, with a return type
 
@@ -86,7 +86,7 @@ Returns: Validity of the content
 ### fun `noDocsFunction()`
 
 ```cadence
-func noDocsFunction()
+fun noDocsFunction()
 ```
 
 ---
@@ -94,7 +94,7 @@ func noDocsFunction()
 ### fun `noLabel()`
 
 ```cadence
-func noLabel(_: Int)
+fun noLabel(_: Int)
 ```
 
 ---
