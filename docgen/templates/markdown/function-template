@@ -2,7 +2,7 @@
 ### fun `{{.DeclarationIdentifier}}()`
 
 ```cadence
-func {{.DeclarationIdentifier}}(
+fun {{.DeclarationIdentifier}}(
 {{- range $index, $param := .ParameterList.Parameters}}
     {{- if $index}}, {{end -}}
     {{.EffectiveArgumentLabel}}: {{.TypeAnnotation.Type.String -}}
