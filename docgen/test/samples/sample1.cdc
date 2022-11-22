@@ -27,6 +27,8 @@ fun bar(name: String, bytes: [Int8]): bool {
 fun noDocsFunction() {
 }
 
+fun noLabel(_ foo: Int) {}
+
 /// This is some struct. It has
 /// @field x: a string field
 /// @field y: a map of int and any-struct

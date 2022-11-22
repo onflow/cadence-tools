@@ -94,6 +94,8 @@ func (w *InMemoryFileWriter) Close() error {
 func NewDocGenerator() *DocGenerator {
 	gen := &DocGenerator{}
 
+	functions := newTemplateFunctions[ast.Declaration](ASTDeclarationTemplateFunctions{})
+
 	functions["fileName"] = func(decl ast.Declaration) string {
 		fileNamePrefix := gen.currentFileName()
 		if len(fileNamePrefix) == 0 {
@@ -105,13 +107,13 @@ func NewDocGenerator() *DocGenerator {
 
 	templateProvider := templates.NewMarkdownTemplateProvider()
 
-	gen.entryPageGen = newTemplate(baseTemplate, templateProvider)
-	gen.compositePageGen = newTemplate(compositeFullTemplate, templateProvider)
+	gen.entryPageGen = newTemplate(baseTemplate, templateProvider, functions)
+	gen.compositePageGen = newTemplate(compositeFullTemplate, templateProvider, functions)
 
 	return gen
 }
 
-func newTemplate(name string, templateProvider templates.TemplateProvider) *template.Template {
+func newTemplate(name string, templateProvider templates.TemplateProvider, functions template.FuncMap) *template.Template {
 	rootTemplate := template.New(name).Funcs(functions)
 
 	for _, templateFile := range templateFiles {
@@ -138,7 +140,7 @@ func newTemplate(name string, templateProvider templates.TemplateProvider) *temp
 
 func (gen *DocGenerator) Generate(source string, outputDir string) error {
 	gen.outputDir = outputDir
-	gen.typeNames = make([]string, 0)
+	gen.typeNames = nil
 
 	program, err := parser.ParseProgram([]byte(source), nil)
 	if err != nil {
@@ -150,7 +152,7 @@ func (gen *DocGenerator) Generate(source string, outputDir string) error {
 
 func (gen *DocGenerator) GenerateInMemory(source string) (InMemoryFiles, error) {
 	gen.files = InMemoryFiles{}
-	gen.typeNames = make([]string, 0)
+	gen.typeNames = nil
 
 	program, err := parser.ParseProgram([]byte(source), nil)
 	if err != nil {
@@ -167,8 +169,10 @@ func (gen *DocGenerator) GenerateInMemory(source string) (InMemoryFiles, error) 
 
 func (gen *DocGenerator) genProgram(program *ast.Program) error {
 
-	// If its not a sole-declaration, i.e: has multiple top level declarations,
-	// then generated an entry page.
+	// If the program does not have a sole declaration,
+	// i.e. it has multiple top level declarations,
+	// then generate an entry page.
+
 	if program.SoleContractDeclaration() == nil &&
 		program.SoleContractInterfaceDeclaration() == nil {
 
@@ -178,7 +182,6 @@ func (gen *DocGenerator) genProgram(program *ast.Program) error {
 		if err != nil {
 			return err
 		}
-
 		defer f.Close()
 
 		err = gen.entryPageGen.Execute(f, program)
@@ -227,9 +230,9 @@ func (gen *DocGenerator) genInterfaceDeclaration(declaration *ast.InterfaceDecla
 
 func (gen *DocGenerator) genCompositeDecl(name string, members *ast.Members, decl ast.Declaration) error {
 	gen.typeNames = append(gen.typeNames, name)
-
 	defer func() {
-		gen.typeNames = gen.typeNames[:len(gen.typeNames)-1]
+		lastIndex := len(gen.typeNames) - 1
+		gen.typeNames = gen.typeNames[:lastIndex]
 	}()
 
 	fileName := fmt.Sprint(gen.currentFileName(), mdFileExt)
@@ -237,7 +240,6 @@ func (gen *DocGenerator) genCompositeDecl(name string, members *ast.Members, dec
 	if err != nil {
 		return err
 	}
-
 	defer f.Close()
 
 	err = gen.compositePageGen.Execute(f, decl)
@@ -260,85 +262,128 @@ func (gen *DocGenerator) currentFileName() string {
 	return strings.Join(gen.typeNames, nameSeparator)
 }
 
-var functions = template.FuncMap{
-	"hasConformance": func(declaration ast.Declaration) bool {
-		switch declaration.DeclarationKind() {
-		case common.DeclarationKindStructure,
-			common.DeclarationKindResource,
-			common.DeclarationKindContract,
-			common.DeclarationKindEnum:
-			return true
-		default:
-			return false
+type ElementTemplateFunctions[T any] interface {
+	HasConformance(T) bool
+	IsEnum(T) bool
+	DeclKeywords(T) string
+	DeclTypeTitle(T) string
+	GenInitializer(T) bool
+	Enums(declarations []T) []T
+	StructsAndResources([]T) []T
+	Events([]T) []T
+}
+
+type ASTDeclarationTemplateFunctions struct{}
+
+var _ ElementTemplateFunctions[ast.Declaration] = ASTDeclarationTemplateFunctions{}
+
+func (ASTDeclarationTemplateFunctions) HasConformance(declaration ast.Declaration) bool {
+	switch declaration.DeclarationKind() {
+	case common.DeclarationKindStructure,
+		common.DeclarationKindResource,
+		common.DeclarationKindContract,
+		common.DeclarationKindEnum:
+		return true
+	default:
+		return false
+	}
+}
+
+func (ASTDeclarationTemplateFunctions) IsEnum(declaration ast.Declaration) bool {
+	return declaration.DeclarationKind() == common.DeclarationKindEnum
+}
+
+func (ASTDeclarationTemplateFunctions) DeclKeywords(declaration ast.Declaration) string {
+	var parts []string
+
+	accessKeyword := declaration.DeclarationAccess().Keyword()
+	if len(accessKeyword) > 0 {
+		parts = append(parts, accessKeyword)
+	}
+
+	var kindKeyword string
+	kind := declaration.DeclarationKind()
+	if kind == common.DeclarationKindField {
+		kindKeyword = declaration.(*ast.FieldDeclaration).VariableKind.Keyword()
+	} else {
+		kindKeyword = kind.Keywords()
+	}
+	if len(kindKeyword) > 0 {
+		parts = append(parts, kindKeyword)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+func (ASTDeclarationTemplateFunctions) DeclTypeTitle(declaration ast.Declaration) string {
+	return strings.Title(declaration.DeclarationKind().Keywords())
+}
+
+func (ASTDeclarationTemplateFunctions) GenInitializer(declaration ast.Declaration) bool {
+	switch declaration.DeclarationKind() {
+	case common.DeclarationKindStructure,
+		common.DeclarationKindResource:
+		return true
+	default:
+		return false
+	}
+}
+
+func (ASTDeclarationTemplateFunctions) Enums(declarations []ast.Declaration) []ast.Declaration {
+	var enums []ast.Declaration
+
+	for _, decl := range declarations {
+		if decl.DeclarationKind() == common.DeclarationKindEnum {
+			enums = append(enums, decl)
 		}
-	},
+	}
 
-	"isEnum": func(declaration ast.Declaration) bool {
-		return declaration.DeclarationKind() == common.DeclarationKindEnum
-	},
+	return enums
+}
 
-	"declKeyword": func(declaration ast.Declaration) string {
-		return declaration.DeclarationKind().Keywords()
-	},
+func (ASTDeclarationTemplateFunctions) StructsAndResources(declarations []ast.Declaration) []ast.Declaration {
+	var structsAndResources []ast.Declaration
 
-	"declTypeTitle": func(declaration ast.Declaration) string {
-		return strings.Title(declaration.DeclarationKind().Keywords())
-	},
-
-	"genInitializer": func(declaration ast.Declaration) bool {
+	for _, declaration := range declarations {
 		switch declaration.DeclarationKind() {
 		case common.DeclarationKindStructure,
 			common.DeclarationKindResource:
-			return true
-		default:
-			return false
+			structsAndResources = append(structsAndResources, declaration)
 		}
-	},
+	}
 
-	"enums": func(declarations []*ast.CompositeDeclaration) []*ast.CompositeDeclaration {
-		decls := make([]*ast.CompositeDeclaration, 0)
-
-		for _, decl := range declarations {
-			if decl.DeclarationKind() == common.DeclarationKindEnum {
-				decls = append(decls, decl)
-			}
-		}
-
-		return decls
-	},
-
-	"structsAndResources": func(declarations []*ast.CompositeDeclaration) []*ast.CompositeDeclaration {
-		decls := make([]*ast.CompositeDeclaration, 0)
-
-		for _, decl := range declarations {
-			switch decl.DeclarationKind() {
-			case common.DeclarationKindStructure,
-				common.DeclarationKindResource:
-				decls = append(decls, decl)
-			default:
-			}
-		}
-
-		return decls
-	},
-
-	"events": func(declarations []*ast.CompositeDeclaration) []*ast.CompositeDeclaration {
-		decls := make([]*ast.CompositeDeclaration, 0)
-		for _, decl := range declarations {
-			if decl.DeclarationKind() == common.DeclarationKindEvent {
-				decls = append(decls, decl)
-			}
-		}
-		return decls
-	},
-
-	"formatDoc": formatDocs,
-
-	"formatFuncDoc": formatFunctionDocs,
+	return structsAndResources
 }
 
-func formatDocs(docString string) string {
-	builder := strings.Builder{}
+func (ASTDeclarationTemplateFunctions) Events(declarations []ast.Declaration) []ast.Declaration {
+	var eventDeclarations []ast.Declaration
+	for _, decl := range declarations {
+		if decl.DeclarationKind() == common.DeclarationKindEvent {
+			eventDeclarations = append(eventDeclarations, decl)
+		}
+	}
+	return eventDeclarations
+}
+
+func newTemplateFunctions[T any](
+	elementFunctions ElementTemplateFunctions[T],
+) template.FuncMap {
+	return template.FuncMap{
+		"hasConformance":      elementFunctions.HasConformance,
+		"isEnum":              elementFunctions.IsEnum,
+		"declKeywords":        elementFunctions.DeclKeywords,
+		"declTypeTitle":       elementFunctions.DeclTypeTitle,
+		"genInitializer":      elementFunctions.GenInitializer,
+		"enums":               elementFunctions.Enums,
+		"structsAndResources": elementFunctions.StructsAndResources,
+		"events":              elementFunctions.Events,
+		"formatDoc":           formatDoc,
+		"formatFuncDoc":       formatFuncDoc,
+	}
+}
+
+func formatDoc(docString string) string {
+	var builder strings.Builder
 
 	// Trim leading and trailing empty lines
 	docString = strings.TrimSpace(docString)
@@ -356,11 +401,12 @@ func formatDocs(docString string) string {
 	return builder.String()
 }
 
-func formatFunctionDocs(docString string, genReturnType bool) string {
-	builder := strings.Builder{}
-	params := make([]string, 0)
-	isPrevLineEmpty := false
-	docLines := 0
+func formatFuncDoc(docString string, genReturnType bool) string {
+	var builder strings.Builder
+
+	var params []string
+	var isPrevLineEmpty bool
+	var docLines int
 	var returnDoc string
 
 	// Trim leading and trailing empty lines
