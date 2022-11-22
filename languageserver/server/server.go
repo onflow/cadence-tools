@@ -1934,7 +1934,7 @@ func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Pr
 	defer sentry.RecoverWithContext(ctx)
 
 	start := time.Now()
-	program, err := parser.ParseProgram([]byte(code), nil)
+	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	elapsed := time.Since(start)
 
 	log(&protocol.LogMessageParams{
@@ -1976,7 +1976,7 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 		return nil, err
 	}
 
-	return parser.ParseProgram([]byte(code), nil)
+	return parser.ParseProgram(nil, []byte(code), parser.Config{})
 }
 
 func (s *Server) GetDocument(uri protocol.DocumentURI) (doc Document, ok bool) {

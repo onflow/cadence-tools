@@ -48,7 +48,7 @@ func Test_ContractUpdate(t *testing.T) {
 			}
      }
         `
-	program, err := parser.ParseProgram([]byte(code), nil)
+	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	require.NoError(t, err)
 
 	location := common.StringLocation("foo")
