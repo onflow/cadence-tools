@@ -1,4 +1,4 @@
 {{define "field"}}
 
-    {{.DeclarationIdentifier}}:  {{.TypeAnnotation.Type.String -}}
+    {{declKeywords .}} {{.DeclarationIdentifier}}: {{.TypeAnnotation.Type.String -}}
 {{end -}}

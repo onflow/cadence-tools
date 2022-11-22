@@ -1,7 +1,7 @@
 # {{declTypeTitle .}} `{{.DeclarationIdentifier}}`
 
 ```cadence
-{{declKeyword .}} {{.DeclarationIdentifier}}
+{{declKeywords .}} {{.DeclarationIdentifier}}
 
 {{- if isEnum . -}}
 {{- if eq (len .Conformances) 1 -}}
