@@ -9,8 +9,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v0.28.0
 	github.com/onflow/cadence-tools/lint v0.2.0
-	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221012181819-8d43a4be0028
-	github.com/onflow/flow-go-sdk v0.29.0
+	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221123090817-587405125c1f
+	github.com/onflow/flow-go-sdk v0.29.1
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.0
 	github.com/stretchr/testify v1.8.0
@@ -108,7 +108,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.1 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
-	github.com/onflow/cadence-tools/test v0.2.0 // indirect
+	github.com/onflow/cadence-tools/test v0.2.1-0.20221012182900-f46efb551c55 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220720151516-797b149ceaaa // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220720151516-797b149ceaaa // indirect
 	github.com/onflow/flow-emulator v0.38.0 // indirect
