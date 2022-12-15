@@ -63,6 +63,11 @@ type EmulatorBackend struct {
 	configuration *stdlib.Configuration
 }
 
+func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler {
+	// TODO:
+	return nil
+}
+
 type keyInfo struct {
 	accountKey *sdk.AccountKey
 	signer     crypto.Signer
@@ -117,7 +122,8 @@ func (e *EmulatorBackend) RunScript(
 		}
 	}
 
-	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, result.Value, nil)
+	// TODO:
+	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, nil, result.Value, nil)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
@@ -398,7 +404,7 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 		return code
 	}
 
-	program, err := parser.ParseProgram([]byte(code), nil)
+	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	if err != nil {
 		panic(err)
 	}

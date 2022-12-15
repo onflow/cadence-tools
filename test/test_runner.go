@@ -21,8 +21,9 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/fvm/environment"
 	"strings"
+
+	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/rs/zerolog"
 
@@ -277,8 +278,9 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 	) (sema.Import, error) {
 		var elaboration *sema.Elaboration
 		switch importedLocation {
-		case stdlib.CryptoChecker.Location:
-			elaboration = stdlib.CryptoChecker.Elaboration
+		case stdlib.CryptoCheckerLocation:
+			cryptoChecker := stdlib.CryptoChecker()
+			elaboration = cryptoChecker.Elaboration
 
 		case stdlib.TestContractLocation:
 			elaboration = stdlib.TestContractChecker.Elaboration
@@ -327,7 +329,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 ) interpreter.ContractValue {
 
 	switch compositeType.Location {
-	case stdlib.CryptoChecker.Location:
+	case stdlib.CryptoCheckerLocation:
 		contract, err := stdlib.NewCryptoContract(
 			inter,
 			constructorGenerator(common.Address{}),
@@ -361,8 +363,9 @@ func (r *TestRunner) interpreterContractValueHandler(
 func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
 	return func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
 		switch location {
-		case stdlib.CryptoChecker.Location:
-			program := interpreter.ProgramFromChecker(stdlib.CryptoChecker)
+		case stdlib.CryptoCheckerLocation:
+			cryptoChecker := stdlib.CryptoChecker()
+			program := interpreter.ProgramFromChecker(cryptoChecker)
 			subInterpreter, err := inter.NewSubInterpreter(program, location)
 			if err != nil {
 				panic(err)
@@ -419,7 +422,12 @@ func newScriptEnvironment() environment.Environment {
 		state.DefaultParameters(),
 	)
 
-	return fvm.NewScriptEnv(context.Background(), ctx, sth, emptyPrograms)
+	return environment.NewScriptEnvironment(
+		context.Background(),
+		environment.DefaultEnvironmentParams(),
+		sth,
+		emptyPrograms,
+	)
 }
 
 func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runtime.Context) (*ast.Program, *sema.Elaboration, error) {
