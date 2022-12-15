@@ -117,7 +117,7 @@ func TestAssertFunction(t *testing.T) {
 	result, err = runner.RunTest(code, "testAssertWithNoArgsFail")
 	require.NoError(t, err)
 	require.Error(t, result.Error)
-	assert.Equal(t, result.Error.Error(), "assertion failed")
+	assert.Contains(t, result.Error.Error(), "assertion failed")
 
 	result, err = runner.RunTest(code, "testAssertWithMessage")
 	require.NoError(t, err)
@@ -1146,10 +1146,16 @@ func TestPrettyPrintTestResults(t *testing.T) {
 	expected := `Test results:
 - PASS: testFunc1
 - FAIL: testFunc2
-		assertion failed: unexpected error occurred
+		Execution failed:
+			error: assertion failed: unexpected error occurred
+			 --> 7465737400000000000000000000000000000000000000000000000000000000:9:12
+			
 - PASS: testFunc3
 - FAIL: testFunc4
-		panic: runtime error
+		Execution failed:
+			error: panic: runtime error
+			  --> 7465737400000000000000000000000000000000000000000000000000000000:17:12
+			
 `
 
 	assert.Equal(t, expected, resultsStr)
