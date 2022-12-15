@@ -23,12 +23,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onflow/flow-go/fvm/environment"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 
@@ -240,7 +239,12 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 
 	// Interpreter configs
 	env.InterpreterConfig.ImportLocationHandler = r.interpreterImportHandler(ctx)
-	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler
+
+	// It is safe to use the test-runner's environment as the standard library handler
+	// in the test framework, since it is only used for value conversions (i.e: values
+	// returned from blockchain to the test script)
+	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
+
 	// TODO: The default injected fields handler only supports 'address' locations.
 	//   However, during tests, it is possible to get non-address locations. e.g: file paths.
 	//   Thus, need to properly handle them. Make this nil for now.
@@ -322,41 +326,45 @@ func contractValueHandler(
 }
 
 func (r *TestRunner) interpreterContractValueHandler(
-	inter *interpreter.Interpreter,
-	compositeType *sema.CompositeType,
-	constructorGenerator func(common.Address) *interpreter.HostFunctionValue,
-	invocationRange ast.Range,
-) interpreter.ContractValue {
+	stdlibHandler stdlib.StandardLibraryHandler,
+) interpreter.ContractValueHandlerFunc {
+	return func(
+		inter *interpreter.Interpreter,
+		compositeType *sema.CompositeType,
+		constructorGenerator func(common.Address) *interpreter.HostFunctionValue,
+		invocationRange ast.Range,
+	) interpreter.ContractValue {
 
-	switch compositeType.Location {
-	case stdlib.CryptoCheckerLocation:
-		contract, err := stdlib.NewCryptoContract(
-			inter,
-			constructorGenerator(common.Address{}),
-			invocationRange,
-		)
-		if err != nil {
-			panic(err)
+		switch compositeType.Location {
+		case stdlib.CryptoCheckerLocation:
+			contract, err := stdlib.NewCryptoContract(
+				inter,
+				constructorGenerator(common.Address{}),
+				invocationRange,
+			)
+			if err != nil {
+				panic(err)
+			}
+			return contract
+
+		case stdlib.TestContractLocation:
+			testFramework := NewEmulatorBackend(r.fileResolver, stdlibHandler)
+			contract, err := stdlib.NewTestContract(
+				inter,
+				testFramework,
+				constructorGenerator(common.Address{}),
+				invocationRange,
+			)
+			if err != nil {
+				panic(err)
+			}
+			return contract
+
+		default:
+			// During tests, imported contracts can be constructed using the constructor,
+			// similar to structs. Therefore, generate a constructor function.
+			return constructorGenerator(common.Address{})
 		}
-		return contract
-
-	case stdlib.TestContractLocation:
-		testFramework := NewEmulatorBackend(r.fileResolver)
-		contract, err := stdlib.NewTestContract(
-			inter,
-			testFramework,
-			constructorGenerator(common.Address{}),
-			invocationRange,
-		)
-		if err != nil {
-			panic(err)
-		}
-		return contract
-
-	default:
-		// During tests, imported contracts can be constructed using the constructor,
-		// similar to structs. Therefore, generate a constructor function.
-		return constructorGenerator(common.Address{})
 	}
 }
 

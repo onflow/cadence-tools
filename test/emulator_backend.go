@@ -55,17 +55,13 @@ type EmulatorBackend struct {
 	accountKeys map[common.Address]map[string]keyInfo
 
 	// fileResolver is used to resolve local files.
-	//
 	fileResolver FileResolver
 
 	// A property bag to pass various configurations to the backend.
 	// Currently, supports passing address mapping for contracts.
 	configuration *stdlib.Configuration
-}
 
-func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler {
-	// TODO:
-	return nil
+	stdlibHandler stdlib.StandardLibraryHandler
 }
 
 type keyInfo struct {
@@ -73,12 +69,13 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
-func NewEmulatorBackend(fileResolver FileResolver) *EmulatorBackend {
+func NewEmulatorBackend(fileResolver FileResolver, stdlibHandler stdlib.StandardLibraryHandler) *EmulatorBackend {
 	return &EmulatorBackend{
-		blockchain:   newBlockchain(),
-		blockOffset:  0,
-		accountKeys:  map[common.Address]map[string]keyInfo{},
-		fileResolver: fileResolver,
+		blockchain:    newBlockchain(),
+		blockOffset:   0,
+		accountKeys:   map[common.Address]map[string]keyInfo{},
+		fileResolver:  fileResolver,
+		stdlibHandler: stdlibHandler,
 	}
 }
 
@@ -122,8 +119,7 @@ func (e *EmulatorBackend) RunScript(
 		}
 	}
 
-	// TODO:
-	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, nil, result.Value, nil)
+	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, e.stdlibHandler, result.Value, nil)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
@@ -135,7 +131,7 @@ func (e *EmulatorBackend) RunScript(
 	}
 }
 
-func (e EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
+func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 	// Also generate the keys. So that users don't have to do this in two steps.
 	// Store the generated keys, so that it could be looked-up, given the address.
 
@@ -442,4 +438,8 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 	sb.WriteString(code[importDeclEnd:])
 
 	return sb.String()
+}
+
+func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler {
+	return e.stdlibHandler
 }
