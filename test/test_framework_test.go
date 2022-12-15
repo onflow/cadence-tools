@@ -117,7 +117,7 @@ func TestAssertFunction(t *testing.T) {
 	result, err = runner.RunTest(code, "testAssertWithNoArgsFail")
 	require.NoError(t, err)
 	require.Error(t, result.Error)
-	assert.Equal(t, result.Error.Error(), "assertion failed")
+	assert.Contains(t, result.Error.Error(), "assertion failed")
 
 	result, err = runner.RunTest(code, "testAssertWithMessage")
 	require.NoError(t, err)
@@ -491,6 +491,87 @@ func TestUsingEnv(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
 	})
+
+	t.Run("verify using public key of account", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+            import Test
+
+            pub fun test() {
+                var blockchain = Test.newEmulatorBlockchain()
+                var account = blockchain.createAccount()
+
+                // just checking the invocation of verify function
+                assert(!account.publicKey.verify(
+                    signature: [],
+                    signedData: [],
+                    domainSeparationTag: "something",
+                    hashAlgorithm: HashAlgorithm.SHA2_256
+                ))
+            }
+        `
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("verify using public key returned from blockchain", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+            import Test
+
+            pub fun test() {
+                var blockchain = Test.newEmulatorBlockchain()
+                var account = blockchain.createAccount()
+
+                var script = Test.readFile("./sample/script.cdc")
+
+                var result = blockchain.executeScript(script, [])
+
+                assert(result.status == Test.ResultStatus.succeeded)
+
+                let pubKey = result.returnValue! as! PublicKey
+
+                // just checking the invocation of verify function
+                assert(!pubKey.verify(
+                   signature: [],
+                   signedData: [],
+                   domainSeparationTag: "",
+                   hashAlgorithm: HashAlgorithm.SHA2_256
+                ))
+            }
+        `
+
+		const scriptCode = `
+            pub fun main(): PublicKey {
+                return PublicKey(
+                    publicKey: "db04940e18ec414664ccfd31d5d2d4ece3985acb8cb17a2025b2f1673427267968e52e2bbf3599059649d4b2cce98fdb8a3048e68abf5abe3e710129e90696ca".decodeHex(),
+                    signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+                )
+            }
+        `
+
+		resolverInvoked := false
+		fileResolver := func(path string) (string, error) {
+			resolverInvoked = true
+			assert.Equal(t, path, "./sample/script.cdc")
+
+			return scriptCode, nil
+		}
+
+		runner := NewTestRunner().WithFileResolver(fileResolver)
+
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+
+		assert.True(t, resolverInvoked)
+	})
+
 }
 
 func TestCreateAccount(t *testing.T) {
@@ -1146,10 +1227,16 @@ func TestPrettyPrintTestResults(t *testing.T) {
 	expected := `Test results:
 - PASS: testFunc1
 - FAIL: testFunc2
-		assertion failed: unexpected error occurred
+		Execution failed:
+			error: assertion failed: unexpected error occurred
+			 --> 7465737400000000000000000000000000000000000000000000000000000000:9:12
+			
 - PASS: testFunc3
 - FAIL: testFunc4
-		panic: runtime error
+		Execution failed:
+			error: panic: runtime error
+			  --> 7465737400000000000000000000000000000000000000000000000000000000:17:12
+			
 `
 
 	assert.Equal(t, expected, resultsStr)
@@ -2417,7 +2504,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(nil)
+	emulatorBackend := NewEmulatorBackend(nil, nil)
 	emulatorBackend.UseConfiguration(&stdlib.Configuration{
 		Addresses: map[string]common.Address{
 			"./sample/contract1.cdc": {0x1},
