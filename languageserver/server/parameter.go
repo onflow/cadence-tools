@@ -29,7 +29,7 @@ type Parameter struct {
 	Type string `json:"type"`
 }
 
-func encodeParameters(parameters []*sema.Parameter) []Parameter {
+func encodeParameters(parameters []sema.Parameter) []Parameter {
 
 	encodedParameters := make([]Parameter, len(parameters))
 
