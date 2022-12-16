@@ -49,7 +49,7 @@ type entryPointInfo struct {
 	documentVersion       int32
 	startPos              *ast.Position
 	kind                  entryPointKind
-	parameters            []*sema.Parameter
+	parameters            []sema.Parameter
 	pragmaArgumentStrings []string
 	pragmaArguments       [][]Argument // todo can we refactor into a 1D list
 	pragmaSignerNames     []string
@@ -67,14 +67,14 @@ func (e *entryPointInfo) update(uri protocol.DocumentURI, version int32, checker
 
 	if transactionDeclaration != nil {
 		docString = transactionDeclaration.DocString
-		transactionType := checker.Elaboration.TransactionDeclarationTypes[transactionDeclaration]
+		transactionType := checker.Elaboration.TransactionDeclarationType(transactionDeclaration)
 		e.startPos = &transactionDeclaration.StartPos
 		e.kind = entryPointKindTransaction
 		e.parameters = transactionType.Parameters
 		e.numberOfSigners = len(transactionType.PrepareParameters)
 	} else if functionDeclaration != nil {
 		docString = functionDeclaration.DocString
-		functionType := checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
+		functionType := checker.Elaboration.FunctionDeclarationFunctionType(functionDeclaration)
 		e.startPos = &functionDeclaration.StartPos
 		e.kind = entryPointKindScript
 		e.parameters = functionType.Parameters
@@ -125,7 +125,6 @@ func (e *entryPointInfo) update(uri protocol.DocumentURI, version int32, checker
 
 // codelens shows an execute button when there is exactly one valid entry point
 // (valid script function or transaction declaration) and no other actionable declarations.
-//
 func (e *entryPointInfo) codelens(client flowClient) []*protocol.CodeLens {
 	if e.kind == entryPointKindUnknown || e.startPos == nil {
 		return nil

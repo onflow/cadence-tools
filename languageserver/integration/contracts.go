@@ -45,7 +45,7 @@ type contractInfo struct {
 	startPos              *ast.Position
 	kind                  contractKind
 	name                  string
-	parameters            []*sema.Parameter
+	parameters            []sema.Parameter
 	pragmaArgumentStrings []string
 	pragmaArguments       [][]Argument
 	pragmaSignersNames    []string
@@ -65,7 +65,7 @@ func (c *contractInfo) update(uri protocol.DocumentURI, version int32, checker *
 		c.name = contractDeclaration.Identifier.String()
 		c.startPos = &contractDeclaration.StartPos
 		c.kind = contractTypeDeclaration
-		contractType := checker.Elaboration.CompositeDeclarationTypes[contractDeclaration]
+		contractType := checker.Elaboration.CompositeDeclarationType(contractDeclaration)
 		c.parameters = contractType.ConstructorParameters
 	} else if contractInterfaceDeclaration != nil {
 		docString = contractInterfaceDeclaration.DocString
