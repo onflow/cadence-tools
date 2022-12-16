@@ -261,8 +261,9 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					redundantType, ok := elaboration.StaticCastTypes[castingExpression]
-					if ok && isRedundantCast(castingExpression.Expression,
+					redundantType := elaboration.StaticCastTypes(castingExpression)
+					if redundantType.ExprActualType != nil && isRedundantCast(
+						castingExpression.Expression,
 						redundantType.ExprActualType,
 						redundantType.TargetType,
 						redundantType.ExpectedType,
@@ -278,8 +279,10 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					alwaysSucceedingTypes, ok := elaboration.RuntimeCastTypes[castingExpression]
-					if ok && sema.IsSubType(alwaysSucceedingTypes.Left, alwaysSucceedingTypes.Right) {
+					alwaysSucceedingTypes := elaboration.RuntimeCastTypes(castingExpression)
+					if alwaysSucceedingTypes.Left != nil &&
+						sema.IsSubType(alwaysSucceedingTypes.Left, alwaysSucceedingTypes.Right) {
+
 						switch castingExpression.Operation {
 						case ast.OperationFailableCast:
 							report(
@@ -293,6 +296,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 										alwaysSucceedingTypes.Right),
 								},
 							)
+
 						case ast.OperationForceCast:
 							report(
 								analysis.Diagnostic{
@@ -305,6 +309,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 										alwaysSucceedingTypes.Right),
 								},
 							)
+
 						default:
 							panic(errors.NewUnreachableError())
 						}
