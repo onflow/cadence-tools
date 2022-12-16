@@ -50,8 +50,8 @@ var UnnecessaryForceAnalyzer = (func() *analysis.Analyzer {
 					if !ok {
 						return
 					}
-					valueType := elaboration.ForceExpressionTypes[forceExpression]
 
+					valueType := elaboration.ForceExpressionType(forceExpression)
 					if valueType == nil {
 						return
 					}

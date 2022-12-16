@@ -57,7 +57,7 @@ var DeprecatedKeyFunctionsAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					memberInfo := elaboration.MemberExpressionMemberInfos[memberExpression]
+					memberInfo, _ := elaboration.MemberExpressionMemberInfo(memberExpression)
 					member := memberInfo.Member
 					if member == nil {
 						return
@@ -70,9 +70,9 @@ var DeprecatedKeyFunctionsAnalyzer = (func() *analysis.Analyzer {
 					var replacement string
 					functionName := member.Identifier.Identifier
 					switch functionName {
-					case sema.AuthAccountAddPublicKeyField:
+					case sema.AuthAccountTypeAddPublicKeyFunctionName:
 						replacement = "keys.add"
-					case sema.AuthAccountRemovePublicKeyField:
+					case sema.AuthAccountTypeRemovePublicKeyFunctionName:
 						replacement = "keys.revoke"
 					default:
 						return

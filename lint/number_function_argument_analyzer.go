@@ -184,17 +184,29 @@ var NumberFunctionArgumentAnalyzer = (func() *analysis.Analyzer {
 
 					switch expr := element.(type) {
 					case *ast.IntegerExpression:
-						argumentData, ok := elaboration.NumberConversionArgumentTypes[expr]
-						if !ok {
+						argumentData := elaboration.NumberConversionArgumentTypes(expr)
+						if argumentData.Type == nil {
 							return
 						}
-						diagnostic = suggestIntegerLiteralConversionReplacement(expr, location, argumentData.Type, argumentData.Range)
+						diagnostic = suggestIntegerLiteralConversionReplacement(
+							expr,
+							location,
+							argumentData.Type,
+							argumentData.Range,
+						)
+
 					case *ast.FixedPointExpression:
-						argumentData, ok := elaboration.NumberConversionArgumentTypes[expr]
-						if !ok {
+						argumentData := elaboration.NumberConversionArgumentTypes(expr)
+						if argumentData.Type == nil {
 							return
 						}
-						diagnostic = suggestFixedPointLiteralConversionReplacement(expr, location, argumentData.Type, argumentData.Range)
+						diagnostic = suggestFixedPointLiteralConversionReplacement(
+							expr,
+							location,
+							argumentData.Type,
+							argumentData.Range,
+						)
+
 					default:
 						return
 					}
