@@ -2206,7 +2206,8 @@ func (s *Server) convertError(
 		switch ty := err.Type.(type) {
 		case *sema.CompositeType:
 			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
-				return elaboration.CompositeTypeDeclaration(ty)
+				declaration, _ := elaboration.CompositeTypeDeclaration(ty)
+				return declaration
 			}
 		case *sema.InterfaceType:
 			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
@@ -2421,7 +2422,8 @@ func maybeAddMissingMembersCodeActionResolver(
 
 		var builder strings.Builder
 
-		indentation := strings.Repeat(" ", err.CompositeDeclaration.StartPos.Column+indentationCount)
+		startPos := err.CompositeDeclaration.StartPosition()
+		indentation := strings.Repeat(" ", startPos.Column+indentationCount)
 
 		for _, missingMember := range err.MissingMembers {
 			newMemberSource := formatNewMember(missingMember, indentation)
@@ -2439,7 +2441,7 @@ func maybeAddMissingMembersCodeActionResolver(
 			builder.WriteRune('\n')
 		}
 
-		insertionPos := err.CompositeDeclaration.EndPos
+		insertionPos := err.CompositeDeclaration.EndPosition(nil)
 
 		textEdit := protocol.TextEdit{
 			Range: protocol.Range{
