@@ -103,10 +103,14 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 		return err
 	}
 
-	hostedEmulator := gateway.NewEmulatorGateway(serviceAccount)
+	var emulator gateway.Gateway
+	// try connecting to already running local emulator
+	emulator, err = gateway.NewGrpcGateway(config.DefaultEmulatorNetwork().Host)
+	if err != nil { // fallback to hosted emulator if error
+		emulator = gateway.NewEmulatorGateway(serviceAccount)
+	}
 
-	f.services = services.NewServices(hostedEmulator, state, logger)
-
+	f.services = services.NewServices(emulator, state, logger)
 	if numberOfAccounts > len(names) || numberOfAccounts <= 0 {
 		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
 	}
