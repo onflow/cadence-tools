@@ -106,7 +106,7 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 	var emulator gateway.Gateway
 	// try connecting to already running local emulator
 	emulator, err = gateway.NewGrpcGateway(config.DefaultEmulatorNetwork().Host)
-	if err != nil { // fallback to hosted emulator if error
+	if err != nil || emulator.Ping() != nil { // fallback to hosted emulator if error
 		emulator = gateway.NewEmulatorGateway(serviceAccount)
 	}
 
