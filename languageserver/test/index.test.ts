@@ -430,6 +430,17 @@ describe("transactions", () => {
     }, true)
   })
 
+  test("send a transaction with an account from configuration", async() => {
+    await withConnection(async connection => {
+      let result = await connection.sendRequest(ExecuteCommandRequest.type, {
+        command: "cadence.server.flow.sendTransaction",
+        arguments: [`file://${__dirname}/transaction.cdc`, "[]", ["moose [flow.json]"]]
+      })
+
+      expect(resultRegex.test(result)).toBeTruthy()
+    }, true)
+  })
+
   test("send a transaction with multiple signers", async() => {
     await withConnection(async connection => {
       let result = await connection.sendRequest(ExecuteCommandRequest.type, {
@@ -445,21 +456,41 @@ describe("transactions", () => {
 
 describe("contracts", () => {
 
-  async function deploy(connection: ProtocolConnection, signer: string) {
+  async function deploy(connection: ProtocolConnection, signer: string, file: string, name: string) {
     return connection.sendRequest(ExecuteCommandRequest.type, {
       command: "cadence.server.flow.deployContract",
-      arguments: [`file://${__dirname}/foo.cdc`, "Foo", signer]
+      arguments: [`file://${__dirname}/${file}.cdc`, name, signer]
     })
   }
 
   test("deploy a contract", async() => {
     await withConnection(async connection => {
-      let result = await deploy(connection, "")
+      let result = await deploy(connection, "", "foo", "Foo")
       expect(result).toEqual("Contract Foo has been deployed to account Alice")
 
-      result = await deploy(connection, "Bob")
+      result = await deploy(connection, "Bob", "foo", "Foo")
       expect(result).toEqual("Contract Foo has been deployed to account Bob")
     }, true)
+  })
+
+  test("deploy contract with file import", async() => {
+    await withConnection(async connection => {
+        let result = await deploy(connection, "moose [flow.json]", "foo", "Foo")
+        expect(result).toEqual("Contract Foo has been deployed to account moose [flow.json]")
+
+        result = await deploy(connection, "moose [flow.json]", "bar", "Bar")
+        expect(result).toEqual("Contract Bar has been deployed to account moose [flow.json]")
+    }, true)
+  })
+
+  test("deploy contract with identifier imports", async() => {
+    await withConnection(async connection => {
+      let result = await deploy(connection, "moose [flow.json]", "foo", "Foo")
+      expect(result).toEqual("Contract Foo has been deployed to account moose [flow.json]")
+
+      result = await deploy(connection, "moose [flow.json]", "zoo", "Zoo")
+      expect(result).toEqual("Contract Zoo has been deployed to account moose [flow.json]")
+    })
   })
 
 })
