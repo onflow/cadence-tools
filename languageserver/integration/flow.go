@@ -331,12 +331,18 @@ func createSigner(address flow.Address, account *flowkit.Account) *flowkit.Accou
 // resolveFilename helper converts the transaction file to a relative location to config file
 // we will be replacing this logic once the FLIP is implemented
 // https://github.com/onflow/flow/blob/master/flips/2022-03-23-contract-imports-syntax.md
-func resolveFilename(configPath string, path string) (filename string, err error) {
-	if filepath.Dir(configPath) != "." {
-		filename, err = filepath.Rel(filepath.Dir(configPath), path)
+func resolveFilename(configPath string, path string) (string, error) {
+	if filepath.Dir(configPath) == "." { // if flow.json is passed as relative use current dir
+		workPath, err := os.Getwd()
 		if err != nil {
 			return "", err
 		}
+		return filepath.Rel(workPath, path)
+	}
+
+	filename, err := filepath.Rel(filepath.Dir(configPath), path)
+	if err != nil {
+		return "", err
 	}
 
 	return filename, nil
