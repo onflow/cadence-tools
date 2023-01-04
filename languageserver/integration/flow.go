@@ -21,6 +21,7 @@ package integration
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 
 	"github.com/onflow/flow-cli/pkg/flowkit/config"
@@ -80,6 +81,7 @@ type flowkitClient struct {
 	accounts      []*clientAccount
 	activeAccount *clientAccount
 	configPath    string
+	hosted        bool
 }
 
 func newFlowkitClient(loader flowkit.ReaderWriter) *flowkitClient {
@@ -106,8 +108,10 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 	var emulator gateway.Gateway
 	// try connecting to already running local emulator
 	emulator, err = gateway.NewGrpcGateway(config.DefaultEmulatorNetwork().Host)
+	f.hosted = false
 	if err != nil || emulator.Ping() != nil { // fallback to hosted emulator if error
 		emulator = gateway.NewEmulatorGateway(serviceAccount)
+		f.hosted = true
 	}
 
 	f.services = services.NewServices(emulator, state, logger)
