@@ -6,8 +6,8 @@
 		}
 	},
 	"contracts": {
-		"foo": "./foo.cdc",
-		"bar": "./bar.cdc"
+		"Foo": "./foo.cdc",
+		"Bar": "./bar.cdc"
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
@@ -27,8 +27,8 @@
 	"deployments": {
 		"emulator": {
 			"moose": [
-				"foo",
-				"bar"
+				"Foo",
+				"Bar"
 			]
 		}
 	}

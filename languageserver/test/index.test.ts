@@ -490,7 +490,7 @@ describe("contracts", () => {
 
       result = await deploy(connection, "moose [flow.json]", "zoo", "Zoo")
       expect(result).toEqual("Contract Zoo has been deployed to account moose [flow.json]")
-    })
+    }, true)
   })
 
 })
