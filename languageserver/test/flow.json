@@ -5,7 +5,10 @@
 			"serviceAccount": "emulator-account"
 		}
 	},
-	"contracts": {},
+	"contracts": {
+		"foo": "./foo.cdc",
+		"bar": "./bar.cdc"
+	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
 		"mainnet": "access.mainnet.nodes.onflow.org:9000",
@@ -15,7 +18,18 @@
 		"emulator-account": {
 			"address": "f8d6e0586b0a20c7",
 			"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+		},
+		"moose": {
+			"address": "f8d6e0586b0a20c7",
+			"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
 		}
 	},
-	"deployments": {}
+	"deployments": {
+		"emulator": {
+			"moose": [
+				"foo",
+				"bar"
+			]
+		}
+	}
 }
