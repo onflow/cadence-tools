@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/onflow/cadence v0.30.0-attachments
-	github.com/onflow/flow-emulator v0.41.0-cadence-attachments
-	github.com/onflow/flow-go v0.28.1-0.20221215213522-3577617919c5
+	github.com/onflow/flow-emulator v0.41.0-cadence-attachments-2
+	github.com/onflow/flow-go v0.28.1-0.20230104183005-ff76d50986c7
 	github.com/onflow/flow-go-sdk v0.29.1
 	github.com/rs/zerolog v1.28.0
 	github.com/stretchr/testify v1.8.0
