@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v0.30.0
 	github.com/onflow/cadence-tools/lint v0.3.0
-	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221219124918-74d7ad5baf41
+	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221219144014-b53c498650fd
 	github.com/onflow/flow-go-sdk v0.30.0
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.0
