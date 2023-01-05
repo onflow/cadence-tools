@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v0.30.0
 	github.com/onflow/cadence-tools/lint v0.3.0
-	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20221219144014-b53c498650fd
+	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20230104130036-edc3a2db7f50
 	github.com/onflow/flow-go-sdk v0.30.0
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.0
@@ -183,3 +183,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
+
+replace github.com/onflow/flow-cli/pkg/flowkit => ../../flow-cli/pkg/flowkit
