@@ -23,6 +23,7 @@ import (
 	"context"
 	json2 "encoding/json"
 	"fmt"
+	"github.com/onflow/cadence-tools/languageserver/test"
 	"io"
 	"os"
 	"strconv"
@@ -145,6 +146,9 @@ type AddressContractNamesResolver func(address common.Address) ([]string, error)
 // StringImportResolver is a function that is used to resolve string imports
 type StringImportResolver func(location common.StringLocation) (string, error)
 
+// IdentifierImportResolver is a function that is used to resolve identifier imports supported by flowkit
+type IdentifierImportResolver func(location common.IdentifierLocation) (string, error)
+
 // CodeLensProvider is a function that is used to provide code lenses for the given checker
 type CodeLensProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.CodeLens, error)
 
@@ -172,6 +176,8 @@ type Server struct {
 	resolveAddressContractNames AddressContractNamesResolver
 	// resolveStringImport is the optional function that is used to resolve string imports
 	resolveStringImport StringImportResolver
+	// resolveIdentifierImport is the optional function that is used to resolve identifiers for the imports used in flowkit
+	resolveIdentifierImport IdentifierImportResolver
 	// codeLensProviders are the functions that are used to provide code lenses for a checker
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
@@ -231,6 +237,15 @@ func WithAddressContractNamesResolver(resolver AddressContractNamesResolver) Opt
 func WithStringImportResolver(resolver StringImportResolver) Option {
 	return func(s *Server) error {
 		s.resolveStringImport = resolver
+		return nil
+	}
+}
+
+// WithIdentifierImportResolver returns a server option that sets the given function
+// as the function that is used to resolve identifier imports
+func WithIdentifierImportResolver(resolver IdentifierImportResolver) Option {
+	return func(s *Server) error {
+		s.resolveIdentifierImport = resolver
 		return nil
 	}
 }
@@ -1969,6 +1984,17 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 		}
 		code, err = s.resolveAddressImport(loc)
 
+	case common.IdentifierLocation:
+		if location.String() == "Crypto" {
+			return nil, nil // don't try resolving stdlibs, leave it to the checker
+		}
+
+		if s.resolveIdentifierImport == nil {
+			return nil, nil
+		}
+		code, err = s.resolveIdentifierImport(loc)
+		test.Log("Resolved identifier import", loc.String(), code)
+
 	default:
 		return nil, nil
 	}
@@ -2805,9 +2831,13 @@ func (s *Server) handleImport(
 			}
 		}
 
+		test.Log("Import location", importedLocation)
+
 		importedChecker, ok := s.checkers[importedLocation]
 		if !ok {
 			importedProgram, err := s.resolveImport(importedLocation)
+			test.Log("Imported program", importedProgram.SoleContractDeclaration().String())
+
 			if err != nil {
 				return nil, err
 			}
@@ -2828,6 +2858,7 @@ func (s *Server) handleImport(
 			}
 		}
 
+		test.Log("checked for location with var count", importedLocation, importedChecker.Elaboration.VariableDeclarationTypesCount())
 		return sema.ElaborationImport{
 			Elaboration: importedChecker.Elaboration,
 		}, nil

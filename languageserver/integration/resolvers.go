@@ -49,6 +49,10 @@ func (r *resolvers) addressImport(location common.AddressLocation) (string, erro
 	return string(account.Contracts[location.Name]), nil
 }
 
+func (r *resolvers) identifierImport(location common.IdentifierLocation) (string, error) {
+	return r.client.GetCodeByIdentifier(location.String())
+}
+
 func (r *resolvers) addressContractNames(address common.Address) ([]string, error) {
 	account, err := r.client.GetAccount(flow.HexToAddress(address.String()))
 	if err != nil {

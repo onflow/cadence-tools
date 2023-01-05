@@ -24,13 +24,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onflow/flow-cli/pkg/flowkit/config"
+	"github.com/onflow/cadence-tools/languageserver/test"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-cli/pkg/flowkit"
+	"github.com/onflow/flow-cli/pkg/flowkit/config"
 	"github.com/onflow/flow-cli/pkg/flowkit/gateway"
 	"github.com/onflow/flow-cli/pkg/flowkit/output"
 	"github.com/onflow/flow-cli/pkg/flowkit/services"
@@ -54,6 +55,7 @@ type flowClient interface {
 	) (*flow.Transaction, *flow.TransactionResult, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	CreateAccount() (*clientAccount, error)
+	GetCodeByIdentifier(name string) (string, error)
 }
 
 var _ flowClient = &flowkitClient{}
@@ -308,6 +310,25 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 	f.accounts = append(f.accounts, clientAccount)
 
 	return clientAccount, nil
+}
+
+func (f *flowkitClient) GetCodeByIdentifier(name string) (string, error) {
+	contracts, err := f.state.DeploymentContractsByNetwork(
+		config.DefaultEmulatorNetwork().Name,
+	)
+	if err != nil {
+		test.Log("ID: err", err)
+		return "", err
+	}
+
+	for _, contract := range contracts {
+		if name == contract.Name {
+			test.Log("ID: found, name", name, string(contract.Code()), contract.Location())
+			return string(contract.Code()), nil
+		}
+	}
+
+	return "", fmt.Errorf(fmt.Sprintf("couldn't find the contract by import identifier: %s", name))
 }
 
 // accountsFromState extracts all the account defined by user in configuration.
