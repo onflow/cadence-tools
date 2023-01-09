@@ -40,6 +40,7 @@ import (
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowClient --filename mock_flow_test.go --inpkg
 type flowClient interface {
 	Initialize(configPath string, numberOfAccounts int) error
+	Reload() error
 	GetClientAccount(name string) *clientAccount
 	GetActiveClientAccount() *clientAccount
 	GetClientAccounts() []*clientAccount
@@ -126,6 +127,15 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 	f.accounts[0].Active = true // make first active by default
 	f.activeAccount = f.accounts[0]
 
+	return nil
+}
+
+func (f *flowkitClient) Reload() error {
+	state, err := flowkit.Load([]string{f.configPath}, f.loader)
+	if err != nil {
+		return err
+	}
+	f.state = state
 	return nil
 }
 
