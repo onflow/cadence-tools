@@ -37,7 +37,7 @@ const (
 	CommandCreateAccount       = "cadence.server.flow.createAccount"
 	CommandSwitchActiveAccount = "cadence.server.flow.switchActiveAccount"
 	CommandGetAccounts         = "cadence.server.flow.getAccounts"
-	CommandReloadConfig        = "cadence.server.flow.reloadConfig"
+	CommandReloadConfig        = "cadence.server.flow.reloadConfiguration"
 )
 
 type commands struct {
