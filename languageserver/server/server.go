@@ -23,7 +23,6 @@ import (
 	"context"
 	json2 "encoding/json"
 	"fmt"
-	"github.com/onflow/cadence-tools/languageserver/test"
 	"io"
 	"os"
 	"strconv"
@@ -1993,7 +1992,6 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 			return nil, nil
 		}
 		code, err = s.resolveIdentifierImport(loc)
-		test.Log("Resolved identifier import", loc.String(), code)
 
 	default:
 		return nil, nil
@@ -2831,12 +2829,9 @@ func (s *Server) handleImport(
 			}
 		}
 
-		test.Log("Import location", importedLocation)
-
 		importedChecker, ok := s.checkers[importedLocation]
 		if !ok {
 			importedProgram, err := s.resolveImport(importedLocation)
-			test.Log("Imported program", importedProgram.SoleContractDeclaration().String())
 
 			if err != nil {
 				return nil, err
@@ -2858,7 +2853,6 @@ func (s *Server) handleImport(
 			}
 		}
 
-		test.Log("checked for location with var count", importedLocation, importedChecker.Elaboration.VariableDeclarationTypesCount())
 		return sema.ElaborationImport{
 			Elaboration: importedChecker.Elaboration,
 		}, nil

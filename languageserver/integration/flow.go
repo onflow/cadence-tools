@@ -24,8 +24,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onflow/cadence-tools/languageserver/test"
-
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
@@ -317,13 +315,11 @@ func (f *flowkitClient) GetCodeByIdentifier(name string) (string, error) {
 		config.DefaultEmulatorNetwork().Name,
 	)
 	if err != nil {
-		test.Log("ID: err", err)
 		return "", err
 	}
 
 	for _, contract := range contracts {
 		if name == contract.Name {
-			test.Log("ID: found, name", name, string(contract.Code()), contract.Location())
 			return string(contract.Code()), nil
 		}
 	}
@@ -389,8 +385,6 @@ func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, er
 //
 
 // resolveFilename helper converts the transaction file to a relative location to config file
-// we will be replacing this logic once the FLIP is implemented
-// https://github.com/onflow/flow/blob/master/flips/2022-03-23-contract-imports-syntax.md
 func resolveFilename(configPath string, path string) (string, error) {
 	if filepath.Dir(configPath) == "." { // if flow.json is passed as relative use current dir
 		workPath, err := os.Getwd()
