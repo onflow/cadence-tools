@@ -37,6 +37,7 @@ const (
 	CommandCreateAccount       = "cadence.server.flow.createAccount"
 	CommandSwitchActiveAccount = "cadence.server.flow.switchActiveAccount"
 	CommandGetAccounts         = "cadence.server.flow.getAccounts"
+	CommandReloadConfig        = "cadence.server.flow.reloadConfig"
 )
 
 type commands struct {
@@ -68,6 +69,10 @@ func (c *commands) getAll() []server.Command {
 		{
 			Name:    CommandGetAccounts,
 			Handler: c.getAccounts,
+		},
+		{
+			Name:    CommandReloadConfig,
+			Handler: c.reloadConfig,
 		},
 	}
 }
@@ -188,6 +193,11 @@ func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 	}
 
 	return fmt.Sprintf("Account switched to %s", name), nil
+}
+
+// reloadConfig when the client detects changes in flow.json so we have an updated state.
+func (c *commands) reloadConfig(_ ...json.RawMessage) (any, error) {
+	return nil, c.client.Reload()
 }
 
 // getAccounts return the client account list with information about the active client.
