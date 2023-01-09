@@ -160,7 +160,7 @@ func Test_Codelensses(t *testing.T) {
 		title:   "💡 Send with (hello: 10.0) signed by Alice",
 		command: "cadence.server.flow.sendTransaction",
 		ranges:  protocol.Range{Start: protocol.Position{Line: 0x3, Character: 0x3}, End: protocol.Position{Line: 0x3, Character: 0x4}},
-		args:    `"[{\"type\":\"UFix64\",\"value\":\"10.00000000\"}]"`,
+		args:    `"[{\"value\":\"10.00000000\",\"type\":\"UFix64\"}]"`,
 	}, {
 		code:    `transaction {}`,
 		title:   "💡 Send signed by service account",
@@ -177,7 +177,7 @@ func Test_Codelensses(t *testing.T) {
 		title:   `💡 Execute script with (hello: "hi")`,
 		command: "cadence.server.flow.executeScript",
 		ranges:  protocol.Range{Start: protocol.Position{Line: 0x2, Character: 0x3}, End: protocol.Position{Line: 0x2, Character: 0x4}},
-		args:    `"[{\"type\":\"String\",\"value\":\"hi\"}]"`,
+		args:    `"[{\"value\":\"hi\",\"type\":\"String\"}]"`,
 	}, {
 		code: `
 			transaction {
