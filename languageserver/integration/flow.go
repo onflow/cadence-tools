@@ -40,6 +40,7 @@ import (
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowClient --filename mock_flow_test.go --inpkg
 type flowClient interface {
 	Initialize(configPath string, numberOfAccounts int) error
+	Reload() error
 	GetClientAccount(name string) *clientAccount
 	GetActiveClientAccount() *clientAccount
 	GetClientAccounts() []*clientAccount
@@ -103,10 +104,14 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 		return err
 	}
 
-	hostedEmulator := gateway.NewEmulatorGateway(serviceAccount)
+	var emulator gateway.Gateway
+	// try connecting to already running local emulator
+	emulator, err = gateway.NewGrpcGateway(config.DefaultEmulatorNetwork().Host)
+	if err != nil || emulator.Ping() != nil { // fallback to hosted emulator if error
+		emulator = gateway.NewEmulatorGateway(serviceAccount)
+	}
 
-	f.services = services.NewServices(hostedEmulator, state, logger)
-
+	f.services = services.NewServices(emulator, state, logger)
 	if numberOfAccounts > len(names) || numberOfAccounts <= 0 {
 		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
 	}
@@ -122,6 +127,15 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 	f.accounts[0].Active = true // make first active by default
 	f.activeAccount = f.accounts[0]
 
+	return nil
+}
+
+func (f *flowkitClient) Reload() error {
+	state, err := flowkit.Load([]string{f.configPath}, f.loader)
+	if err != nil {
+		return err
+	}
+	f.state = state
 	return nil
 }
 

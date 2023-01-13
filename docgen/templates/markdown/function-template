@@ -1,11 +1,11 @@
 {{define "function"}}
-### fun `{{.DeclarationIdentifier}}()`
+### `{{.DeclarationIdentifier}}()`
 
 ```cadence
-func {{.DeclarationIdentifier}}(
+fun {{.DeclarationIdentifier}}(
 {{- range $index, $param := .ParameterList.Parameters}}
     {{- if $index}}, {{end -}}
-    {{.EffectiveArgumentLabel}} {{.TypeAnnotation.Type.String -}}
+    {{.EffectiveArgumentLabel}}: {{.TypeAnnotation.Type.String -}}
 {{end -}}
 )
 {{- $returnType := .ReturnTypeAnnotation.Type.String}}

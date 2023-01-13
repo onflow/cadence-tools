@@ -1399,7 +1399,7 @@ func (s *Server) prepareFunctionMemberCompletionItem(
 func (s *Server) prepareParametersCompletionItem(
 	item *protocol.CompletionItem,
 	name string,
-	parameters []*sema.Parameter,
+	parameters []sema.Parameter,
 ) {
 	item.InsertTextFormat = protocol.SnippetTextFormat
 
@@ -1706,7 +1706,7 @@ func (s *Server) InlayHint(
 	})
 
 	for _, variableDeclaration := range variableDeclarations {
-		targetType := checker.Elaboration.VariableDeclarationTypes[variableDeclaration].TargetType
+		targetType := checker.Elaboration.VariableDeclarationTypes(variableDeclaration).TargetType
 		if targetType == nil { // bugfix getting nil target
 			continue // todo this should never occur
 		}
@@ -1934,7 +1934,7 @@ func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Pr
 	defer sentry.RecoverWithContext(ctx)
 
 	start := time.Now()
-	program, err := parser.ParseProgram([]byte(code), nil)
+	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	elapsed := time.Since(start)
 
 	log(&protocol.LogMessageParams{
@@ -1976,7 +1976,7 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 		return nil, err
 	}
 
-	return parser.ParseProgram([]byte(code), nil)
+	return parser.ParseProgram(nil, []byte(code), parser.Config{})
 }
 
 func (s *Server) GetDocument(uri protocol.DocumentURI) (doc Document, ok bool) {
@@ -2067,7 +2067,7 @@ func (s *Server) getContractInitializerParameters(args ...json2.RawMessage) (int
 		return []Parameter{}, nil
 	}
 
-	compositeType := checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
+	compositeType := checker.Elaboration.CompositeDeclarationType(compositeDeclaration)
 
 	encodedParameters := encodeParameters(compositeType.ConstructorParameters)
 
@@ -2206,11 +2206,11 @@ func (s *Server) convertError(
 		switch ty := err.Type.(type) {
 		case *sema.CompositeType:
 			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
-				return elaboration.CompositeTypeDeclarations[ty]
+				return elaboration.CompositeTypeDeclaration(ty)
 			}
 		case *sema.InterfaceType:
 			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
-				return elaboration.InterfaceTypeDeclarations[ty]
+				return elaboration.InterfaceTypeDeclaration(ty)
 			}
 		}
 
@@ -2492,7 +2492,7 @@ func formatNewMember(member *sema.Member, indentation string) string {
 
 		var returnType string
 		returnTypeAnnotation := functionType.ReturnTypeAnnotation
-		if returnTypeAnnotation != nil && returnTypeAnnotation.Type != sema.VoidType {
+		if returnTypeAnnotation.Type != nil && returnTypeAnnotation.Type != sema.VoidType {
 			returnType = fmt.Sprintf(": %s", returnTypeAnnotation.QualifiedString())
 		}
 
@@ -2556,8 +2556,9 @@ func (s *Server) maybeAddDeclarationActionsResolver(
 				case *ast.InvocationExpression:
 					isInvoked = parent.InvokedExpression == errorExpression
 
-					invocationArgumentTypes = checker.Elaboration.InvocationExpressionTypes[parent].ArgumentTypes
-					invocationReturnType = checker.Elaboration.InvocationExpressionTypes[parent].ReturnType
+					invocationExpressionTypes := checker.Elaboration.InvocationExpressionTypes(parent)
+					invocationArgumentTypes = invocationExpressionTypes.ArgumentTypes
+					invocationReturnType = invocationExpressionTypes.ReturnType
 
 					invocationArgumentLabels = make([]string, 0, len(parent.Arguments))
 					for _, argument := range parent.Arguments {
@@ -2652,7 +2653,7 @@ func (s *Server) maybeAddDeclarationActionsResolver(
 				insertionPos = memberInsertionPosGetter(checker, false)
 
 				memberExpression := errorExpression.(*ast.MemberExpression)
-				expectedType := checker.Elaboration.MemberExpressionExpectedTypes[memberExpression]
+				expectedType := checker.Elaboration.MemberExpressionExpectedType(memberExpression)
 
 				var typeString string
 				if expectedType != nil {
@@ -2785,9 +2786,10 @@ func (s *Server) handleImport(
 	error,
 ) {
 	switch importedLocation {
-	case stdlib.CryptoChecker.Location:
+	case stdlib.CryptoCheckerLocation:
+		cryptoChecker := stdlib.CryptoChecker()
 		return sema.ElaborationImport{
-			Elaboration: stdlib.CryptoChecker.Elaboration,
+			Elaboration: cryptoChecker.Elaboration,
 		}, nil
 
 	default:

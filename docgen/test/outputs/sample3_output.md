@@ -1,9 +1,9 @@
 ## Functions
 
-### fun `func_1()`
+### `func_1()`
 
 ```cadence
-func func_1(name String, bytes [Int8]): bool
+fun func_1(name: String, bytes: [Int8]): bool
 ```
 This is a function, with too many spaces in docs.
 
@@ -15,10 +15,10 @@ Returns: Validity of the content
 
 ---
 
-### fun `func_2()`
+### `func_2()`
 
 ```cadence
-func func_2(name String, bytes [Int8]): bool
+fun func_2(name: String, bytes: [Int8]): bool
 ```
 This function doc contains mixed params and doc lines.
 
@@ -34,10 +34,10 @@ Returns: Validity of the content
 
 ---
 
-### fun `func_3()`
+### `func_3()`
 
 ```cadence
-func func_3()
+fun func_3()
 ```
 param1's name is missing.
 @param : The param1. Must be a string

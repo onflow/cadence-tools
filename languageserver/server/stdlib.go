@@ -30,12 +30,7 @@ type standardLibrary struct {
 	baseValueActivation *sema.VariableActivation
 }
 
-var _ stdlib.Logger = standardLibrary{}
-var _ stdlib.UnsafeRandomGenerator = standardLibrary{}
-var _ stdlib.BlockAtHeightProvider = standardLibrary{}
-var _ stdlib.CurrentBlockProvider = standardLibrary{}
-var _ stdlib.PublicAccountHandler = standardLibrary{}
-var _ stdlib.AccountCreator = standardLibrary{}
+var _ stdlib.StandardLibraryHandler = standardLibrary{}
 
 func (standardLibrary) ProgramLog(_ string) error {
 	// Implementation should never be called,
@@ -205,24 +200,59 @@ func (standardLibrary) CreateAccount(_ common.Address) (address common.Address, 
 	panic(errors.NewUnreachableError())
 }
 
-func newStandardLibrary() (result standardLibrary) {
-	// TODO: either:
-	//   - use runtime's script environment. requires it to become more configurable
-	//   - separate out stdlib definitions from script environment, and use them here instead
+func (standardLibrary) ValidatePublicKey(_ *stdlib.PublicKey) error {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
 
+func (standardLibrary) VerifySignature(
+	_ []byte,
+	_ string,
+	_ []byte,
+	_ []byte,
+	_ sema.SignatureAlgorithm,
+	_ sema.HashAlgorithm,
+) (bool, error) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) BLSVerifyPOP(_ *stdlib.PublicKey, _ []byte) (bool, error) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) Hash(_ []byte, _ string, _ sema.HashAlgorithm) ([]byte, error) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) AccountKeysCount(_ common.Address) (uint64, error) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) BLSAggregatePublicKeys(_ []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) BLSAggregateSignatures(_ [][]byte) ([]byte, error) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func newStandardLibrary() (result standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
-	for _, valueDeclaration := range append(
-		stdlib.BuiltinValues[:],
-		stdlib.NewLogFunction(result),
-		stdlib.NewUnsafeRandomFunction(result),
-		stdlib.NewGetBlockFunction(result),
-		stdlib.NewGetCurrentBlockFunction(result),
-		stdlib.NewGetAccountFunction(result),
-		stdlib.NewAuthAccountConstructor(result),
-		stdlib.NewGetAuthAccountFunction(result),
-	) {
+	for _, valueDeclaration := range stdlib.DefaultStandardLibraryValues(result) {
 		result.baseValueActivation.DeclareValue(valueDeclaration)
 	}
-
 	return
 }

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/onflow/flow-go-sdk"
@@ -36,6 +37,7 @@ const (
 	CommandCreateAccount       = "cadence.server.flow.createAccount"
 	CommandSwitchActiveAccount = "cadence.server.flow.switchActiveAccount"
 	CommandGetAccounts         = "cadence.server.flow.getAccounts"
+	CommandReloadConfig        = "cadence.server.flow.reloadConfiguration"
 )
 
 type commands struct {
@@ -68,6 +70,10 @@ func (c *commands) getAll() []server.Command {
 			Name:    CommandGetAccounts,
 			Handler: c.getAccounts,
 		},
+		{
+			Name:    CommandReloadConfig,
+			Handler: c.reloadConfig,
+		},
 	}
 }
 
@@ -75,9 +81,9 @@ func (c *commands) getAll() []server.Command {
 // source document in VS Code.
 //
 // There should be exactly 3 arguments:
-//   * the DocumentURI of the file to submit
-//   * the arguments, encoded as JSON-CDC
-//   * the signer names as list
+//   - the DocumentURI of the file to submit
+//   - the arguments, encoded as JSON-CDC
+//   - the signer names as list
 func (c *commands) sendTransaction(args ...json.RawMessage) (any, error) {
 	err := server.CheckCommandArgumentCount(args, 3)
 	if err != nil {
@@ -132,8 +138,8 @@ func (c *commands) sendTransaction(args ...json.RawMessage) (any, error) {
 // executeScript handles executing a script defined in the source document.
 //
 // There should be exactly 2 arguments:
-//   * the DocumentURI of the file to submit
-//   * the arguments, encoded as JSON-CDC
+//   - the DocumentURI of the file to submit
+//   - the arguments, encoded as JSON-CDC
 func (c *commands) executeScript(args ...json.RawMessage) (any, error) {
 	err := server.CheckCommandArgumentCount(args, 2)
 	if err != nil {
@@ -168,7 +174,7 @@ func (c *commands) executeScript(args ...json.RawMessage) (any, error) {
 // when submitting transactions.
 //
 // There should be 1 argument:
-//	 * name of the new active account
+//   - name of the new active account
 func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 	err := server.CheckCommandArgumentCount(args, 1)
 	if err != nil {
@@ -187,6 +193,11 @@ func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 	}
 
 	return fmt.Sprintf("Account switched to %s", name), nil
+}
+
+// reloadConfig when the client detects changes in flow.json so we have an updated state.
+func (c *commands) reloadConfig(_ ...json.RawMessage) (any, error) {
+	return nil, c.client.Reload()
 }
 
 // getAccounts return the client account list with information about the active client.
@@ -208,9 +219,9 @@ func (c *commands) createAccount(_ ...json.RawMessage) (any, error) {
 // file.
 //
 // There should be exactly 3 arguments:
-//   * the DocumentURI of the file to submit
-//   * the name of the contract
-//   * the signer names as list
+//   - the DocumentURI of the file to submit
+//   - the name of the contract
+//   - the signer names as list
 func (c *commands) deployContract(args ...json.RawMessage) (any, error) {
 	err := server.CheckCommandArgumentCount(args, 3)
 	if err != nil {
@@ -262,6 +273,12 @@ func parseLocation(arg []byte) (*url.URL, error) {
 	location, err := url.Parse(uri)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path argument: %s", uri)
+	}
+
+	// workaround for Windows files being sent with prefixed '/' which is /c:/test/foo
+	// we remove the first / for Windows files, so they are valid
+	if strings.Contains(location.Path, ":") {
+		location.Path = location.Path[1:]
 	}
 
 	return location, nil

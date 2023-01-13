@@ -34,6 +34,7 @@ import (
 )
 
 func Test_ContractUpdate(t *testing.T) {
+
 	const code = `
       /// pragma signers Alice
 	  pub contract HelloWorld {
@@ -47,8 +48,9 @@ func Test_ContractUpdate(t *testing.T) {
 				self.greeting = a
 			}
      }
-        `
-	program, err := parser.ParseProgram([]byte(code), nil)
+    `
+
+	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	require.NoError(t, err)
 
 	location := common.StringLocation("foo")
