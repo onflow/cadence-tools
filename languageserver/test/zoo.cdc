@@ -1,4 +1,4 @@
-import Foo
+import "Foo"
 
 pub contract Zoo {
      pub let x: String
