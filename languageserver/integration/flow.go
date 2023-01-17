@@ -91,7 +91,7 @@ func newFlowkitClient(loader flowkit.ReaderWriter) *flowkitClient {
 
 func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) error {
 	f.configPath = configPath
-	state, err := flowkit.Load([]string{configPath}, f.loader)
+	state, err := flowkit.Load([]string{f.configPath}, f.loader)
 	if err != nil {
 		return err
 	}
