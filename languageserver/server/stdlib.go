@@ -256,3 +256,11 @@ func newStandardLibrary() (result standardLibrary) {
 	}
 	return
 }
+
+func newScriptStandardLibrary() standardLibrary {
+	result := newStandardLibrary()
+	for _, declaration := range stdlib.DefaultScriptStandardLibraryValues(result) {
+		result.baseValueActivation.DeclareValue(declaration)
+	}
+	return result
+}
