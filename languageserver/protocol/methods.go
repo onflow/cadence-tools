@@ -139,6 +139,15 @@ func (s *Server) handleExecuteCommand(req *json.RawMessage) (any, error) {
 	return s.Handler.ExecuteCommand(s.conn, &params)
 }
 
+func (s *Server) handleDidChangeConfiguration(req *json.RawMessage) (any, error) {
+	var params DidChangeConfigurationParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	return s.Handler.DidChangeConfiguration(s.conn, &params)
+}
+
 func (s *Server) handleDocumentSymbol(req *json.RawMessage) (any, error) {
 	var params DocumentSymbolParams
 	if err := json.Unmarshal(*req, &params); err != nil {
