@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/onflow/flow-go-sdk"
+	"strings"
 )
 
 type resolvers struct {
@@ -30,7 +31,7 @@ type resolvers struct {
 }
 
 func (r *resolvers) fileImport(location common.StringLocation) (string, error) {
-	filename := string(location)
+	filename := cleanWindowsPath(location.String())
 
 	data, err := r.loader.ReadFile(filename)
 	if err != nil {
@@ -63,4 +64,14 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 	}
 
 	return names, nil
+}
+
+// workaround for Windows files being sent with prefixed '/' which is /c:/test/foo
+// we remove the first / for Windows files, so they are valid, also replace encoded column sign.
+func cleanWindowsPath(path string) string {
+	path = strings.ReplaceAll(path, "%3A", ":")
+	if strings.Contains(path, ":") {
+		path = path[1:]
+	}
+	return path
 }

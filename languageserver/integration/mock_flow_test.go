@@ -161,6 +161,20 @@ func (_m *mockFlowClient) Initialize(configPath string, numberOfAccounts int) er
 	return r0
 }
 
+// Reload provides a mock function with given fields:
+func (_m *mockFlowClient) Reload() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SendTransaction provides a mock function with given fields: authorizers, location, args
 func (_m *mockFlowClient) SendTransaction(authorizers []flow.Address, location *url.URL, args []cadence.Value) (*flow.Transaction, *flow.TransactionResult, error) {
 	ret := _m.Called(authorizers, location, args)

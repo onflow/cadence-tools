@@ -93,6 +93,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	if !ok || configPath == "" {
 		return errors.New("initialization options: invalid config path")
 	}
+	configPath = cleanWindowsPath(configPath)
 
 	numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
 	if !ok || numberOfAccountsString == "" {
