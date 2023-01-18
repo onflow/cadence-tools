@@ -367,6 +367,10 @@ func (s *Server) Initialize(
 
 	s.configure(options)
 
+	// update the value after config is initialized
+	s.checkerStandardConfig.AccessCheckMode = s.accessCheckMode
+	s.checkerScriptConfig.AccessCheckMode = s.accessCheckMode
+
 	for _, handler := range s.initializationOptionsHandlers {
 		err := handler(options)
 		if err != nil {
