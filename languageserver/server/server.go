@@ -187,6 +187,8 @@ type Server struct {
 	checkerStandardConfig *sema.Config
 	// checkerScriptConfig is a config used to check scripts
 	checkerScriptConfig *sema.Config
+	// memberAccountAccessHandler is a handler to determine whether access is allowed or not
+	memberAccountAccessHandler sema.MemberAccountAccessHandlerFunc
 }
 
 type Option func(*Server) error
@@ -264,6 +266,18 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 	}
 }
 
+// WithMemberAccountAccessHandler returns a server option that adds the given function
+// as a function that is used to determine access for accounts.
+//
+// When we have a syntax like access(account) this handler is called and
+// determines whether the access is allowed based on the location of program and the called member.
+func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
+	return func(server *Server) error {
+		server.memberAccountAccessHandler = handler
+		return nil
+	}
+}
+
 const GetEntryPointParametersCommand = "cadence.server.getEntryPointParameters"
 const GetContractInitializerParametersCommand = "cadence.server.getContractInitializerParameters"
 const ParseEntryPointArgumentsCommand = "cadence.server.parseEntryPointArguments"
@@ -301,6 +315,7 @@ func NewServer() (*Server, error) {
 		ExtendedElaborationEnabled: true,
 		LocationHandler:            server.handleLocation,
 		ImportHandler:              server.handleImport,
+		MemberAccountAccessHandler: server.memberAccountAccessHandler,
 	}
 
 	scriptConfig := *server.checkerStandardConfig
