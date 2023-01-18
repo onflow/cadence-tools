@@ -225,7 +225,7 @@ describe("parseEntryPointArguments command", () => {
 
 describe("diagnostics", () => {
 
-  async function testCode(code: string) {
+  async function testCode(code: string, errors: string[]) {
     return withConnection(async (connection) => {
 
       const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
@@ -237,20 +237,38 @@ describe("diagnostics", () => {
       const notification = await notificationPromise
 
       expect(notification.uri).toEqual(uri)
-      expect(notification.diagnostics).toHaveLength(1)
-      expect(notification.diagnostics[0].message).toEqual("cannot find variable in this scope: `X`. not found in this scope")
+      expect(notification.diagnostics).toHaveLength(errors.length)
+      notification.diagnostics.forEach(
+        (diagnostic, i) => expect(diagnostic.message).toEqual(errors[i])
+      )
     })
   }
 
   test("script", async() =>
     testCode(
       `pub fun main() { X }`,
+      ["cannot find variable in this scope: `X`. not found in this scope"]
+    )
+  )
+
+  test("script auth account", async() =>
+    testCode(
+      `pub fun main() { getAuthAccount(0x01) }`,
+      [],
     )
   )
 
   test("transaction", async() =>
     testCode(
       `transaction() { execute { X } }`,
+      ["cannot find variable in this scope: `X`. not found in this scope"]
+    )
+  )
+
+  test("transaction auth account", async() =>
+    testCode(
+      `transaction() { execute { getAuthAccount(0x01) } }`,
+      ["cannot find variable in this scope: `getAuthAccount`. not found in this scope"],
     )
   )
 
