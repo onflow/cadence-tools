@@ -183,6 +183,10 @@ type Server struct {
 	accessCheckMode               sema.AccessCheckMode
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
+	// checkerStandardConfig is a config used to check contracts and transactions
+	checkerStandardConfig *sema.Config
+	// checkerScriptConfig is a config used to check scripts
+	checkerScriptConfig *sema.Config
 }
 
 type Option func(*Server) error
@@ -288,6 +292,20 @@ func NewServer() (*Server, error) {
 			return nil, err
 		}
 	}
+
+	// create checker configurations
+	server.checkerStandardConfig = &sema.Config{
+		BaseValueActivation:        newStandardLibrary().baseValueActivation,
+		AccessCheckMode:            server.accessCheckMode,
+		PositionInfoEnabled:        true,
+		ExtendedElaborationEnabled: true,
+		LocationHandler:            server.handleLocation,
+		ImportHandler:              server.handleImport,
+	}
+
+	scriptConfig := *server.checkerStandardConfig
+	scriptConfig.BaseValueActivation = newScriptStandardLibrary().baseValueActivation
+	server.checkerScriptConfig = &scriptConfig
 
 	return server, nil
 }
@@ -1748,6 +1766,17 @@ const filePrefix = "file://"
 
 var lintingAnalyzers = maps.Values(linter.Analyzers)
 
+// decideCheckerConfig based on the program type
+//
+// if a program is a script return the augmented config containing additional values
+func (s *Server) decideCheckerConfig(program *ast.Program) *sema.Config {
+	if program.SoleTransactionDeclaration() != nil || program.SoleContractDeclaration() != nil {
+		return s.checkerStandardConfig
+	}
+
+	return s.checkerScriptConfig
+}
+
 // getDiagnostics parses and checks the given file and generates diagnostics
 // indicating each syntax or semantic error. Returns a list of diagnostics
 // that the caller is responsible for publishing to the client.
@@ -1782,7 +1811,7 @@ func (s *Server) getDiagnostics(
 		}
 	}
 	// If there is a parse result succeeded proceed with resolving imports and checking the parsed program,
-	// even if there there might have been parsing errors.
+	// even if there might have been parsing errors.
 
 	location := uriToLocation(uri)
 
@@ -1791,21 +1820,12 @@ func (s *Server) getDiagnostics(
 		return
 	}
 
-	config := &sema.Config{
-		BaseValueActivation:        s.baseValueActivation,
-		AccessCheckMode:            s.accessCheckMode,
-		PositionInfoEnabled:        true,
-		ExtendedElaborationEnabled: true,
-		LocationHandler:            s.handleLocation,
-		ImportHandler:              s.handleImport,
-	}
-
 	var checker *sema.Checker
 	checker, diagnosticsErr = sema.NewChecker(
 		program,
 		location,
 		nil,
-		config,
+		s.decideCheckerConfig(program),
 	)
 	if diagnosticsErr != nil {
 		return
