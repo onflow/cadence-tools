@@ -1633,6 +1633,11 @@ func (s *Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteComm
 	return res, nil
 }
 
+// DidChangeConfiguration is called to propagate new values set in the client configuration.
+func (s *Server) DidChangeConfiguration(conn protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
+
+}
+
 // DocumentSymbol is called every time the document contents change and returns a
 // tree of known  document symbols, which can be shown in outline panel
 func (s *Server) DocumentSymbol(
