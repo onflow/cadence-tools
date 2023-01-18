@@ -1635,7 +1635,21 @@ func (s *Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteComm
 
 // DidChangeConfiguration is called to propagate new values set in the client configuration.
 func (s *Server) DidChangeConfiguration(conn protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
+	optsMap, ok := params.Settings.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid configuration parameters")
+	}
 
+	cadenceMap, ok := optsMap["cadence"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+
+	if accessCheckModeName, ok := cadenceMap[accessCheckModeOption].(string); ok {
+		s.accessCheckMode = accessCheckModeFromName(accessCheckModeName)
+	}
+
+	return nil, nil
 }
 
 // DocumentSymbol is called every time the document contents change and returns a
