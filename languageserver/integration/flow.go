@@ -187,7 +187,11 @@ func (f *flowkitClient) ExecuteScript(
 	}
 
 	return f.services.Scripts.Execute(
-		flowkit.NewScript(code, args, codeFilename),
+		&services.Script{
+			Code:     code,
+			Args:     args,
+			Filename: codeFilename,
+		},
 		config.DefaultEmulatorNetwork().Name,
 	)
 }
@@ -222,8 +226,13 @@ func (f *flowkitClient) DeployContract(
 
 	_, err = f.services.Accounts.AddContract(
 		createSigner(address, service),
-		flowkit.NewScript(code, nil, codeFilename),
-		config.DefaultEmulatorNetwork().Name,
+		&services.Contract{
+			Script: &services.Script{
+				Code:     code,
+				Filename: codeFilename,
+			},
+			Network: config.DefaultEmulatorNetwork().Name,
+		},
 		updateExisting,
 	)
 	return err
@@ -264,7 +273,11 @@ func (f *flowkitClient) SendTransaction(
 
 	return f.services.Transactions.Send(
 		accs,
-		flowkit.NewScript(code, args, codeFilename),
+		&services.Script{
+			Code:     code,
+			Args:     args,
+			Filename: codeFilename,
+		},
 		flow.DefaultTransactionGasLimit,
 		config.DefaultEmulatorNetwork().Name,
 	)
