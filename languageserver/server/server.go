@@ -294,20 +294,22 @@ func NewServer() (*Server, error) {
 	}
 
 	// create checker configurations
-	server.checkerStandardConfig = &sema.Config{
-		BaseValueActivation:        newStandardLibrary().baseValueActivation,
-		AccessCheckMode:            server.accessCheckMode,
-		PositionInfoEnabled:        true,
-		ExtendedElaborationEnabled: true,
-		LocationHandler:            server.handleLocation,
-		ImportHandler:              server.handleImport,
-	}
-
-	scriptConfig := *server.checkerStandardConfig
-	scriptConfig.BaseValueActivation = newScriptStandardLibrary().baseValueActivation
-	server.checkerScriptConfig = &scriptConfig
+	server.checkerStandardConfig = newCheckerConfig(server, newStandardLibrary())
+	server.checkerScriptConfig = newCheckerConfig(server, newScriptStandardLibrary())
 
 	return server, nil
+}
+
+// newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
+func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
+	return &sema.Config{
+		BaseValueActivation:        lib.baseValueActivation,
+		AccessCheckMode:            s.accessCheckMode,
+		PositionInfoEnabled:        true,
+		ExtendedElaborationEnabled: true,
+		LocationHandler:            s.handleLocation,
+		ImportHandler:              s.handleImport,
+	}
 }
 
 func (s *Server) SetOptions(options ...Option) error {
