@@ -187,8 +187,6 @@ type Server struct {
 	checkerStandardConfig *sema.Config
 	// checkerScriptConfig is a config used to check scripts
 	checkerScriptConfig *sema.Config
-	// memberAccountAccessHandler is a handler to determine whether access is allowed or not
-	memberAccountAccessHandler sema.MemberAccountAccessHandlerFunc
 }
 
 type Option func(*Server) error
@@ -273,7 +271,8 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 // determines whether the access is allowed based on the location of program and the called member.
 func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
 	return func(server *Server) error {
-		server.memberAccountAccessHandler = handler
+		server.checkerStandardConfig.MemberAccountAccessHandler = handler
+		server.checkerScriptConfig.MemberAccountAccessHandler = handler
 		return nil
 	}
 }
@@ -315,7 +314,6 @@ func NewServer() (*Server, error) {
 		ExtendedElaborationEnabled: true,
 		LocationHandler:            server.handleLocation,
 		ImportHandler:              server.handleImport,
-		MemberAccountAccessHandler: server.memberAccountAccessHandler,
 	}
 
 	scriptConfig := *server.checkerStandardConfig
