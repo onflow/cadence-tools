@@ -6,6 +6,8 @@ import (
 	cadence "github.com/onflow/cadence"
 	flow "github.com/onflow/flow-go-sdk"
 
+	flowkit "github.com/onflow/flow-cli/pkg/flowkit"
+
 	mock "github.com/stretchr/testify/mock"
 
 	url "net/url"
@@ -216,6 +218,36 @@ func (_m *mockFlowClient) SetActiveClientAccount(name string) error {
 		r0 = rf(name)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// getConfigPath provides a mock function with given fields:
+func (_m *mockFlowClient) getConfigPath() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// getState provides a mock function with given fields:
+func (_m *mockFlowClient) getState() *flowkit.State {
+	ret := _m.Called()
+
+	var r0 *flowkit.State
+	if rf, ok := ret.Get(0).(func() *flowkit.State); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flowkit.State)
+		}
 	}
 
 	return r0

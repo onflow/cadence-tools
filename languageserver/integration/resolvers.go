@@ -29,7 +29,7 @@ import (
 )
 
 type resolvers struct {
-	client *flowkitClient
+	client flowClient
 	loader flowkit.ReaderWriter
 }
 
@@ -76,7 +76,7 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 //
 // if the contracts were deployed on the same account then it returns true and hence allows the access, false otherwise.
 func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.Location) bool {
-	contracts, err := r.client.state.DeploymentContractsByNetwork(config.DefaultEmulatorNetwork().Name)
+	contracts, err := r.client.getState().DeploymentContractsByNetwork(config.DefaultEmulatorNetwork().Name)
 	if err != nil {
 		return false
 	}
@@ -84,8 +84,8 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 	var checkerAccount, memberAccount string
 	// go over contracts and match contract by the location of checker and member and assign the account name for later check
 	for _, c := range contracts {
-		// get absolute path of the contract relative to flow.json
-		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(r.client.configPath), c.Source))
+		// get absolute path of the contract relative to the dir where flow.json is (working env)
+		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(r.client.getConfigPath()), c.Source))
 
 		if memberLocation.String() == absLocation {
 			memberAccount = c.AccountName
