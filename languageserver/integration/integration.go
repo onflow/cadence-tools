@@ -59,6 +59,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
+			server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
 
 		comm := commands{client: client}

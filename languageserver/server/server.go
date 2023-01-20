@@ -264,6 +264,19 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 	}
 }
 
+// WithMemberAccountAccessHandler returns a server option that adds the given function
+// as a function that is used to determine access for accounts.
+//
+// When we have a syntax like access(account) this handler is called and
+// determines whether the access is allowed based on the location of program and the called member.
+func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
+	return func(server *Server) error {
+		server.checkerStandardConfig.MemberAccountAccessHandler = handler
+		server.checkerScriptConfig.MemberAccountAccessHandler = handler
+		return nil
+	}
+}
+
 const GetEntryPointParametersCommand = "cadence.server.getEntryPointParameters"
 const GetContractInitializerParametersCommand = "cadence.server.getContractInitializerParameters"
 const ParseEntryPointArgumentsCommand = "cadence.server.parseEntryPointArguments"

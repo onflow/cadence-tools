@@ -54,6 +54,8 @@ type flowClient interface {
 	) (*flow.Transaction, *flow.TransactionResult, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	CreateAccount() (*clientAccount, error)
+	getState() *flowkit.State
+	getConfigPath() string
 }
 
 var _ flowClient = &flowkitClient{}
@@ -128,6 +130,14 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 	f.activeAccount = f.accounts[0]
 
 	return nil
+}
+
+func (f *flowkitClient) getState() *flowkit.State {
+	return f.state
+}
+
+func (f *flowkitClient) getConfigPath() string {
+	return f.configPath
 }
 
 func (f *flowkitClient) Reload() error {
