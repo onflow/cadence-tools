@@ -231,6 +231,7 @@ func (f *flowkitClient) DeployContract(
 				Code:     code,
 				Filename: codeFilename,
 			},
+			Name:    name,
 			Network: config.DefaultEmulatorNetwork().Name,
 		},
 		updateExisting,
