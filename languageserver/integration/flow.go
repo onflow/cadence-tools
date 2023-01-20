@@ -234,13 +234,14 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	_, err = f.services.Accounts.AddContract(
+	_, _, err = f.services.Accounts.AddContract(
 		createSigner(address, service),
 		&services.Contract{
 			Script: &services.Script{
 				Code:     code,
 				Filename: codeFilename,
 			},
+			Name:    name,
 			Network: config.DefaultEmulatorNetwork().Name,
 		},
 		updateExisting,
