@@ -24,9 +24,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/onflow/flow-cli/pkg/flowkit/config"
@@ -216,14 +213,6 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	flowAccount, err := f.services.Accounts.Get(address)
-	if err != nil {
-		return err
-	}
-
-	// check if account already has a contract with this name deployed then update // todo remove
-	updateExisting := slices.Contains(maps.Keys(flowAccount.Contracts), name)
-
 	codeFilename, err := resolveFilename(f.configPath, location.Path)
 	if err != nil {
 		return err
@@ -238,7 +227,7 @@ func (f *flowkitClient) DeployContract(
 		signer,
 		flowkit.NewScript(code, nil, codeFilename),
 		config.DefaultEmulatorNetwork().Name,
-		updateExisting,
+		true,
 	)
 	return err
 }
