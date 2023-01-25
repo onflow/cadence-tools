@@ -147,27 +147,6 @@ func (_m *mockFlowClient) GetClientAccounts() []*clientAccount {
 	return r0
 }
 
-// GetCodeByIdentifier provides a mock function with given fields: name
-func (_m *mockFlowClient) GetCodeByIdentifier(name string) (string, error) {
-	ret := _m.Called(name)
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func(string) string); ok {
-		r0 = rf(name)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Initialize provides a mock function with given fields: configPath, numberOfAccounts
 func (_m *mockFlowClient) Initialize(configPath string, numberOfAccounts int) error {
 	ret := _m.Called(configPath, numberOfAccounts)
