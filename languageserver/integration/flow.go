@@ -21,15 +21,12 @@ package integration
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
-
-	"github.com/onflow/flow-cli/pkg/flowkit/config"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-cli/pkg/flowkit"
+	"github.com/onflow/flow-cli/pkg/flowkit/config"
 	"github.com/onflow/flow-cli/pkg/flowkit/gateway"
 	"github.com/onflow/flow-cli/pkg/flowkit/output"
 	"github.com/onflow/flow-cli/pkg/flowkit/services"
@@ -64,6 +61,7 @@ type clientAccount struct {
 	*flow.Account
 	Name   string
 	Active bool
+	Key    *flowkit.AccountKey
 }
 
 var names = []string{
@@ -118,6 +116,7 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
 	}
 
+	// create base accounts
 	f.accounts = make([]*clientAccount, 0)
 	for i := 0; i < numberOfAccounts; i++ {
 		_, err := f.CreateAccount()
@@ -125,6 +124,8 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 			return err
 		}
 	}
+
+	f.accounts = append(f.accounts, f.accountsFromState()...)
 
 	f.accounts[0].Active = true // make first active by default
 	f.activeAccount = f.accounts[0]
@@ -197,11 +198,7 @@ func (f *flowkitClient) ExecuteScript(
 	}
 
 	return f.services.Scripts.Execute(
-		&services.Script{
-			Code:     code,
-			Args:     args,
-			Filename: codeFilename,
-		},
+		flowkit.NewScript(code, args, codeFilename),
 		config.DefaultEmulatorNetwork().Name,
 	)
 }
@@ -216,35 +213,21 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	service, err := f.state.EmulatorServiceAccount()
-	if err != nil {
-		return err
-	}
-
-	flowAccount, err := f.services.Accounts.Get(address)
-	if err != nil {
-		return err
-	}
-
-	// check if account already has a contract with this name deployed then update
-	updateExisting := slices.Contains(maps.Keys(flowAccount.Contracts), name)
-
 	codeFilename, err := resolveFilename(f.configPath, location.Path)
 	if err != nil {
 		return err
 	}
 
+	signer, err := f.createSigner(address)
+	if err != nil {
+		return err
+	}
+
 	_, _, err = f.services.Accounts.AddContract(
-		createSigner(address, service),
-		&services.Contract{
-			Script: &services.Script{
-				Code:     code,
-				Filename: codeFilename,
-			},
-			Name:    name,
-			Network: config.DefaultEmulatorNetwork().Name,
-		},
-		updateExisting,
+		signer,
+		flowkit.NewScript(code, nil, codeFilename),
+		config.DefaultEmulatorNetwork().Name,
+		true,
 	)
 	return err
 }
@@ -271,7 +254,12 @@ func (f *flowkitClient) SendTransaction(
 
 	authAccs := make([]*flowkit.Account, len(authorizers))
 	for i, auth := range authorizers {
-		authAccs[i] = createSigner(auth, service)
+		signer, err := f.createSigner(auth)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		authAccs[i] = signer
 		if err != nil {
 			return nil, nil, err
 		}
@@ -284,11 +272,7 @@ func (f *flowkitClient) SendTransaction(
 
 	return f.services.Transactions.Send(
 		accs,
-		&services.Script{
-			Code:     code,
-			Args:     args,
-			Filename: codeFilename,
-		},
+		flowkit.NewScript(code, args, codeFilename),
 		flow.DefaultTransactionGasLimit,
 		config.DefaultEmulatorNetwork().Name,
 	)
@@ -334,26 +318,76 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 	return clientAccount, nil
 }
 
+// accountsFromState extracts all the account defined by user in configuration.
+// if account doesn't exist on the chain we are connecting to
+// we skip it since we don't have a way to automatically create it.
+func (f *flowkitClient) accountsFromState() []*clientAccount {
+	accounts := make([]*clientAccount, 0)
+	for _, acc := range *f.state.Accounts() {
+		account, err := f.services.Accounts.Get(acc.Address())
+		if err != nil {
+			// we skip user configured accounts that weren't already created on-chain
+			// by user because we can't guarantee addresses are available
+			continue
+		}
+
+		key := acc.Key()
+		accounts = append(accounts, &clientAccount{
+			Account: account,
+			Name:    fmt.Sprintf("%s [flow.json]", acc.Name()),
+			Key:     &key,
+		})
+	}
+
+	return accounts
+}
+
+// createSigner creates a new flowkit account used for signing but using the key of the existing account.
+func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, error) {
+	var account *clientAccount
+	for _, acc := range f.accounts {
+		if acc.Address == address {
+			account = acc
+		}
+	}
+	if account == nil {
+		return nil, fmt.Errorf(fmt.Sprintf("account with address %s not found in the list of accounts", address))
+	}
+
+	signer := &flowkit.Account{}
+	signer.SetAddress(address)
+
+	var accountKey flowkit.AccountKey
+	if account.Key != nil {
+		accountKey = *account.Key
+	} else { // default to service account if key not set
+		service, err := f.state.EmulatorServiceAccount()
+		if err != nil {
+			return nil, err
+		}
+		accountKey = service.Key()
+	}
+
+	signer.SetKey(accountKey)
+	return signer, nil
+}
+
 // Helpers
 //
 
-// createSigner creates a new flowkit account used for signing but using the key of the existing account.
-func createSigner(address flow.Address, account *flowkit.Account) *flowkit.Account {
-	signer := &flowkit.Account{}
-	signer.SetAddress(address)
-	signer.SetKey(account.Key())
-	return signer
-}
-
 // resolveFilename helper converts the transaction file to a relative location to config file
-// we will be replacing this logic once the FLIP is implemented
-// https://github.com/onflow/flow/blob/master/flips/2022-03-23-contract-imports-syntax.md
-func resolveFilename(configPath string, path string) (filename string, err error) {
-	if filepath.Dir(configPath) != "." {
-		filename, err = filepath.Rel(filepath.Dir(configPath), path)
+func resolveFilename(configPath string, path string) (string, error) {
+	if filepath.Dir(configPath) == "." { // if flow.json is passed as relative use current dir
+		workPath, err := os.Getwd()
 		if err != nil {
 			return "", err
 		}
+		return filepath.Rel(workPath, path)
+	}
+
+	filename, err := filepath.Rel(filepath.Dir(configPath), path)
+	if err != nil {
+		return "", err
 	}
 
 	return filename, nil

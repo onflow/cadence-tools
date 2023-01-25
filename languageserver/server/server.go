@@ -2863,6 +2863,7 @@ func (s *Server) handleImport(
 		importedChecker, ok := s.checkers[importedLocation]
 		if !ok {
 			importedProgram, err := s.resolveImport(importedLocation)
+
 			if err != nil {
 				return nil, err
 			}
