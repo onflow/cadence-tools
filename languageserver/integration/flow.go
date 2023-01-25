@@ -224,7 +224,7 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	_, err = f.services.Accounts.AddContract(
+	_, _, err = f.services.Accounts.AddContract(
 		signer,
 		flowkit.NewScript(code, nil, codeFilename),
 		config.DefaultEmulatorNetwork().Name,
