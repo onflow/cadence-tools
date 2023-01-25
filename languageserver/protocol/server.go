@@ -91,6 +91,7 @@ type Handler interface {
 	Completion(conn Conn, params *CompletionParams) ([]*CompletionItem, error)
 	ResolveCompletionItem(conn Conn, item *CompletionItem) (*CompletionItem, error)
 	ExecuteCommand(conn Conn, params *ExecuteCommandParams) (any, error)
+	DidChangeConfiguration(conn Conn, d *DidChangeConfigurationParams) (any, error)
 	DocumentSymbol(conn Conn, params *DocumentSymbolParams) ([]*DocumentSymbol, error)
 	DocumentLink(conn Conn, params *DocumentLinkParams) ([]*DocumentLink, error)
 	InlayHint(conn Conn, params *InlayHintParams) ([]*InlayHint, error)
@@ -149,6 +150,9 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["workspace/executeCommand"] =
 		server.handleExecuteCommand
+
+	jsonrpc2Server.Methods["workspace/didChangeConfiguration"] =
+		server.handleDidChangeConfiguration
 
 	jsonrpc2Server.Methods["textDocument/documentSymbol"] =
 		server.handleDocumentSymbol
