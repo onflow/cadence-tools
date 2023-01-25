@@ -172,8 +172,6 @@ type Server struct {
 	resolveAddressContractNames AddressContractNamesResolver
 	// resolveStringImport is the optional function that is used to resolve string imports
 	resolveStringImport StringImportResolver
-	// resolveIdentifierImport is the optional function that is used to resolve identifiers for the imports used in flowkit
-	resolveIdentifierImport IdentifierImportResolver
 	// codeLensProviders are the functions that are used to provide code lenses for a checker
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
