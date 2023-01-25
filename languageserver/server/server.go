@@ -145,9 +145,6 @@ type AddressContractNamesResolver func(address common.Address) ([]string, error)
 // StringImportResolver is a function that is used to resolve string imports
 type StringImportResolver func(location common.StringLocation) (string, error)
 
-// IdentifierImportResolver is a function that is used to resolve identifier imports supported by flowkit
-type IdentifierImportResolver func(location common.IdentifierLocation) (string, error)
-
 // CodeLensProvider is a function that is used to provide code lenses for the given checker
 type CodeLensProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.CodeLens, error)
 
