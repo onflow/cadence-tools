@@ -85,7 +85,7 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 	// go over contracts and match contract by the location of checker and member and assign the account name for later check
 	for _, c := range contracts {
 		// get absolute path of the contract relative to the dir where flow.json is (working env)
-		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(r.client.getConfigPath()), c.Source))
+		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(r.client.getConfigPath()), c.Location()))
 
 		if memberLocation.String() == absLocation {
 			memberAccount = c.AccountName
