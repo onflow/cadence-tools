@@ -483,7 +483,7 @@ describe("contracts", () => {
     }, true)
   })
 
-  test("deploy contract with identifier imports", async() => {
+  test("deploy contract with string imports", async() => {
     await withConnection(async connection => {
       let result = await deploy(connection, "moose [flow.json]", "foo", "Foo")
       expect(result).toEqual("Contract Foo has been deployed to account moose [flow.json]")

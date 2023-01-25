@@ -54,7 +54,6 @@ type flowClient interface {
 	) (*flow.Transaction, *flow.TransactionResult, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	CreateAccount() (*clientAccount, error)
-	GetCodeByIdentifier(name string) (string, error)
 }
 
 var _ flowClient = &flowkitClient{}
@@ -212,7 +211,7 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	// check if account already has a contract with this name deployed then update
+	// check if account already has a contract with this name deployed then update // todo remove
 	updateExisting := slices.Contains(maps.Keys(flowAccount.Contracts), name)
 
 	codeFilename, err := resolveFilename(f.configPath, location.Path)
@@ -225,7 +224,7 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	_, _, err = f.services.Accounts.AddContract(
+	_, err = f.services.Accounts.AddContract(
 		signer,
 		flowkit.NewScript(code, nil, codeFilename),
 		config.DefaultEmulatorNetwork().Name,
@@ -318,23 +317,6 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 	f.accounts = append(f.accounts, clientAccount)
 
 	return clientAccount, nil
-}
-
-func (f *flowkitClient) GetCodeByIdentifier(name string) (string, error) {
-	contracts, err := f.state.DeploymentContractsByNetwork(
-		config.DefaultEmulatorNetwork().Name,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	for _, contract := range contracts {
-		if name == contract.Name {
-			return string(contract.Code()), nil
-		}
-	}
-
-	return "", fmt.Errorf(fmt.Sprintf("couldn't find the contract by import identifier: %s", name))
 }
 
 // accountsFromState extracts all the account defined by user in configuration.

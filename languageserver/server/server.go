@@ -240,15 +240,6 @@ func WithStringImportResolver(resolver StringImportResolver) Option {
 	}
 }
 
-// WithIdentifierImportResolver returns a server option that sets the given function
-// as the function that is used to resolve identifier imports
-func WithIdentifierImportResolver(resolver IdentifierImportResolver) Option {
-	return func(s *Server) error {
-		s.resolveIdentifierImport = resolver
-		return nil
-	}
-}
-
 // WithCodeLensProvider returns a server option that adds the given function
 // as a function that is used to generate code lenses
 func WithCodeLensProvider(provider CodeLensProvider) Option {
@@ -1982,16 +1973,6 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 			return nil, nil
 		}
 		code, err = s.resolveAddressImport(loc)
-
-	case common.IdentifierLocation:
-		if location.String() == "Crypto" {
-			return nil, nil // don't try resolving stdlibs, leave it to the checker
-		}
-
-		if s.resolveIdentifierImport == nil {
-			return nil, nil
-		}
-		code, err = s.resolveIdentifierImport(loc)
 
 	default:
 		return nil, nil
