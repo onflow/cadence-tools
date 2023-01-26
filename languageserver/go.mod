@@ -13,6 +13,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.31.0
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.0
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 )
@@ -137,7 +138,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/cobra v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
 	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 // indirect
 	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
