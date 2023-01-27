@@ -107,7 +107,7 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 // we remove the first / for Windows files, so they are valid, also replace encoded column sign.
 func cleanWindowsPath(path string) string {
 	path = strings.ReplaceAll(path, "%3A", ":")
-	if strings.Contains(path, ":") {
+	if strings.Contains(path, ":") && strings.HasPrefix(path, "/") {
 		path = path[1:]
 	}
 	return path
