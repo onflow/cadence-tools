@@ -332,6 +332,24 @@ describe("diagnostics", () => {
     expect(script.diagnostics).toHaveLength(0)
   })
 
+  test("script with string import", async() => {
+    const contractName = "foo"
+    const scriptName = "script"
+    const scriptCode = `
+      import "Foo"
+      pub fun main() { log(Foo.bar) }
+    `
+
+    let docNotifications = await testImports([
+      { name: contractName, code: fooContractCode },
+      { name: scriptName, code: scriptCode }
+    ])
+
+    let script = await docNotifications.find(n => n.name == scriptName).notification
+    expect(script.uri).toEqual(`file://${scriptName}.cdc`)
+    expect(script.diagnostics).toHaveLength(0)
+  })
+
   test("script import failure", async() => {
     const contractName = "foo"
     const scriptName = "script"
