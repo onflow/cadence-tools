@@ -32,7 +32,7 @@ class ConsoleTracer implements Tracer {
 
 async function withConnection(f: (connection: ProtocolConnection) => Promise<void>, enableFlowClient = false, debug = false): Promise<void> {
 
-  let opts = [`-enableFlowClient=${enableFlowClient}`]
+  let opts = [`--enable-flow-client=${enableFlowClient}`]
   const child = spawn(
     path.resolve(__dirname, './languageserver'),
     opts

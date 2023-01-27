@@ -22,14 +22,13 @@
 package main
 
 import (
-	"flag"
-
 	"github.com/onflow/cadence-tools/languageserver"
+	"github.com/spf13/pflag"
 )
 
-var enableFlowClientFlag = flag.Bool("enableFlowClient", true, "enable Flow client functionality")
+var enableFlowClientFlag = pflag.Bool("enable-flow-client", true, "enable Flow client functionality")
 
 func main() {
-	flag.Parse()
+	pflag.Parse()
 	languageserver.RunWithStdio(*enableFlowClientFlag)
 }
