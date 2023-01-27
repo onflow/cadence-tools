@@ -42,8 +42,7 @@ async function withConnection(f: (connection: ProtocolConnection) => Promise<voi
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', (data) => {
     stderr += data
-  });
-
+  })
   child.on('exit', (code) => {
     if (code !== 0) {
       console.error(stderr)
@@ -309,7 +308,7 @@ describe("diagnostics", () => {
         }
 
         resolve(docsNotifications)
-      })
+      }, true)
 
     })
   }
@@ -333,7 +332,7 @@ describe("diagnostics", () => {
   })
 
   test("script with string import", async() => {
-    const contractName = "foo"
+    const contractName = "Foo"
     const scriptName = "script"
     const scriptCode = `
       import "Foo"
