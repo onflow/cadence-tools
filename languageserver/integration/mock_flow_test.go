@@ -149,7 +149,7 @@ func (_m *mockFlowClient) GetClientAccounts() []*clientAccount {
 	return r0
 }
 
-// GetCodeByIdentifier provides a mock function with given fields: name
+// GetCodeByName provides a mock function with given fields: name
 func (_m *mockFlowClient) GetCodeByName(name string) (string, error) {
 	ret := _m.Called(name)
 
