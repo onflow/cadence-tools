@@ -57,6 +57,9 @@ func locationToPath(location common.Location) string {
 	if !ok {
 		return ""
 	}
+	if !strings.Contains(stringLocation.String(), ".cdc") {
+		return ""
+	}
 
 	return string(stringLocation)
 }

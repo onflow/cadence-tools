@@ -42,8 +42,7 @@ async function withConnection(f: (connection: ProtocolConnection) => Promise<voi
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', (data) => {
     stderr += data
-  });
-
+  })
   child.on('exit', (code) => {
     if (code !== 0) {
       console.error(stderr)
@@ -309,7 +308,7 @@ describe("diagnostics", () => {
         }
 
         resolve(docsNotifications)
-      })
+      }, true)
 
     })
   }
@@ -319,6 +318,24 @@ describe("diagnostics", () => {
     const scriptName = "script"
     const scriptCode = `
       import Foo from "./foo.cdc"
+      pub fun main() { log(Foo.bar) }
+    `
+
+    let docNotifications = await testImports([
+      { name: contractName, code: fooContractCode },
+      { name: scriptName, code: scriptCode }
+    ])
+
+    let script = await docNotifications.find(n => n.name == scriptName).notification
+    expect(script.uri).toEqual(`file://${scriptName}.cdc`)
+    expect(script.diagnostics).toHaveLength(0)
+  })
+
+  test("script with string import", async() => {
+    const contractName = "Foo"
+    const scriptName = "script"
+    const scriptCode = `
+      import "Foo"
       pub fun main() { log(Foo.bar) }
     `
 

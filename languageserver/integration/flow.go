@@ -51,6 +51,7 @@ type flowClient interface {
 	) (*flow.Transaction, *flow.TransactionResult, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	CreateAccount() (*clientAccount, error)
+	GetCodeByName(name string) (string, error)
 	getState() *flowkit.State
 	getConfigPath() string
 }
@@ -370,6 +371,23 @@ func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, er
 
 	signer.SetKey(accountKey)
 	return signer, nil
+}
+
+func (f *flowkitClient) GetCodeByName(name string) (string, error) {
+	contracts, err := f.state.DeploymentContractsByNetwork(
+		config.DefaultEmulatorNetwork().Name,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	for _, contract := range contracts {
+		if name == contract.Name {
+			return string(contract.Code()), nil
+		}
+	}
+
+	return "", fmt.Errorf(fmt.Sprintf("couldn't find the contract by import identifier: %s", name))
 }
 
 // Helpers

@@ -40,14 +40,14 @@ func Test_FileImport(t *testing.T) {
 
 	t.Run("existing file", func(t *testing.T) {
 		t.Parallel()
-		resolved, err := resolver.fileImport("./test.cdc")
+		resolved, err := resolver.stringImport("./test.cdc")
 		assert.NoError(t, err)
 		assert.Equal(t, "hello test", resolved)
 	})
 
 	t.Run("non existing file", func(t *testing.T) {
 		t.Parallel()
-		resolved, err := resolver.fileImport("./foo.cdc")
+		resolved, err := resolver.stringImport("./foo.cdc")
 		assert.EqualError(t, err, "open foo.cdc: file does not exist")
 		assert.Equal(t, "", resolved)
 	})
