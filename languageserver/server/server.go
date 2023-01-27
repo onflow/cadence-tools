@@ -1785,6 +1785,12 @@ func (s *Server) InlayHint(
 // Shutdown tells the server to stop accepting any new requests. This can only
 // be followed by a call to Exit, which exits the process.
 func (*Server) Shutdown(conn protocol.Conn) error {
+
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Warning,
+		Message: "Cadence language server is shutting down",
+	})
+
 	return nil
 }
 
