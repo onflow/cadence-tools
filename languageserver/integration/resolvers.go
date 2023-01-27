@@ -38,7 +38,7 @@ type resolvers struct {
 func (r *resolvers) stringImport(location common.StringLocation) (string, error) {
 	// if the location is not a cadence file try getting the code by identifier
 	if !strings.Contains(location.String(), ".cdc") {
-		return r.client.GetCodeByIdentifier(location.String())
+		return r.client.GetCodeByName(location.String())
 	}
 
 	filename := cleanWindowsPath(location.String())

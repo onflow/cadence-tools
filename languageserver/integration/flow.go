@@ -51,7 +51,7 @@ type flowClient interface {
 	) (*flow.Transaction, *flow.TransactionResult, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	CreateAccount() (*clientAccount, error)
-	GetCodeByIdentifier(name string) (string, error)
+	GetCodeByName(name string) (string, error)
 	getState() *flowkit.State
 	getConfigPath() string
 }
@@ -373,7 +373,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, er
 	return signer, nil
 }
 
-func (f *flowkitClient) GetCodeByIdentifier(name string) (string, error) {
+func (f *flowkitClient) GetCodeByName(name string) (string, error) {
 	contracts, err := f.state.DeploymentContractsByNetwork(
 		config.DefaultEmulatorNetwork().Name,
 	)
