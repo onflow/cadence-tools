@@ -19,13 +19,14 @@
 package integration
 
 import (
+	"path/filepath"
+	"strings"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/flow-cli/pkg/flowkit"
 	"github.com/onflow/flow-cli/pkg/flowkit/config"
 	"github.com/onflow/flow-go-sdk"
-	"path/filepath"
-	"strings"
 )
 
 type resolvers struct {
@@ -33,8 +34,8 @@ type resolvers struct {
 	loader flowkit.ReaderWriter
 }
 
-// fileImport loads the code for a string location.
-func (r *resolvers) fileImport(location common.StringLocation) (string, error) {
+// stringImport loads the code for a string location.
+func (r *resolvers) stringImport(location common.StringLocation) (string, error) {
 	filename := cleanWindowsPath(location.String())
 
 	data, err := r.loader.ReadFile(filename)
