@@ -34,10 +34,14 @@ type resolvers struct {
 	loader flowkit.ReaderWriter
 }
 
-// stringImport loads the code for a string location.
+// stringImport loads the code for a string location that can either be file path or contract identifier.
 func (r *resolvers) stringImport(location common.StringLocation) (string, error) {
-	filename := cleanWindowsPath(location.String())
+	// if the location is not a cadence file try getting the code by identifier
+	if !strings.Contains(location.String(), ".cdc") {
+		return r.client.GetCodeByIdentifier(location.String())
+	}
 
+	filename := cleanWindowsPath(location.String())
 	data, err := r.loader.ReadFile(filename)
 	if err != nil {
 		return "", err
