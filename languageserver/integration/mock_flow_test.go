@@ -6,6 +6,8 @@ import (
 	cadence "github.com/onflow/cadence"
 	flow "github.com/onflow/flow-go-sdk"
 
+	flowkit "github.com/onflow/flow-cli/pkg/flowkit"
+
 	mock "github.com/stretchr/testify/mock"
 
 	url "net/url"
@@ -147,6 +149,27 @@ func (_m *mockFlowClient) GetClientAccounts() []*clientAccount {
 	return r0
 }
 
+// GetCodeByName provides a mock function with given fields: name
+func (_m *mockFlowClient) GetCodeByName(name string) (string, error) {
+	ret := _m.Called(name)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(name)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Initialize provides a mock function with given fields: configPath, numberOfAccounts
 func (_m *mockFlowClient) Initialize(configPath string, numberOfAccounts int) error {
 	ret := _m.Called(configPath, numberOfAccounts)
@@ -154,6 +177,20 @@ func (_m *mockFlowClient) Initialize(configPath string, numberOfAccounts int) er
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, int) error); ok {
 		r0 = rf(configPath, numberOfAccounts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Reload provides a mock function with given fields:
+func (_m *mockFlowClient) Reload() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -202,6 +239,36 @@ func (_m *mockFlowClient) SetActiveClientAccount(name string) error {
 		r0 = rf(name)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// getConfigPath provides a mock function with given fields:
+func (_m *mockFlowClient) getConfigPath() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// getState provides a mock function with given fields:
+func (_m *mockFlowClient) getState() *flowkit.State {
+	ret := _m.Called()
+
+	var r0 *flowkit.State
+	if rf, ok := ret.Get(0).(func() *flowkit.State); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flowkit.State)
+		}
 	}
 
 	return r0

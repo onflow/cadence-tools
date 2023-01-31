@@ -183,8 +183,10 @@ type Server struct {
 	accessCheckMode               sema.AccessCheckMode
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
-	// baseValueActivation is the sema value activation used for type-checking all programs
-	baseValueActivation *sema.VariableActivation
+	// checkerStandardConfig is a config used to check contracts and transactions
+	checkerStandardConfig *sema.Config
+	// checkerScriptConfig is a config used to check scripts
+	checkerScriptConfig *sema.Config
 }
 
 type Option func(*Server) error
@@ -262,6 +264,19 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 	}
 }
 
+// WithMemberAccountAccessHandler returns a server option that adds the given function
+// as a function that is used to determine access for accounts.
+//
+// When we have a syntax like access(account) this handler is called and
+// determines whether the access is allowed based on the location of program and the called member.
+func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
+	return func(server *Server) error {
+		server.checkerStandardConfig.MemberAccountAccessHandler = handler
+		server.checkerScriptConfig.MemberAccountAccessHandler = handler
+		return nil
+	}
+}
+
 const GetEntryPointParametersCommand = "cadence.server.getEntryPointParameters"
 const GetContractInitializerParametersCommand = "cadence.server.getContractInitializerParameters"
 const ParseEntryPointArgumentsCommand = "cadence.server.parseEntryPointArguments"
@@ -275,7 +290,6 @@ func NewServer() (*Server, error) {
 		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]func() []*protocol.CodeAction),
 		commands:             make(map[string]CommandHandler),
 		accessCheckMode:      sema.AccessCheckModeStrict,
-		baseValueActivation:  newStandardLibrary().baseValueActivation,
 	}
 	server.protocolServer = protocol.NewServer(server)
 
@@ -292,7 +306,23 @@ func NewServer() (*Server, error) {
 		}
 	}
 
+	// create checker configurations
+	server.checkerStandardConfig = newCheckerConfig(server, newStandardLibrary())
+	server.checkerScriptConfig = newCheckerConfig(server, newScriptStandardLibrary())
+
 	return server, nil
+}
+
+// newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
+func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
+	return &sema.Config{
+		BaseValueActivation:        lib.baseValueActivation,
+		AccessCheckMode:            s.accessCheckMode,
+		PositionInfoEnabled:        true,
+		ExtendedElaborationEnabled: true,
+		LocationHandler:            s.handleLocation,
+		ImportHandler:              s.handleImport,
+	}
 }
 
 func (s *Server) SetOptions(options ...Option) error {
@@ -351,6 +381,10 @@ func (s *Server) Initialize(
 	options := params.InitializationOptions
 
 	s.configure(options)
+
+	// update the value after config is initialized
+	s.checkerStandardConfig.AccessCheckMode = s.accessCheckMode
+	s.checkerScriptConfig.AccessCheckMode = s.accessCheckMode
 
 	for _, handler := range s.initializationOptionsHandlers {
 		err := handler(options)
@@ -1633,6 +1667,25 @@ func (s *Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteComm
 	return res, nil
 }
 
+// DidChangeConfiguration is called to propagate new values set in the client configuration.
+func (s *Server) DidChangeConfiguration(conn protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
+	optsMap, ok := params.Settings.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid configuration parameters")
+	}
+
+	cadenceMap, ok := optsMap["cadence"].(map[string]any)
+	if !ok {
+		return nil, nil
+	}
+
+	if accessCheckModeName, ok := cadenceMap[accessCheckModeOption].(string); ok {
+		s.accessCheckMode = accessCheckModeFromName(accessCheckModeName)
+	}
+
+	return nil, nil
+}
+
 // DocumentSymbol is called every time the document contents change and returns a
 // tree of known  document symbols, which can be shown in outline panel
 func (s *Server) DocumentSymbol(
@@ -1733,7 +1786,7 @@ func (s *Server) InlayHint(
 // be followed by a call to Exit, which exits the process.
 func (*Server) Shutdown(conn protocol.Conn) error {
 
-	conn.ShowMessage(&protocol.ShowMessageParams{
+	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Warning,
 		Message: "Cadence language server is shutting down",
 	})
@@ -1750,6 +1803,17 @@ func (*Server) Exit(_ protocol.Conn) error {
 const filePrefix = "file://"
 
 var lintingAnalyzers = maps.Values(linter.Analyzers)
+
+// decideCheckerConfig based on the program type
+//
+// if a program is a script return the augmented config containing additional values
+func (s *Server) decideCheckerConfig(program *ast.Program) *sema.Config {
+	if program.SoleTransactionDeclaration() != nil || program.SoleContractDeclaration() != nil {
+		return s.checkerStandardConfig
+	}
+
+	return s.checkerScriptConfig
+}
 
 // getDiagnostics parses and checks the given file and generates diagnostics
 // indicating each syntax or semantic error. Returns a list of diagnostics
@@ -1785,7 +1849,7 @@ func (s *Server) getDiagnostics(
 		}
 	}
 	// If there is a parse result succeeded proceed with resolving imports and checking the parsed program,
-	// even if there there might have been parsing errors.
+	// even if there might have been parsing errors.
 
 	location := uriToLocation(uri)
 
@@ -1794,21 +1858,12 @@ func (s *Server) getDiagnostics(
 		return
 	}
 
-	config := &sema.Config{
-		BaseValueActivation:        s.baseValueActivation,
-		AccessCheckMode:            s.accessCheckMode,
-		PositionInfoEnabled:        true,
-		ExtendedElaborationEnabled: true,
-		LocationHandler:            s.handleLocation,
-		ImportHandler:              s.handleImport,
-	}
-
 	var checker *sema.Checker
 	checker, diagnosticsErr = sema.NewChecker(
 		program,
 		location,
 		nil,
-		config,
+		s.decideCheckerConfig(program),
 	)
 	if diagnosticsErr != nil {
 		return
@@ -2810,6 +2865,7 @@ func (s *Server) handleImport(
 		importedChecker, ok := s.checkers[importedLocation]
 		if !ok {
 			importedProgram, err := s.resolveImport(importedLocation)
+
 			if err != nil {
 				return nil, err
 			}

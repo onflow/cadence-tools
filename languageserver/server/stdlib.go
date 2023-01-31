@@ -256,3 +256,11 @@ func newStandardLibrary() (result standardLibrary) {
 	}
 	return
 }
+
+func newScriptStandardLibrary() (result standardLibrary) {
+	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
+	for _, declaration := range stdlib.DefaultScriptStandardLibraryValues(result) {
+		result.baseValueActivation.DeclareValue(declaration)
+	}
+	return
+}

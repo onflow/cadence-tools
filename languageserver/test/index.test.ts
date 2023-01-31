@@ -32,7 +32,7 @@ class ConsoleTracer implements Tracer {
 
 async function withConnection(f: (connection: ProtocolConnection) => Promise<void>, enableFlowClient = false, debug = false): Promise<void> {
 
-  let opts = [`-enableFlowClient=${enableFlowClient}`]
+  let opts = [`--enable-flow-client=${enableFlowClient}`]
   const child = spawn(
     path.resolve(__dirname, './languageserver'),
     opts
@@ -42,8 +42,7 @@ async function withConnection(f: (connection: ProtocolConnection) => Promise<voi
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', (data) => {
     stderr += data
-  });
-
+  })
   child.on('exit', (code) => {
     if (code !== 0) {
       console.error(stderr)
@@ -225,7 +224,7 @@ describe("parseEntryPointArguments command", () => {
 
 describe("diagnostics", () => {
 
-  async function testCode(code: string) {
+  async function testCode(code: string, errors: string[]) {
     return withConnection(async (connection) => {
 
       const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
@@ -237,20 +236,38 @@ describe("diagnostics", () => {
       const notification = await notificationPromise
 
       expect(notification.uri).toEqual(uri)
-      expect(notification.diagnostics).toHaveLength(1)
-      expect(notification.diagnostics[0].message).toEqual("cannot find variable in this scope: `X`. not found in this scope")
+      expect(notification.diagnostics).toHaveLength(errors.length)
+      notification.diagnostics.forEach(
+        (diagnostic, i) => expect(diagnostic.message).toEqual(errors[i])
+      )
     })
   }
 
   test("script", async() =>
     testCode(
       `pub fun main() { X }`,
+      ["cannot find variable in this scope: `X`. not found in this scope"]
+    )
+  )
+
+  test("script auth account", async() =>
+    testCode(
+      `pub fun main() { getAuthAccount(0x01) }`,
+      [],
     )
   )
 
   test("transaction", async() =>
     testCode(
       `transaction() { execute { X } }`,
+      ["cannot find variable in this scope: `X`. not found in this scope"]
+    )
+  )
+
+  test("transaction auth account", async() =>
+    testCode(
+      `transaction() { execute { getAuthAccount(0x01) } }`,
+      ["cannot find variable in this scope: `getAuthAccount`. not found in this scope"],
     )
   )
 
@@ -291,7 +308,7 @@ describe("diagnostics", () => {
         }
 
         resolve(docsNotifications)
-      })
+      }, true)
 
     })
   }
@@ -301,6 +318,24 @@ describe("diagnostics", () => {
     const scriptName = "script"
     const scriptCode = `
       import Foo from "./foo.cdc"
+      pub fun main() { log(Foo.bar) }
+    `
+
+    let docNotifications = await testImports([
+      { name: contractName, code: fooContractCode },
+      { name: scriptName, code: scriptCode }
+    ])
+
+    let script = await docNotifications.find(n => n.name == scriptName).notification
+    expect(script.uri).toEqual(`file://${scriptName}.cdc`)
+    expect(script.diagnostics).toHaveLength(0)
+  })
+
+  test("script with string import", async() => {
+    const contractName = "Foo"
+    const scriptName = "script"
+    const scriptCode = `
+      import "Foo"
       pub fun main() { log(Foo.bar) }
     `
 
@@ -370,9 +405,9 @@ describe("accounts", () => {
     await withConnection(async (connection) => {
       let result = await getAccounts(connection)
 
-      expect(result.map(r => r.Name)).toEqual(["Alice", "Bob", "Charlie", "Dave", "Eve"])
-      expect(result.map(r => r.Address)).toEqual(["01cf0e2f2f715450", "179b6b1cb6755e31", "f3fcd2c1a78f5eee", "e03daebed8ca0615", "045a1763c93006ca"])
-      expect(result.map(r => r.Active)).toEqual([true, false, false, false, false])
+      expect(result.map(r => r.Name).sort()).toEqual(["Alice", "Bob", "Charlie", "Dave", "Eve", "emulator-account [flow.json]", "moose [flow.json]"])
+      expect(result.map(r => r.Address)).toEqual(["01cf0e2f2f715450", "179b6b1cb6755e31", "f3fcd2c1a78f5eee", "e03daebed8ca0615", "045a1763c93006ca", "f8d6e0586b0a20c7", "f8d6e0586b0a20c7"])
+      expect(result.map(r => r.Active)).toEqual([true, false, false, false, false, false, false])
     }, true)
   })
 
@@ -430,6 +465,17 @@ describe("transactions", () => {
     }, true)
   })
 
+  test("send a transaction with an account from configuration", async() => {
+    await withConnection(async connection => {
+      let result = await connection.sendRequest(ExecuteCommandRequest.type, {
+        command: "cadence.server.flow.sendTransaction",
+        arguments: [`file://${__dirname}/transaction.cdc`, "[]", ["moose [flow.json]"]]
+      })
+
+      expect(resultRegex.test(result)).toBeTruthy()
+    }, true)
+  })
+
   test("send a transaction with multiple signers", async() => {
     await withConnection(async connection => {
       let result = await connection.sendRequest(ExecuteCommandRequest.type, {
@@ -445,20 +491,40 @@ describe("transactions", () => {
 
 describe("contracts", () => {
 
-  async function deploy(connection: ProtocolConnection, signer: string) {
+  async function deploy(connection: ProtocolConnection, signer: string, file: string, name: string) {
     return connection.sendRequest(ExecuteCommandRequest.type, {
       command: "cadence.server.flow.deployContract",
-      arguments: [`file://${__dirname}/foo.cdc`, "Foo", signer]
+      arguments: [`file://${__dirname}/${file}.cdc`, name, signer]
     })
   }
 
   test("deploy a contract", async() => {
     await withConnection(async connection => {
-      let result = await deploy(connection, "")
+      let result = await deploy(connection, "", "foo", "Foo")
       expect(result).toEqual("Contract Foo has been deployed to account Alice")
 
-      result = await deploy(connection, "Bob")
+      result = await deploy(connection, "Bob", "foo", "Foo")
       expect(result).toEqual("Contract Foo has been deployed to account Bob")
+    }, true)
+  })
+
+  test("deploy contract with file import", async() => {
+    await withConnection(async connection => {
+        let result = await deploy(connection, "moose [flow.json]", "foo", "Foo")
+        expect(result).toEqual("Contract Foo has been deployed to account moose [flow.json]")
+
+        result = await deploy(connection, "moose [flow.json]", "bar", "Bar")
+        expect(result).toEqual("Contract Bar has been deployed to account moose [flow.json]")
+    }, true)
+  })
+
+  test("deploy contract with string imports", async() => {
+    await withConnection(async connection => {
+      let result = await deploy(connection, "moose [flow.json]", "foo", "Foo")
+      expect(result).toEqual("Contract Foo has been deployed to account moose [flow.json]")
+
+      result = await deploy(connection, "moose [flow.json]", "zoo", "Zoo")
+      expect(result).toEqual("Contract Zoo has been deployed to account moose [flow.json]")
     }, true)
   })
 

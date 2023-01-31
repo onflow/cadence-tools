@@ -46,7 +46,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 
 	options := []server.Option{
 		server.WithDiagnosticProvider(diagnostics),
-		server.WithStringImportResolver(resolve.fileImport),
+		server.WithStringImportResolver(resolve.stringImport),
 	}
 
 	if enableFlowClient {
@@ -59,6 +59,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
+			server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
 
 		comm := commands{client: client}
@@ -93,6 +94,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	if !ok || configPath == "" {
 		return errors.New("initialization options: invalid config path")
 	}
+	configPath = cleanWindowsPath(configPath)
 
 	numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
 	if !ok || numberOfAccountsString == "" {
