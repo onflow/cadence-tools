@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -432,6 +433,7 @@ func newScriptEnvironment() environment.Environment {
 
 	return environment.NewScriptEnvironment(
 		context.Background(),
+		tracing.NewTracerSpan(),
 		environment.DefaultEnvironmentParams(),
 		sth,
 		emptyPrograms,
