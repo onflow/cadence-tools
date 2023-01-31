@@ -23,9 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
