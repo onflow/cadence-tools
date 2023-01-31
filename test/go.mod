@@ -3,11 +3,11 @@ module github.com/onflow/cadence-tools/test
 go 1.18
 
 require (
-	github.com/onflow/cadence v0.31.0
-	github.com/onflow/flow-emulator v0.42.0
-	github.com/onflow/flow-go v0.29.1
-	github.com/onflow/flow-go-sdk v0.31.0
-	github.com/stretchr/testify v1.8.0
+	github.com/onflow/cadence v0.31.3-attachments-2
+	github.com/onflow/flow-emulator v0.43.0-cadence-attachments-3
+	github.com/onflow/flow-go v0.28.1-0.20230131201837-7ea3990bcc13
+	github.com/onflow/flow-go-sdk v0.31.3-cadence-attachements
+	github.com/stretchr/testify v1.8.1
 )
 
 require (
@@ -84,8 +84,8 @@ require (
 	github.com/multiformats/go-multihash v0.2.1 // indirect
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/onflow/atree v0.4.0 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221214150253-cb74e7764c12 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221214150253-cb74e7764c12 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20221216161720-c1b31d5a4722 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20221216161720-c1b31d5a4722 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow-go/crypto v0.24.4 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 // indirect
@@ -100,7 +100,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
-	github.com/rs/zerolog v1.28.0 // indirect
+	github.com/rs/zerolog v1.29.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/skeema/knownhosts v1.1.0 // indirect

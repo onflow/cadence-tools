@@ -28,6 +28,8 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
