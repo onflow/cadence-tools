@@ -19,6 +19,7 @@
 package test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -26,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
@@ -1222,9 +1224,9 @@ func TestPrettyPrintTestResults(t *testing.T) {
 	results, err := runner.RunTests(code)
 	require.NoError(t, err)
 
-	resultsStr := PrettyPrintResults(results)
+	resultsStr := PrettyPrintResults(results, "test_script.cdc")
 
-	expected := `Test results:
+	expected := `Test results: "test_script.cdc"
 - PASS: testFunc1
 - FAIL: testFunc2
 		Execution failed:
@@ -2531,4 +2533,149 @@ func TestReplaceImports(t *testing.T) {
 	replacedCode := emulatorBackend.replaceImports(code)
 
 	assert.Equal(t, expected, replacedCode)
+}
+
+func TestCoverageReport(t *testing.T) {
+	t.Parallel()
+
+	const fooContract = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        init() {
+	            self.specialNumbers = {
+	                1729: "Harshad",
+	                8128: "Harmonic",
+	                41041: "Carmichael"
+	            }
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if n < 0 {
+	                return "Negative"
+	            } else if n == 0 {
+	                return "Zero"
+	            } else if n < 10 {
+	                return "Small"
+	            } else if n < 100 {
+	                return "Big"
+	            } else if n < 1000 {
+	                return "Huge"
+	            }
+
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Enormous"
+	        }
+	    }
+	`
+
+	code := `
+	    import FooContract from "FooContract.cdc"
+
+	    pub let foo = FooContract()
+
+	    pub fun testGetIntegerTrait() {
+	        // Arrange
+	        let testInputs: {Int: String} = {
+	            -1: "Negative",
+	            0: "Zero",
+	            9: "Small",
+	            99: "Big",
+	            999: "Huge",
+	            1001: "Enormous",
+	            1729: "Harshad",
+	            8128: "Harmonic",
+	            41041: "Carmichael"
+	        }
+
+	        for input in testInputs.keys {
+	            // Act
+	            let result = foo.getIntegerTrait(input)
+
+	            // Assert
+	            assert(result == testInputs[input])
+	        }
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        // Act
+	        foo.addSpecialNumber(78557, "Sierpinski")
+
+	        // Assert
+	        assert("Sierpinski" == foo.getIntegerTrait(78557))
+	    }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		if location == common.StringLocation("FooContract.cdc") {
+			return fooContract, nil
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	coverageReport := runtime.NewCoverageReport()
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithCoverageReport(coverageReport)
+
+	results, err := runner.RunTests(code)
+	require.NoError(t, err)
+
+	require.Len(t, results, 2)
+
+	result1 := results[0]
+	assert.Equal(t, result1.TestName, "testGetIntegerTrait")
+	assert.NoError(t, result1.Error)
+
+	result2 := results[1]
+	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
+	require.NoError(t, result2.Error)
+
+	actual, err := json.Marshal(coverageReport)
+	require.NoError(t, err)
+
+	expected := `
+	  {
+	    "coverage": {
+	      "S.FooContract.cdc": {
+	        "line_hits": {
+	          "14": 1,
+	          "18": 10,
+	          "19": 1,
+	          "20": 9,
+	          "21": 1,
+	          "22": 8,
+	          "23": 1,
+	          "24": 7,
+	          "25": 1,
+	          "26": 6,
+	          "27": 1,
+	          "30": 5,
+	          "31": 4,
+	          "34": 1,
+	          "6": 1
+	        },
+	        "missed_lines": [],
+	        "statements": 15,
+	        "percentage": "100.0%"
+	      }
+	    }
+	  }
+	`
+
+	require.JSONEq(t, expected, string(actual))
+
+	assert.Equal(
+		t,
+		"Coverage: 100.0% of statements",
+		coverageReport.CoveredStatementsPercentage(),
+	)
 }
