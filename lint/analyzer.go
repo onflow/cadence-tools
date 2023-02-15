@@ -26,17 +26,17 @@ import (
 )
 
 const (
-	ReplacementCategory     string = "replacement-hint"
-	RemovalCategory         string = "removal-hint"
-	UpdateCategory          string = "update recommended"
-	UnnecessaryCastCategory string = "unnecessary-cast-hint"
+	ReplacementCategory     = "replacement-hint"
+	RemovalCategory         = "removal-hint"
+	UpdateCategory          = "update recommended"
+	UnnecessaryCastCategory = "unnecessary-cast-hint"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
 
 var analyzerNamePattern = regexp.MustCompile(`\w+`)
 
-func registerAnalyzer(name string, analyzer *analysis.Analyzer) {
+func RegisterAnalyzer(name string, analyzer *analysis.Analyzer) {
 	if _, ok := Analyzers[name]; ok {
 		panic(fmt.Errorf("analyzer already exists: %s", name))
 	}

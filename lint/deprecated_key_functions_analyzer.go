@@ -102,7 +102,7 @@ var DeprecatedKeyFunctionsAnalyzer = (func() *analysis.Analyzer {
 })()
 
 func init() {
-	registerAnalyzer(
+	RegisterAnalyzer(
 		"deprecated-key-functions",
 		DeprecatedKeyFunctionsAnalyzer,
 	)

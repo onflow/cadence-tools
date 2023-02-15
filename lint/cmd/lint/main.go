@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"plugin"
 	"sort"
 
 	"github.com/onflow/cadence/tools/analysis"
@@ -40,14 +41,18 @@ var loadOnlyFlag = flag.Bool("load-only", false, "only load (parse and check) pr
 var silentFlag = flag.Bool("silent", false, "only show parsing/checking success/failure")
 var colorFlag = flag.Bool("color", true, "format using colors")
 var analyzersFlag stringSliceFlag
+var pluginsFlag stringSliceFlag
 
 func init() {
 	flag.Var(&analyzersFlag, "analyze", "enable analyzer")
+	flag.Var(&pluginsFlag, "plugin", "load plugin")
 }
 
 func main() {
 	defaultUsage := flag.Usage
 	flag.Usage = func() {
+		loadPlugins()
+
 		defaultUsage()
 		_, _ = fmt.Fprintf(os.Stderr, "\nAvailable analyzers:\n")
 
@@ -70,6 +75,8 @@ func main() {
 	}
 
 	flag.Parse()
+
+	loadPlugins()
 
 	var enabledAnalyzers []*analysis.Analyzer
 
@@ -121,5 +128,15 @@ func main() {
 
 	default:
 		println("Nothing to do. Please provide -address, -transaction, -directory, or -csv. See -help")
+	}
+}
+
+func loadPlugins() {
+	for _, pluginPath := range pluginsFlag {
+		_, err := plugin.Open(pluginPath)
+		if err != nil {
+			log.Panic(fmt.Errorf("failed to load plugin: %s: %w", pluginPath, err))
+			return
+		}
 	}
 }
