@@ -23,12 +23,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 
 	"github.com/onflow/cadence/runtime"
@@ -309,7 +310,7 @@ func contractValueHandler(
 	declaration *ast.CompositeDeclaration,
 	compositeType *sema.CompositeType,
 ) sema.ValueDeclaration {
-	constructorType, constructorArgumentLabels := sema.CompositeConstructorType(
+	constructorType, constructorArgumentLabels := sema.CompositeLikeConstructorType(
 		checker.Elaboration,
 		declaration,
 		compositeType,
@@ -420,7 +421,6 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 func newScriptEnvironment() environment.Environment {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
-	emptyPrograms := programs.NewEmptyPrograms()
 
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	v := view.NewChild()
@@ -430,11 +430,20 @@ func newScriptEnvironment() environment.Environment {
 		state.DefaultParameters(),
 	)
 
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+		derived.EndOfBlockExecutionTime,
+		derived.EndOfBlockExecutionTime)
+	if err != nil {
+		panic(err)
+	}
+
 	return environment.NewScriptEnvironment(
 		context.Background(),
+		tracing.NewTracerSpan(),
 		environment.DefaultEnvironmentParams(),
 		sth,
-		emptyPrograms,
+		derivedTxnData,
 	)
 }
 
