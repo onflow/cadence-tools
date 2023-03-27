@@ -45,14 +45,15 @@ var AuthAccountParameterAnalyzer = (func() *analysis.Analyzer {
 			inspector.Preorder(
 				elementFilter,
 				func(element ast.Element) {
-					functionDeclaration, isFD := element.(*ast.FunctionDeclaration)
-					specialFunctionDeclaration, isSFD := element.(*ast.SpecialFunctionDeclaration)
 					var parameterList *ast.ParameterList
-					if isSFD && specialFunctionDeclaration.DeclarationKind() == common.DeclarationKindInitializer {
-						parameterList = specialFunctionDeclaration.FunctionDeclaration.ParameterList
-					} else if isFD {
-						parameterList = functionDeclaration.ParameterList
-					} else {
+					switch declaration := element.(type) {
+					case *ast.FunctionDeclaration:
+						parameterList = declaration.ParameterList
+					case *ast.SpecialFunctionDeclaration:
+						if declaration.DeclarationKind() == common.DeclarationKindInitializer {
+							parameterList = declaration.FunctionDeclaration.ParameterList
+						}
+					default:
 						return
 					}
 
