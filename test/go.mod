@@ -147,3 +147,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
+
+replace github.com/onflow/flow-cli/pkg/flowkit => /Users/dapper/Dev/flow-cli/pkg/flowkit

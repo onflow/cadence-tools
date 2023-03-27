@@ -19,6 +19,7 @@
 package integration
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,7 +30,6 @@ import (
 	"github.com/onflow/flow-cli/pkg/flowkit/config"
 	"github.com/onflow/flow-cli/pkg/flowkit/gateway"
 	"github.com/onflow/flow-cli/pkg/flowkit/output"
-	"github.com/onflow/flow-cli/pkg/flowkit/services"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
@@ -76,7 +76,7 @@ var names = []string{
 }
 
 type flowkitClient struct {
-	services      *services.Services
+	services      flowkit.Services
 	loader        flowkit.ReaderWriter
 	state         *flowkit.State
 	accounts      []*clientAccount
@@ -100,19 +100,24 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 
 	logger := output.NewStdoutLogger(output.NoneLog)
 
-	serviceAccount, err := state.EmulatorServiceAccount()
+	acc, err := state.EmulatorServiceAccount()
 	if err != nil {
 		return err
 	}
 
 	var emulator gateway.Gateway
 	// try connecting to already running local emulator
-	emulator, err = gateway.NewGrpcGateway(config.DefaultEmulatorNetwork().Host)
+	emulator, err = gateway.NewGrpcGateway(config.EmulatorNetwork)
 	if err != nil || emulator.Ping() != nil { // fallback to hosted emulator if error
-		emulator = gateway.NewEmulatorGateway(serviceAccount)
+		pk, _ := acc.Key().PrivateKey()
+		emulator = gateway.NewEmulatorGateway(&gateway.EmulatorKey{
+			PublicKey: (*pk).PublicKey(),
+			SigAlgo:   acc.Key().SigAlgo(),
+			HashAlgo:  acc.Key().HashAlgo(),
+		})
 	}
 
-	f.services = services.NewServices(emulator, state, logger)
+	f.services = flowkit.NewFlowkit(state, config.EmulatorNetwork, emulator, logger)
 	if numberOfAccounts > len(names) || numberOfAccounts <= 0 {
 		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
 	}
@@ -198,9 +203,9 @@ func (f *flowkitClient) ExecuteScript(
 		return nil, err
 	}
 
-	return f.services.Scripts.Execute(
+	return f.services.ExecuteScript(
+		context.Background(),
 		flowkit.NewScript(code, args, codeFilename),
-		config.DefaultEmulatorNetwork().Name,
 	)
 }
 
@@ -224,10 +229,10 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	_, _, err = f.services.Accounts.AddContract(
+	_, _, err = f.services.AddContract(
+		context.Background(),
 		signer,
 		flowkit.NewScript(code, nil, codeFilename),
-		config.DefaultEmulatorNetwork().Name,
 		true,
 	)
 	return err
@@ -253,34 +258,33 @@ func (f *flowkitClient) SendTransaction(
 		return nil, nil, err
 	}
 
-	authAccs := make([]*flowkit.Account, len(authorizers))
+	authAccs := make([]flowkit.Account, len(authorizers))
 	for i, auth := range authorizers {
 		signer, err := f.createSigner(auth)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		authAccs[i] = signer
+		authAccs[i] = *signer
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 
-	accs, err := services.NewTransactionAccountRoles(service, service, authAccs)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return f.services.Transactions.Send(
-		accs,
+	return f.services.SendTransaction(
+		context.Background(),
+		&flowkit.TransactionAccountRoles{
+			Proposer:    *service,
+			Authorizers: authAccs,
+			Payer:       *service,
+		},
 		flowkit.NewScript(code, args, codeFilename),
 		flow.DefaultTransactionGasLimit,
-		config.DefaultEmulatorNetwork().Name,
 	)
 }
 
 func (f *flowkitClient) GetAccount(address flow.Address) (*flow.Account, error) {
-	return f.services.Accounts.Get(address)
+	return f.services.GetAccount(context.Background(), address)
 }
 
 func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
@@ -293,13 +297,15 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 		return nil, err
 	}
 
-	account, err := f.services.Accounts.Create(
+	account, _, err := f.services.CreateAccount(
+		context.Background(),
 		service,
-		[]crypto.PublicKey{(*serviceKey).PublicKey()},
-		[]int{flow.AccountKeyWeightThreshold},
-		[]crypto.SignatureAlgorithm{crypto.ECDSA_P256},
-		[]crypto.HashAlgorithm{crypto.SHA3_256},
-		nil,
+		[]flowkit.Key{{
+			Public:   (*serviceKey).PublicKey(),
+			Weight:   flow.AccountKeyWeightThreshold,
+			SigAlgo:  crypto.ECDSA_P256,
+			HashAlgo: crypto.SHA3_256,
+		}},
 	)
 	if err != nil {
 		return nil, err
@@ -325,7 +331,7 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 func (f *flowkitClient) accountsFromState() []*clientAccount {
 	accounts := make([]*clientAccount, 0)
 	for _, acc := range *f.state.Accounts() {
-		account, err := f.services.Accounts.Get(acc.Address())
+		account, err := f.services.GetAccount(context.Background(), acc.Address())
 		if err != nil {
 			// we skip user configured accounts that weren't already created on-chain
 			// by user because we can't guarantee addresses are available
@@ -374,9 +380,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, er
 }
 
 func (f *flowkitClient) GetCodeByName(name string) (string, error) {
-	contracts, err := f.state.DeploymentContractsByNetwork(
-		config.DefaultEmulatorNetwork().Name,
-	)
+	contracts, err := f.state.DeploymentContractsByNetwork(config.EmulatorNetwork)
 	if err != nil {
 		return "", err
 	}

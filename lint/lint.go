@@ -19,6 +19,7 @@
 package lint
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -35,7 +36,6 @@ import (
 	"github.com/onflow/flow-cli/pkg/flowkit/config"
 	"github.com/onflow/flow-cli/pkg/flowkit/gateway"
 	"github.com/onflow/flow-cli/pkg/flowkit/output"
-	"github.com/onflow/flow-cli/pkg/flowkit/services"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/spf13/afero"
 )
@@ -83,7 +83,7 @@ func (l *Linter) AnalyzeAccount(address string, networkName string) {
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
-		account, err := services.Accounts.Get(flowAddress)
+		account, err := services.GetAccount(context.Background(), flowAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +129,7 @@ func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName s
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
-		account, err := services.Accounts.Get(flowAddress)
+		account, err := services.GetAccount(context.Background(), flowAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +143,7 @@ func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName s
 		transactionLocation,
 	}
 
-	transaction, _, err := services.Transactions.GetStatus(transactionID, true)
+	transaction, _, err := services.GetTransactionByID(context.Background(), transactionID, true)
 	if err != nil {
 		panic(err)
 	}
@@ -161,7 +161,7 @@ func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName s
 	l.analyze(analysisConfig, locations)
 }
 
-func newFlowKitServices(networkName string) (*services.Services, error) {
+func newFlowKitServices(networkName string) (flowkit.Services, error) {
 	loader := &afero.Afero{Fs: afero.NewOsFs()}
 	state, err := flowkit.Load(config.DefaultPaths(), loader)
 	if err != nil {
@@ -173,14 +173,14 @@ func newFlowKitServices(networkName string) (*services.Services, error) {
 		panic(err)
 	}
 
-	grpcGateway, err := gateway.NewGrpcGateway(network.Host)
+	grpcGateway, err := gateway.NewGrpcGateway(*network)
 	if err != nil {
 		panic(err)
 	}
 
 	logger := output.NewStdoutLogger(output.ErrorLog)
 
-	return services.NewServices(grpcGateway, state, logger), nil
+	return flowkit.NewFlowkit(state, *network, grpcGateway, logger), nil
 }
 
 func (l *Linter) AnalyzeCSV(path string) {

@@ -81,7 +81,7 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 //
 // if the contracts were deployed on the same account then it returns true and hence allows the access, false otherwise.
 func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.Location) bool {
-	contracts, err := r.client.getState().DeploymentContractsByNetwork(config.DefaultEmulatorNetwork().Name)
+	contracts, err := r.client.getState().DeploymentContractsByNetwork(config.EmulatorNetwork)
 	if err != nil {
 		return false
 	}
