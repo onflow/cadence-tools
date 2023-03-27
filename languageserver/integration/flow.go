@@ -230,7 +230,7 @@ func (f *flowkitClient) DeployContract(
 		signer,
 		flowkit.NewScript(code, nil, codeFilename),
 		config.DefaultEmulatorNetwork().Name,
-		true,
+		services.UpdateExisting(true),
 	)
 	return err
 }
