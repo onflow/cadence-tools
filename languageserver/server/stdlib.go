@@ -98,7 +98,7 @@ func (standardLibrary) GetAccountContractNames(_ common.Address) ([]string, erro
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) GetAccountContractCode(_ common.Address, _ string) ([]byte, error) {
+func (standardLibrary) GetAccountContractCode(_ common.AddressLocation) ([]byte, error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -153,13 +153,13 @@ func (standardLibrary) ParseAndCheckProgram(_ []byte, _ common.Location, _ bool)
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) UpdateAccountContractCode(_ common.Address, _ string, _ []byte) error {
+func (standardLibrary) UpdateAccountContractCode(_ common.AddressLocation, _ []byte) error {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) RecordContractUpdate(_ common.Address, _ string, _ *interpreter.CompositeValue) {
+func (standardLibrary) RecordContractUpdate(_ common.AddressLocation, _ *interpreter.CompositeValue) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -182,13 +182,13 @@ func (standardLibrary) TemporarilyRecordCode(_ common.AddressLocation, _ []byte)
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) RemoveAccountContractCode(_ common.Address, _ string) error {
+func (standardLibrary) RemoveAccountContractCode(_ common.AddressLocation) error {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) RecordContractRemoval(_ common.Address, _ string) {
+func (standardLibrary) RecordContractRemoval(_ common.AddressLocation) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
