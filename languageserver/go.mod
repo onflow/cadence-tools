@@ -8,7 +8,7 @@ require (
 	github.com/mattn/go-isatty v0.0.17
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v0.37.0
-	github.com/onflow/cadence-tools/lint v0.5.0
+	github.com/onflow/cadence-tools/lint v0.6.0
 	github.com/onflow/flow-cli/pkg/flowkit v0.0.0-20230327102447-8c34a92f8cbb
 	github.com/onflow/flow-go-sdk v0.37.0
 	github.com/sourcegraph/jsonrpc2 v0.1.0
