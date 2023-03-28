@@ -19,8 +19,12 @@
 package lint
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
+	"golang.org/x/exp/maps"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"log"
 	"os"
@@ -31,13 +35,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/pretty"
 	"github.com/onflow/cadence/tools/analysis"
-	"github.com/onflow/flow-cli/pkg/flowkit"
-	"github.com/onflow/flow-cli/pkg/flowkit/config"
-	"github.com/onflow/flow-cli/pkg/flowkit/gateway"
-	"github.com/onflow/flow-cli/pkg/flowkit/output"
-	"github.com/onflow/flow-cli/pkg/flowkit/services"
 	"github.com/onflow/flow-go-sdk"
-	"github.com/spf13/afero"
+	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
 )
 
 const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
@@ -75,7 +74,7 @@ func (l *Linter) PrettyPrintError(err error, location common.Location) {
 }
 
 func (l *Linter) AnalyzeAccount(address string, networkName string) {
-	services, err := newFlowKitServices(networkName)
+	access, err := newFlowAccess(networkName)
 	if err != nil {
 		panic(err)
 	}
@@ -83,7 +82,7 @@ func (l *Linter) AnalyzeAccount(address string, networkName string) {
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
-		account, err := services.Accounts.Get(flowAddress)
+		account, err := access.GetAccount(context.Background(), flowAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +120,7 @@ func (l *Linter) AnalyzeAccount(address string, networkName string) {
 }
 
 func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName string) {
-	services, err := newFlowKitServices(networkName)
+	access, err := newFlowAccess(networkName)
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +128,7 @@ func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName s
 	contractNames := map[common.Address][]string{}
 
 	getContracts := func(flowAddress flow.Address) (map[string][]byte, error) {
-		account, err := services.Accounts.Get(flowAddress)
+		account, err := access.GetAccount(context.Background(), flowAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -143,7 +142,7 @@ func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName s
 		transactionLocation,
 	}
 
-	transaction, _, err := services.Transactions.GetStatus(transactionID, true)
+	transaction, err := access.GetTransaction(context.Background(), transactionID)
 	if err != nil {
 		panic(err)
 	}
@@ -161,26 +160,24 @@ func (l *Linter) AnalyzeTransaction(transactionID flow.Identifier, networkName s
 	l.analyze(analysisConfig, locations)
 }
 
-func newFlowKitServices(networkName string) (*services.Services, error) {
-	loader := &afero.Afero{Fs: afero.NewOsFs()}
-	state, err := flowkit.Load(config.DefaultPaths(), loader)
-	if err != nil {
-		panic(err)
+func newFlowAccess(networkName string) (*grpcAccess.Client, error) {
+	networkMap := map[string]string{
+		"mainnet":  grpcAccess.MainnetHost,
+		"testnet":  grpcAccess.TestnetHost,
+		"emulator": grpcAccess.EmulatorHost,
+		"":         grpcAccess.EmulatorHost,
 	}
 
-	network, err := state.Networks().ByName(networkName)
-	if err != nil {
-		panic(err)
+	network := networkMap[networkName]
+	if network == "" {
+		return nil, fmt.Errorf("invalid network name provided, only valid %s", maps.Keys(networkMap))
 	}
 
-	grpcGateway, err := gateway.NewGrpcGateway(network.Host)
-	if err != nil {
-		panic(err)
-	}
-
-	logger := output.NewStdoutLogger(output.ErrorLog)
-
-	return services.NewServices(grpcGateway, state, logger), nil
+	return grpcAccess.NewClient(
+		network,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(),
+	)
 }
 
 func (l *Linter) AnalyzeCSV(path string) {
