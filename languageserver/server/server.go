@@ -27,14 +27,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/onflow/cadence-tools/languageserver/conversion"
-	"github.com/onflow/cadence-tools/languageserver/jsonrpc2"
-	"github.com/onflow/cadence-tools/languageserver/protocol"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
@@ -45,6 +43,13 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/cadence/tools/analysis"
+	"golang.org/x/exp/maps"
+
+	"github.com/onflow/cadence-tools/languageserver/conversion"
+	"github.com/onflow/cadence-tools/languageserver/jsonrpc2"
+	"github.com/onflow/cadence-tools/languageserver/protocol"
+
+	linter "github.com/onflow/cadence-tools/lint"
 )
 
 // Document represents an open document on the client. It contains all cached
@@ -1797,7 +1802,7 @@ func (*Server) Exit(_ protocol.Conn) error {
 
 const filePrefix = "file://"
 
-//var lintingAnalyzers = maps.Values(linter.Analyzers)
+var lintingAnalyzers = maps.Values(linter.Analyzers)
 
 // decideCheckerConfig based on the program type
 //
@@ -1895,29 +1900,29 @@ func (s *Server) getDiagnostics(
 	if checkError != nil {
 		return
 	}
-	/*
-		analysisProgram := analysis.Program{
-			Program:     program,
-			Elaboration: checker.Elaboration,
-			Location:    checker.Location,
-			Code:        []byte(text),
-		}
 
-		var reportLock sync.Mutex
+	analysisProgram := analysis.Program{
+		Program:     program,
+		Elaboration: checker.Elaboration,
+		Location:    checker.Location,
+		Code:        []byte(text),
+	}
 
-		report := func(linterDiagnostic analysis.Diagnostic) {
-			reportLock.Lock()
-			defer reportLock.Unlock()
-			diagnostic, codeActionsResolver := convertDiagnostic(linterDiagnostic, uri)
-			if codeActionsResolver != nil {
-				codeActionsResolverID := uuid.New()
-				diagnostic.Data = codeActionsResolverID
-				codeActionsResolvers[codeActionsResolverID] = codeActionsResolver
-			}
-			diagnostics = append(diagnostics, diagnostic)
+	var reportLock sync.Mutex
+
+	report := func(linterDiagnostic analysis.Diagnostic) {
+		reportLock.Lock()
+		defer reportLock.Unlock()
+		diagnostic, codeActionsResolver := convertDiagnostic(linterDiagnostic, uri)
+		if codeActionsResolver != nil {
+			codeActionsResolverID := uuid.New()
+			diagnostic.Data = codeActionsResolverID
+			codeActionsResolvers[codeActionsResolverID] = codeActionsResolver
 		}
-	*/
-	//analysisProgram.Run(lintingAnalyzers, report)
+		diagnostics = append(diagnostics, diagnostic)
+	}
+
+	analysisProgram.Run(lintingAnalyzers, report)
 
 	return
 }
@@ -3163,53 +3168,53 @@ func convertDiagnostic(
 	var message string
 
 	var codeActionsResolver func() []*protocol.CodeAction
-	/*
-		switch linterDiagnostic.Category {
-		case linter.ReplacementCategory:
-			codeActionsResolver = func() []*protocol.CodeAction {
-				return []*protocol.CodeAction{
-					{
-						Title:       fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage),
-						Kind:        protocol.QuickFix,
-						Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-						Edit: protocol.WorkspaceEdit{
-							Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-								uri: {
-									{
-										Range:   protocolRange,
-										NewText: linterDiagnostic.SecondaryMessage,
-									},
+
+	switch linterDiagnostic.Category {
+	case linter.ReplacementCategory:
+		codeActionsResolver = func() []*protocol.CodeAction {
+			return []*protocol.CodeAction{
+				{
+					Title:       fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage),
+					Kind:        protocol.QuickFix,
+					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+					Edit: protocol.WorkspaceEdit{
+						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+							uri: {
+								{
+									Range:   protocolRange,
+									NewText: linterDiagnostic.SecondaryMessage,
 								},
 							},
 						},
-						IsPreferred: true,
 					},
-				}
-			}
-			message = fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage)
-		case linter.RemovalCategory:
-			codeActionsResolver = func() []*protocol.CodeAction {
-				return []*protocol.CodeAction{
-					{
-						Title:       "Remove unnecessary code",
-						Kind:        protocol.QuickFix,
-						Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-						Edit: protocol.WorkspaceEdit{
-							Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-								uri: {
-									{
-										Range:   protocolRange,
-										NewText: "",
-									},
-								},
-							},
-						},
-						IsPreferred: true,
-					},
-				}
+					IsPreferred: true,
+				},
 			}
 		}
-	*/
+		message = fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage)
+	case linter.RemovalCategory:
+		codeActionsResolver = func() []*protocol.CodeAction {
+			return []*protocol.CodeAction{
+				{
+					Title:       "Remove unnecessary code",
+					Kind:        protocol.QuickFix,
+					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+					Edit: protocol.WorkspaceEdit{
+						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+							uri: {
+								{
+									Range:   protocolRange,
+									NewText: "",
+								},
+							},
+						},
+					},
+					IsPreferred: true,
+				},
+			}
+		}
+	}
+
 	if message == "" {
 		message = linterDiagnostic.Message
 	}
