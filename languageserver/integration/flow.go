@@ -211,13 +211,12 @@ func (f *flowkitClient) ExecuteScript(
 			Location: codeFilename,
 		},
 		flowkit.LatestScriptQuery,
-		&util.ScriptQuery{},
 	)
 }
 
 func (f *flowkitClient) DeployContract(
 	address flow.Address,
-	name string,
+	_ string,
 	location *url.URL,
 ) error {
 	code, err := f.loader.ReadFile(location.Path)
