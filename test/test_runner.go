@@ -23,12 +23,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 
 	"github.com/onflow/cadence/runtime"
@@ -86,6 +87,8 @@ type TestRunner struct {
 	fileResolver FileResolver
 
 	testRuntime runtime.Runtime
+
+	coverageReport *runtime.CoverageReport
 }
 
 func NewTestRunner() *TestRunner {
@@ -101,6 +104,11 @@ func (r *TestRunner) WithImportResolver(importResolver ImportResolver) *TestRunn
 
 func (r *TestRunner) WithFileResolver(fileResolver FileResolver) *TestRunner {
 	r.fileResolver = fileResolver
+	return r
+}
+
+func (r *TestRunner) WithCoverageReport(coverageReport *runtime.CoverageReport) *TestRunner {
+	r.coverageReport = coverageReport
 	return r
 }
 
@@ -225,12 +233,21 @@ func recoverPanics(onError func(error)) {
 }
 
 func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+	config := runtime.Config{
+		CoverageReportingEnabled: r.coverageReport != nil,
+	}
+	env := runtime.NewBaseInterpreterEnvironment(config)
 
 	ctx := runtime.Context{
 		Interface:   newScriptEnvironment(),
 		Location:    testScriptLocation,
 		Environment: env,
+	}
+	if r.coverageReport != nil {
+		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
+		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
+		r.coverageReport.ExcludeLocation(testScriptLocation)
+		ctx.CoverageReport = r.coverageReport
 	}
 
 	// Checker configs
@@ -309,7 +326,7 @@ func contractValueHandler(
 	declaration *ast.CompositeDeclaration,
 	compositeType *sema.CompositeType,
 ) sema.ValueDeclaration {
-	constructorType, constructorArgumentLabels := sema.CompositeConstructorType(
+	constructorType, constructorArgumentLabels := sema.CompositeLikeConstructorType(
 		checker.Elaboration,
 		declaration,
 		compositeType,
@@ -420,7 +437,6 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 func newScriptEnvironment() environment.Environment {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
-	emptyPrograms := programs.NewEmptyPrograms()
 
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	v := view.NewChild()
@@ -430,11 +446,20 @@ func newScriptEnvironment() environment.Environment {
 		state.DefaultParameters(),
 	)
 
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+		derived.EndOfBlockExecutionTime,
+		derived.EndOfBlockExecutionTime)
+	if err != nil {
+		panic(err)
+	}
+
 	return environment.NewScriptEnvironment(
 		context.Background(),
+		tracing.NewTracerSpan(),
 		environment.DefaultEnvironmentParams(),
 		sth,
-		emptyPrograms,
+		derivedTxnData,
 	)
 }
 
@@ -478,9 +503,9 @@ func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runt
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.
-func PrettyPrintResults(results Results) string {
+func PrettyPrintResults(results Results, scriptPath string) string {
 	var sb strings.Builder
-	sb.WriteString("Test results:\n")
+	fmt.Fprintf(&sb, "Test results: %q\n", scriptPath)
 	for _, result := range results {
 		sb.WriteString(PrettyPrintResult(result.TestName, result.Error))
 		sb.WriteRune('\n')

@@ -205,6 +205,10 @@ func (d *CheckCastVisitor) VisitPathExpression(_ *ast.PathExpression) bool {
 	return d.isTypeRedundant(d.exprInferredType, d.targetType)
 }
 
+func (d *CheckCastVisitor) VisitAttachExpression(_ *ast.AttachExpression) bool {
+	return d.isTypeRedundant(d.exprInferredType, d.targetType)
+}
+
 func (d *CheckCastVisitor) isTypeRedundant(exprType, targetType sema.Type) bool {
 	// If there is no expected type (e.g: var-decl with no type annotation),
 	// then the simple-cast might be used as a way of marking the type of the variable.
@@ -323,7 +327,7 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 })()
 
 func init() {
-	registerAnalyzer(
+	RegisterAnalyzer(
 		"redundant-cast",
 		RedundantCastAnalyzer,
 	)

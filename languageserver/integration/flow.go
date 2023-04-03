@@ -211,6 +211,7 @@ func (f *flowkitClient) ExecuteScript(
 			Location: codeFilename,
 		},
 		flowkit.LatestScriptQuery,
+		&util.ScriptQuery{},
 	)
 }
 

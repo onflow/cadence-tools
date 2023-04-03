@@ -76,7 +76,7 @@ var UnnecessaryForceAnalyzer = (func() *analysis.Analyzer {
 })()
 
 func init() {
-	registerAnalyzer(
+	RegisterAnalyzer(
 		"unnecessary-force",
 		UnnecessaryForceAnalyzer,
 	)

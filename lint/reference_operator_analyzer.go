@@ -86,7 +86,7 @@ var ReferenceOperatorAnalyzer = (func() *analysis.Analyzer {
 })()
 
 func init() {
-	registerAnalyzer(
+	RegisterAnalyzer(
 		"reference-operator",
 		ReferenceOperatorAnalyzer,
 	)

@@ -223,7 +223,7 @@ var NumberFunctionArgumentAnalyzer = (func() *analysis.Analyzer {
 })()
 
 func init() {
-	registerAnalyzer(
+	RegisterAnalyzer(
 		"number-function-arguments",
 		NumberFunctionArgumentAnalyzer,
 	)
