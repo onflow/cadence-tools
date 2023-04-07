@@ -365,7 +365,11 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			testFramework := NewEmulatorBackend(r.fileResolver, stdlibHandler)
+			testFramework := NewEmulatorBackend(
+				r.fileResolver,
+				stdlibHandler,
+				r.coverageReport,
+			)
 			contract, err := stdlib.NewTestContract(
 				inter,
 				testFramework,

@@ -2506,7 +2506,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(nil, nil)
+	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
 	emulatorBackend.UseConfiguration(&stdlib.Configuration{
 		Addresses: map[string]common.Address{
 			"./sample/contract1.cdc": {0x1},
