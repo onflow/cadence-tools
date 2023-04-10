@@ -2676,6 +2676,6 @@ func TestCoverageReport(t *testing.T) {
 	assert.Equal(
 		t,
 		"Coverage: 100.0% of statements",
-		coverageReport.CoveredStatementsPercentage(),
+		coverageReport.String(),
 	)
 }
