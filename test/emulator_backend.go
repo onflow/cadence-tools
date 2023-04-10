@@ -69,9 +69,21 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
-func NewEmulatorBackend(fileResolver FileResolver, stdlibHandler stdlib.StandardLibraryHandler) *EmulatorBackend {
+func NewEmulatorBackend(
+	fileResolver FileResolver,
+	stdlibHandler stdlib.StandardLibraryHandler,
+	coverageReport *runtime.CoverageReport,
+) *EmulatorBackend {
+	var blockchain *emulator.Blockchain
+	if coverageReport != nil {
+		blockchain = newBlockchain(emulator.WithCoverageReportingEnabled(true))
+		blockchain.SetCoverageReport(coverageReport)
+	} else {
+		blockchain = newBlockchain()
+	}
+
 	return &EmulatorBackend{
-		blockchain:    newBlockchain(),
+		blockchain:    blockchain,
 		blockOffset:   0,
 		accountKeys:   map[common.Address]map[string]keyInfo{},
 		fileResolver:  fileResolver,

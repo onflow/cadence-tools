@@ -19,18 +19,14 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/state"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
@@ -365,7 +361,11 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			testFramework := NewEmulatorBackend(r.fileResolver, stdlibHandler)
+			testFramework := NewEmulatorBackend(
+				r.fileResolver,
+				stdlibHandler,
+				r.coverageReport,
+			)
 			contract, err := stdlib.NewTestContract(
 				inter,
 				testFramework,
@@ -437,29 +437,11 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 func newScriptEnvironment() environment.Environment {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
+	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
 
-	view := testutil.RootBootstrappedLedger(vm, ctx)
-	v := view.NewChild()
-
-	sth := state.NewTransactionState(
-		v,
-		state.DefaultParameters(),
-	)
-
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		derived.EndOfBlockExecutionTime,
-		derived.EndOfBlockExecutionTime)
-	if err != nil {
-		panic(err)
-	}
-
-	return environment.NewScriptEnvironment(
-		context.Background(),
-		tracing.NewTracerSpan(),
+	return environment.NewScriptEnvironmentFromStorageSnapshot(
 		environment.DefaultEnvironmentParams(),
-		sth,
-		derivedTxnData,
+		snapshotTree,
 	)
 }
 
