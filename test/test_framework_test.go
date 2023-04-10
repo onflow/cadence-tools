@@ -19,7 +19,6 @@
 package test
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -1497,7 +1496,11 @@ func TestErrors(t *testing.T) {
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.Contains(t, result.Error.Error(), "account not found for address")
+		assert.Contains(
+			t,
+			result.Error.Error(),
+			"cannot find declaration `Foo` in `0000000000000001.Foo`",
+		)
 	})
 
 	t.Run("transaction error", func(t *testing.T) {
@@ -2364,7 +2367,11 @@ func TestReplacingImports(t *testing.T) {
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.Contains(t, result.Error.Error(), "account not found for address 0000000000000001")
+		assert.Contains(
+			t,
+			result.Error.Error(),
+			"cannot find declaration `Foo` in `0000000000000001.Foo`",
+		)
 	})
 
 	t.Run("config not provided", func(t *testing.T) {
@@ -2639,40 +2646,30 @@ func TestCoverageReport(t *testing.T) {
 	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
 	require.NoError(t, result2.Error)
 
-	actual, err := json.Marshal(coverageReport)
-	require.NoError(t, err)
+	location := common.StringLocation("FooContract.cdc")
+	coverage := coverageReport.Coverage[location]
 
-	expected := `
-	  {
-	    "coverage": {
-	      "S.FooContract.cdc": {
-	        "line_hits": {
-	          "14": 1,
-	          "18": 10,
-	          "19": 1,
-	          "20": 9,
-	          "21": 1,
-	          "22": 8,
-	          "23": 1,
-	          "24": 7,
-	          "25": 1,
-	          "26": 6,
-	          "27": 1,
-	          "30": 5,
-	          "31": 4,
-	          "34": 1,
-	          "6": 1
-	        },
-	        "missed_lines": [],
-	        "statements": 15,
-	        "percentage": "100.0%"
-	      }
-	    }
-	  }
-	`
+	assert.Equal(t, []int{}, coverage.MissedLines())
+	assert.Equal(t, 15, coverage.Statements)
+	assert.Equal(t, "100.0%", coverage.Percentage())
+	assert.EqualValues(
+		t,
+		map[int]int{
+			6: 1, 14: 1, 18: 10, 19: 1, 20: 9, 21: 1, 22: 8, 23: 1,
+			24: 7, 25: 1, 26: 6, 27: 1, 30: 5, 31: 4, 34: 1,
+		},
+		coverage.LineHits,
+	)
 
-	require.JSONEq(t, expected, string(actual))
-
+	assert.ElementsMatch(
+		t,
+		[]string{
+			"s.7465737400000000000000000000000000000000000000000000000000000000",
+			"I.Crypto",
+			"I.Test",
+		},
+		coverageReport.ExcludedLocationIDs(),
+	)
 	assert.Equal(
 		t,
 		"Coverage: 100.0% of statements",
