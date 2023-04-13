@@ -57,7 +57,7 @@ instead of the Flow CLI binary, and allowing this server to be debugged, e.g. us
     ```
 4. In Visual Studio Code, go to Settings
 5. Search for `Cadence: Flow Command`, and enter the full path to the `run.sh` script
-   found in this directory (for example: `/Users/dapper/Dev/cadence/languageserver/run.sh`).
+   found in this directory (for example: `/Users/dapper/Dev/cadence-tools/languageserver/run.sh`).
 
 This allows the language server to be re-built each time it is restarted:
 - Kill Delve: `killall dlv` (Delve ignores SIGINT in headless mode)
