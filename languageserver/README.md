@@ -18,7 +18,7 @@ and also in the [Flow Playground](https://play.onflow.org/)
 
 ### Main functionality
 
-The main functionality of the language server, such as providing reporting diagnostics (e.g. errors), auto completion, etc. is implemented in the [`server` package](https://github.com/onflow/cadence/tree/master/languageserver/server).
+The main functionality of the language server, such as providing reporting diagnostics (e.g. errors), auto completion, etc. is implemented in the [`server` package](https://github.com/onflow/cadence-tools/tree/master/languageserver/server).
 
 ### Integration with the Flow network
 
@@ -29,8 +29,8 @@ This code can be found in the [`integration` package](https://github.com/onflow/
 
 ### Language Server Protocol Types
 
-The Go code for the LSP types can be found in the [`protocol` package](https://github.com/onflow/cadence/tree/master/languageserver/protocol).
-The code is generated from the specification's TypeScript declarations using [scripts](https://github.com/onflow/cadence/tree/master/languageserver/scripts).
+The Go code for the LSP types can be found in the [`protocol` package](https://github.com/onflow/cadence-tools/tree/master/languageserver/protocol).
+The code is generated from the specification's TypeScript declarations using [scripts](https://github.com/onflow/cadence-tools/tree/master/languageserver/scripts).
 
 ### Building for WebAssembly
 
@@ -44,7 +44,7 @@ make wasm
 ### Tests
 
 The integration tests for the Cadence Language Server are written in TypeScript
-and can be found in the [`test` directory](https://github.com/onflow/cadence/tree/master/languageserver/test).
+and can be found in the [`test` directory](https://github.com/onflow/cadence-tools/tree/master/languageserver/test).
 
 ### Development and Debugging
 
