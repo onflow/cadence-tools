@@ -21,9 +21,10 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-cli/pkg/flowkit"
-	"github.com/onflow/flow-go-sdk"
 	"net/url"
+
+	"github.com/onflow/flow-cli/flowkit"
+	"github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
 )
