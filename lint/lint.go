@@ -22,9 +22,6 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"golang.org/x/exp/maps"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"log"
 	"os"
@@ -37,6 +34,9 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/onflow/flow-go-sdk"
 	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
+	"golang.org/x/exp/maps"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
@@ -233,37 +233,15 @@ func (l *Linter) readDirectoryEntries(
 			continue
 		}
 
-		// Strip extension
-		typeID := name[:len(name)-len(path.Ext(name))]
-
-		location, qualifiedIdentifier, err := common.DecodeTypeID(nil, typeID)
-		if err != nil {
-			panic(fmt.Errorf("invalid location in file %q: %w", name, err))
-		}
-
-		identifierParts := strings.Split(qualifiedIdentifier, ".")
-		if len(identifierParts) > 1 {
-			panic(fmt.Errorf(
-				"invalid location in file %q: invalid qualified identifier: %s",
-				name,
-				qualifiedIdentifier,
-			))
-		}
-
-		rawCode, err := os.ReadFile(path.Join(directory, name))
+		fullPath := path.Join(directory, name)
+		location := common.NewStringLocation(nil, fullPath)
+		rawCode, err := os.ReadFile(fullPath)
 		if err != nil {
 			panic(fmt.Errorf("failed to read file %q: %w", name, err))
 		}
 
 		locations = append(locations, location)
 		l.Codes[location] = rawCode
-
-		if addressLocation, ok := location.(common.AddressLocation); ok {
-			contractNames[addressLocation.Address] = append(
-				contractNames[addressLocation.Address],
-				addressLocation.Name,
-			)
-		}
 	}
 
 	return
@@ -280,7 +258,6 @@ func (l *Linter) analyze(
 	printErr := l.Config.PrintError
 
 	for _, location := range locations {
-		log.Printf("Loading %s", location.Description())
 
 		err := programs.Load(config, location)
 		if err != nil {
