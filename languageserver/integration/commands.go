@@ -21,9 +21,9 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-cli/flowkit/arguments"
 	"net/url"
 
-	"github.com/onflow/flow-cli/flowkit"
 	"github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
@@ -100,7 +100,7 @@ func (c *commands) sendTransaction(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid transaction arguments: %s", args[1])
 	}
 
-	txArgs, err := flowkit.ParseArgumentsJSON(argsJSON)
+	txArgs, err := arguments.ParseJSON(argsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("invalid transaction arguments cadence encoding format: %s, error: %s", argsJSON, err)
 	}
@@ -156,7 +156,7 @@ func (c *commands) executeScript(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid script arguments: %s", args[1])
 	}
 
-	scriptArgs, err := flowkit.ParseArgumentsJSON(argsJSON)
+	scriptArgs, err := arguments.ParseJSON(argsJSON)
 	if err != nil {
 		return nil, fmt.Errorf("invalid script arguments cadence encoding format: %s, error: %s", argsJSON, err)
 	}

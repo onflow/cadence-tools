@@ -21,6 +21,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-cli/flowkit/accounts"
+	"github.com/onflow/flow-cli/flowkit/transactions"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -62,7 +64,7 @@ type clientAccount struct {
 	*flow.Account
 	Name   string
 	Active bool
-	Key    *flowkit.AccountKey
+	Key    *accounts.Key
 }
 
 var names = []string{
@@ -266,7 +268,7 @@ func (f *flowkitClient) SendTransaction(
 		return nil, nil, err
 	}
 
-	authAccs := make([]flowkit.Account, len(authorizers))
+	authAccs := make([]accounts.Account, len(authorizers))
 	for i, auth := range authorizers {
 		signer, err := f.createSigner(auth)
 		if err != nil {
@@ -281,7 +283,7 @@ func (f *flowkitClient) SendTransaction(
 
 	return f.services.SendTransaction(
 		context.Background(),
-		flowkit.TransactionAccountRoles{
+		transactions.AccountRoles{
 			Proposer:    *service,
 			Authorizers: authAccs,
 			Payer:       *service,
@@ -312,7 +314,7 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 	account, _, err := f.services.CreateAccount(
 		context.Background(),
 		service,
-		[]flowkit.AccountPublicKey{{
+		[]accounts.PublicKey{{
 			Public:   (*serviceKey).PublicKey(),
 			Weight:   flow.AccountKeyWeightThreshold,
 			SigAlgo:  crypto.ECDSA_P256,
@@ -362,7 +364,7 @@ func (f *flowkitClient) accountsFromState() []*clientAccount {
 }
 
 // createSigner creates a new flowkit account used for signing but using the key of the existing account.
-func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, error) {
+func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, error) {
 	var account *clientAccount
 	for _, acc := range f.accounts {
 		if acc.Address == address {
@@ -373,7 +375,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, er
 		return nil, fmt.Errorf(fmt.Sprintf("account with address %s not found in the list of accounts", address))
 	}
 
-	var accountKey flowkit.AccountKey
+	var accountKey accounts.Key
 	if account.Key != nil {
 		accountKey = *account.Key
 	} else { // default to service account if key not set
@@ -384,7 +386,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*flowkit.Account, er
 		accountKey = service.Key
 	}
 
-	return &flowkit.Account{
+	return &accounts.Account{
 		Address: address,
 		Key:     accountKey,
 	}, nil
