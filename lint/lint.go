@@ -258,7 +258,7 @@ func (l *Linter) analyze(
 	printErr := l.Config.PrintError
 
 	for _, location := range locations {
-
+		log.Printf("Loading %s", location.Description())
 		err := programs.Load(config, location)
 		if err != nil {
 			if l.Config.Silent {
