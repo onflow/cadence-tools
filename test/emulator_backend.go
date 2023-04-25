@@ -21,7 +21,10 @@ package test
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -392,6 +395,11 @@ func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
 		append(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
+				emulator.WithServerLogger(
+					zerolog.New(
+						zerolog.ConsoleWriter{Out: os.Stdout},
+					).With().Timestamp().Logger(),
+				),
 			},
 			opts...,
 		)...,

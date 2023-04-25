@@ -20,6 +20,7 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -438,9 +439,18 @@ func newScriptEnvironment() environment.Environment {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
 	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
+	environmentParams := environment.DefaultEnvironmentParams()
+	logger := zerolog.New(
+		zerolog.ConsoleWriter{Out: os.Stdout},
+	).With().Timestamp().Logger()
+	environmentParams.ProgramLoggerParams = environment.ProgramLoggerParams{
+		Logger:                logger,
+		CadenceLoggingEnabled: true,
+		MetricsReporter:       environment.NoopMetricsReporter{},
+	}
 
 	return environment.NewScriptEnvironmentFromStorageSnapshot(
-		environment.DefaultEnvironmentParams(),
+		environmentParams,
 		snapshotTree,
 	)
 }
