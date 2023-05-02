@@ -2542,7 +2542,7 @@ func TestReplaceImports(t *testing.T) {
 	assert.Equal(t, expected, replacedCode)
 }
 
-func TestCoverageReport(t *testing.T) {
+func TestCoverageReportForUnitTests(t *testing.T) {
 	t.Parallel()
 
 	const fooContract = `
@@ -2673,6 +2673,212 @@ func TestCoverageReport(t *testing.T) {
 	assert.Equal(
 		t,
 		"Coverage: 100.0% of statements",
+		coverageReport.String(),
+	)
+}
+
+func TestCoverageReportForIntegrationTests(t *testing.T) {
+	t.Parallel()
+
+	const contractCode = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        init() {
+	            self.specialNumbers = {
+	                1729: "Harshad",
+	                8128: "Harmonic",
+	                41041: "Carmichael"
+	            }
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if n < 0 {
+	                return "Negative"
+	            } else if n == 0 {
+	                return "Zero"
+	            } else if n < 10 {
+	                return "Small"
+	            } else if n < 100 {
+	                return "Big"
+	            } else if n < 1000 {
+	                return "Huge"
+	            }
+
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Enormous"
+	        }
+	    }
+	`
+
+	const scriptCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    pub fun main(): Bool {
+	        // Arrange
+	        let testInputs: {Int: String} = {
+	            -1: "Negative",
+	            0: "Zero",
+	            9: "Small",
+	            99: "Big",
+	            999: "Huge",
+	            1001: "Enormous",
+	            1729: "Harshad",
+	            8128: "Harmonic",
+	            41041: "Carmichael"
+	        }
+
+	        for input in testInputs.keys {
+	            // Act
+	            let result = FooContract.getIntegerTrait(input)
+
+	            // Assert
+	            assert(result == testInputs[input])
+	        }
+
+	        return true
+	    }
+	`
+
+	testCode := `
+	    import Test
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun setup() {
+	        let contractCode = Test.readFile("../contracts/FooContract.cdc")
+	        let err = blockchain.deployContract(
+	            name: "FooContract",
+	            code: contractCode,
+	            account: account,
+	            arguments: []
+	        )
+
+	        if err != nil {
+	            panic(err!.message)
+	        }
+
+	        blockchain.useConfiguration(Test.Configuration({
+	            "../contracts/FooContract.cdc": account.address
+	        }))
+	    }
+
+	    pub fun testGetIntegerTrait() {
+	        let script = Test.readFile("../scripts/get_integer_traits.cdc")
+	        let result = blockchain.executeScript(script, [])
+
+	        if result.status != Test.ResultStatus.succeeded {
+	            panic(result.error!.message)
+	        }
+	        assert(result.returnValue! as! Bool)
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        let code = Test.readFile("../transactions/add_special_number.cdc")
+	        let tx = Test.Transaction(
+	            code: code,
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: [78557, "Sierpinski"]
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        assert(result.status == Test.ResultStatus.succeeded)
+	    }
+	`
+
+	transactionCode := `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    transaction(number: Int, trait: String) {
+	        prepare(acct: AuthAccount) {}
+
+	        execute {
+	            // Act
+	            FooContract.addSpecialNumber(number, trait)
+
+	            // Assert
+	            assert(trait == FooContract.getIntegerTrait(number))
+	        }
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return contractCode, nil
+		case "../scripts/get_integer_traits.cdc":
+			return scriptCode, nil
+		case "../transactions/add_special_number.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	coverageReport := runtime.NewCoverageReport()
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithCoverageReport(coverageReport)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+
+	require.Len(t, results, 2)
+
+	result1 := results[0]
+	assert.Equal(t, result1.TestName, "testGetIntegerTrait")
+	assert.NoError(t, result1.Error)
+
+	result2 := results[1]
+	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
+	require.NoError(t, result2.Error)
+
+	address, err := common.HexToAddress("0x01cf0e2f2f715450")
+	require.NoError(t, err)
+	location := common.AddressLocation{
+		Address: address,
+		Name:    "FooContract",
+	}
+	coverage := coverageReport.Coverage[location]
+
+	assert.Equal(t, []int{}, coverage.MissedLines())
+	assert.Equal(t, 15, coverage.Statements)
+	assert.Equal(t, "100.0%", coverage.Percentage())
+	assert.EqualValues(
+		t,
+		map[int]int{
+			6: 1, 14: 1, 18: 10, 19: 1, 20: 9, 21: 1, 22: 8, 23: 1,
+			24: 7, 25: 1, 26: 6, 27: 1, 30: 5, 31: 4, 34: 1,
+		},
+		coverage.LineHits,
+	)
+
+	assert.ElementsMatch(
+		t,
+		[]string{
+			"A.0ae53cb6e3f42a79.FlowToken",
+			"A.ee82856bf20e2aa6.FungibleToken",
+			"A.e5a8b7f23e8b548f.FlowFees",
+			"A.f8d6e0586b0a20c7.FlowStorageFees",
+			"A.f8d6e0586b0a20c7.FlowServiceAccount",
+			"s.7465737400000000000000000000000000000000000000000000000000000000",
+			"I.Crypto",
+			"I.Test",
+		},
+		coverageReport.ExcludedLocationIDs(),
+	)
+	assert.Equal(
+		t,
+		"Coverage: 96.4% of statements",
 		coverageReport.String(),
 	)
 }

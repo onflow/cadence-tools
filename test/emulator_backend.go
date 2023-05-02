@@ -30,7 +30,9 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkTest "github.com/onflow/flow-go-sdk/test"
 
+	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 
 	emulator "github.com/onflow/flow-emulator"
 
@@ -79,8 +81,26 @@ func NewEmulatorBackend(
 ) *EmulatorBackend {
 	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
-		blockchain = newBlockchain(emulator.WithCoverageReportingEnabled(true))
+		blockchain = newBlockchain(
+			emulator.WithCoverageReportingEnabled(true),
+		)
 		blockchain.SetCoverageReport(coverageReport)
+		chain := blockchain.GetChain()
+		contracts := map[string]string{
+			"FlowServiceAccount": chain.ServiceAddress().HexWithPrefix(),
+			"FlowToken":          fvm.FlowTokenAddress(chain).HexWithPrefix(),
+			"FungibleToken":      fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+			"FlowFees":           environment.FlowFeesAddress(chain).HexWithPrefix(),
+			"FlowStorageFees":    chain.ServiceAddress().HexWithPrefix(),
+		}
+		for name, address := range contracts {
+			addr, _ := common.HexToAddress(address)
+			location := common.AddressLocation{
+				Address: addr,
+				Name:    name,
+			}
+			coverageReport.ExcludeLocation(location)
+		}
 	} else {
 		blockchain = newBlockchain()
 	}
