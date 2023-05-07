@@ -2851,7 +2851,11 @@ func (s *Server) handleImport(
 		return sema.ElaborationImport{
 			Elaboration: cryptoChecker.Elaboration,
 		}, nil
-
+	case stdlib.TestContractLocation:
+		elaboration := stdlib.TestContractChecker.Elaboration
+		return sema.ElaborationImport{
+			Elaboration: elaboration,
+		}, nil
 	default:
 		if isPathLocation(importedLocation) {
 			// import may be a relative path and therefore should be normalized
