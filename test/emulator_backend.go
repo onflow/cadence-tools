@@ -29,6 +29,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkTest "github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
@@ -74,6 +75,28 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
+var systemContracts = func() []common.AddressLocation {
+	chain := flow.Emulator.Chain()
+	contracts := map[string]string{
+		"FlowServiceAccount": chain.ServiceAddress().HexWithPrefix(),
+		"FlowToken":          fvm.FlowTokenAddress(chain).HexWithPrefix(),
+		"FungibleToken":      fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+		"FlowFees":           environment.FlowFeesAddress(chain).HexWithPrefix(),
+		"FlowStorageFees":    chain.ServiceAddress().HexWithPrefix(),
+	}
+
+	locations := make([]common.AddressLocation, 0)
+	for name, address := range contracts {
+		addr, _ := common.HexToAddress(address)
+		locations = append(locations, common.AddressLocation{
+			Address: addr,
+			Name:    name,
+		})
+	}
+
+	return locations
+}()
+
 func NewEmulatorBackend(
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
@@ -85,20 +108,7 @@ func NewEmulatorBackend(
 			emulator.WithCoverageReportingEnabled(true),
 		)
 		blockchain.SetCoverageReport(coverageReport)
-		chain := blockchain.GetChain()
-		contracts := map[string]string{
-			"FlowServiceAccount": chain.ServiceAddress().HexWithPrefix(),
-			"FlowToken":          fvm.FlowTokenAddress(chain).HexWithPrefix(),
-			"FungibleToken":      fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-			"FlowFees":           environment.FlowFeesAddress(chain).HexWithPrefix(),
-			"FlowStorageFees":    chain.ServiceAddress().HexWithPrefix(),
-		}
-		for name, address := range contracts {
-			addr, _ := common.HexToAddress(address)
-			location := common.AddressLocation{
-				Address: addr,
-				Name:    name,
-			}
+		for _, location := range systemContracts {
 			coverageReport.ExcludeLocation(location)
 		}
 	} else {

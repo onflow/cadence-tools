@@ -572,7 +572,6 @@ func TestUsingEnv(t *testing.T) {
 
 		assert.True(t, resolverInvoked)
 	})
-
 }
 
 func TestCreateAccount(t *testing.T) {
