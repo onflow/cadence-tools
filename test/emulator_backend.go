@@ -277,9 +277,9 @@ func (e *EmulatorBackend) signTransaction(
 	for i := len(signerAccounts) - 1; i >= 0; i-- {
 		signerAccount := signerAccounts[i]
 
-		publicKey := string(signerAccount.PublicKey.PublicKey)
+		publicKey := signerAccount.PublicKey.PublicKey
 		accountKeys := e.accountKeys[signerAccount.Address]
-		keyInfo := accountKeys[publicKey]
+		keyInfo := accountKeys[string(publicKey)]
 
 		err := tx.SignPayload(sdk.Address(signerAccount.Address), 0, keyInfo.signer)
 		if err != nil {
