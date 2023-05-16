@@ -1,0 +1,38 @@
+name: Sync Langauge Server and NPM package.json versions
+
+on:
+  release:
+    types:
+      - created
+jobs:
+   build:
+    runs-on: ubuntu-latest
+    # This only runs this action if the release was made for language server
+    if: startsWith(github.event.release.target_commitish, 'refs/tags/languageserver') 
+    run: |
+      # Extract release version from event payload
+      release_version=$(echo "${{ github.event.release.tag_name }}" | cut -d "v" -f 2)
+
+      # Update package.json file with release version
+      jq '.version = $version' --arg version "$release_version" package.json > tmp_package.json && mv tmp_package.json package.json
+
+      # Display the updated package.json file
+      cat package.json
+
+      # Configure git
+      git config user.name "${{ github.actor }}"
+      git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      # Commit changes
+      git add package.json
+      git commit -m "Update version to $release_version"
+
+      # Create a branch for the changes
+      git branch ls-npm-version-update
+      git checkout ls-npm-version-update
+
+      # Push the branch to the repository
+      git push origin ls-npm-version-update
+
+      # Create a pull request with the changes
+      gh pr create --title "Update LS NPM version to $release_version" --body "Updating the version in package.json to $release_version. After this PR is merged an GitHub action will automatically publish the NPM package." --base main --head version-update
