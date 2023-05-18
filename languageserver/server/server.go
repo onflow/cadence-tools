@@ -1764,13 +1764,18 @@ func (s *Server) InlayHint(
 			continue // todo this should never occur
 		}
 
+		typeAnnotation := sema.TypeAnnotation{
+			Type:       targetType,
+			IsResource: targetType.IsResourceType(),
+		}
+
 		identifierEndPosition := variableDeclaration.Identifier.EndPosition(nil)
 		inlayHintPosition := conversion.ASTToProtocolPosition(identifierEndPosition.Shifted(nil, 1))
 		inlayHint := protocol.InlayHint{
 			Position: &inlayHintPosition,
 			Label: []protocol.InlayHintLabelPart{
 				{
-					Value: fmt.Sprintf(": %s", targetType.QualifiedString()),
+					Value: fmt.Sprintf(": %s", typeAnnotation.QualifiedString()),
 				},
 			},
 			Kind: protocol.Type,
