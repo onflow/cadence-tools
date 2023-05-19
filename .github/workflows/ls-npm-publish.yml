@@ -1,4 +1,4 @@
-name: Sync Langauge Server and NPM package.json versions
+name: Publish LS NPM Package
 
 on:
   release:
@@ -7,6 +7,13 @@ on:
 jobs:
    build:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      # Setup .npmrc file to publish to npm
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
     # This only runs this action if the release was made for language server
     if: startsWith(github.event.release.target_commitish, 'refs/tags/languageserver') 
     run: |
@@ -36,3 +43,11 @@ jobs:
 
       # Create a pull request with the changes
       gh pr create --title "Update LS NPM version to $release_version" --body "Updating the version in package.json to $release_version. After this PR is merged an GitHub action will automatically publish the NPM package." --base main --head version-update
+      
+      # Run build of LS 
+      npm build
+      
+      # Publish npm package
+      npm publish
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
