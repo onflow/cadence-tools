@@ -1,53 +1,53 @@
 name: Publish LS NPM Package
 
 on:
-  release:
-    types:
-      - created
+  push:
+    tags:
+      - 'languageserver/v*'
 jobs:
-   build:
+  build:
     runs-on: ubuntu-latest
     steps:
+      # This only runs this action if the release was made for language server
       - uses: actions/checkout@v3
       # Setup .npmrc file to publish to npm
       - uses: actions/setup-node@v3
         with:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
-    # This only runs this action if the release was made for language server
-    if: startsWith(github.event.release.target_commitish, 'refs/tags/languageserver') 
-    run: |
-      # Extract release version from event payload
-      release_version=$(echo "${{ github.event.release.tag_name }}" | cut -d "v" -f 2)
+      - name: "Update package.json"
+        run: |
+          tag_name=${GITHUB_REF#refs/tags/}
+          release_version=$(echo "$tag_name" | awk -F"/v" '{print $2}')
+          
+          jq '.version = $version' --arg version "$release_version" ./npm-packages/cadence-language-server/package.json > tmp_package.json && mv tmp_package.json ./npm-packages/cadence-language-server/package.json
+          cat ./npm-packages/cadence-language-server/package.json
 
-      # Update package.json file with release version
-      jq '.version = $version' --arg version "$release_version" package.json > tmp_package.json && mv tmp_package.json package.json
+          release_branch="ls/npm-publish-$(echo $release_version)"
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-      # Display the updated package.json file
-      cat package.json
+          # Commit changes
+          git add ./npm-packages/cadence-language-server/package.json
+          git commit -m "Update version to $release_version"
 
-      # Configure git
-      git config user.name "${{ github.actor }}"
-      git config user.email "${{ github.actor }}@users.noreply.github.com"
+          # Create a branch for the changes
+          git branch $(echo $release_branch)
+          git checkout $(echo $release_branch)
+          git push origin $(echo $release_branch)
 
-      # Commit changes
-      git add package.json
-      git commit -m "Update version to $release_version"
-
-      # Create a branch for the changes
-      git branch ls-npm-version-update
-      git checkout ls-npm-version-update
-
-      # Push the branch to the repository
-      git push origin ls-npm-version-update
-
-      # Create a pull request with the changes
-      gh pr create --title "Update LS NPM version to $release_version" --body "Updating the version in package.json to $release_version. After this PR is merged an GitHub action will automatically publish the NPM package." --base main --head version-update
-      
-      # Run build of LS 
-      npm build
-      
-      # Publish npm package
-      npm publish
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Create a pull request with the changes
+          gh pr create --title "[LS] Update and publish NPM package $release_version" --body "Updating the version in package.json to $release_version and publishing to NPM" --base master --head $(echo $release_branch)
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: "Build NPM package"
+        run: |
+          cd npm-packages/cadence-language-server
+          npm install
+          npm run build
+      - name: "Publish NPM package"
+        run: |
+          cd npm-packages/cadence-language-server
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
