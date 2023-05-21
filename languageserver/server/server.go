@@ -1788,6 +1788,15 @@ func (s *Server) InlayHint(
 				},
 			},
 			Kind: protocol.Type,
+			TextEdits: []protocol.TextEdit{
+				{
+					Range: protocol.Range{
+						Start: inlayHintPosition,
+						End:   inlayHintPosition,
+					},
+					NewText: typeAnnotationString,
+				},
+			},
 		}
 
 		inlayHints = append(inlayHints, &inlayHint)
