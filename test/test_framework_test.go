@@ -2757,6 +2757,21 @@ func TestReplaceImports(t *testing.T) {
 	assert.Equal(t, expected, replacedCode)
 }
 
+func TestRetrieveServiceAccount(t *testing.T) {
+	t.Parallel()
+
+	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+
+	serviceAccount, err := emulatorBackend.ServiceAccount()
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		"0xf8d6e0586b0a20c7",
+		serviceAccount.Address.HexWithPrefix(),
+	)
+}
+
 func TestCoverageReportForUnitTests(t *testing.T) {
 	t.Parallel()
 
