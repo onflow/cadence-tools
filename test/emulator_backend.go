@@ -108,9 +108,7 @@ func NewEmulatorBackend(
 			emulator.WithCoverageReportingEnabled(true),
 		)
 		blockchain.SetCoverageReport(coverageReport)
-		for _, location := range systemContracts {
-			coverageReport.ExcludeLocation(location)
-		}
+		excludeCommonLocations(coverageReport)
 	} else {
 		blockchain = newBlockchain()
 	}
@@ -120,6 +118,7 @@ func NewEmulatorBackend(
 		blockOffset:   0,
 		accountKeys:   map[common.Address]map[string]keyInfo{},
 		fileResolver:  fileResolver,
+		configuration: baseConfiguration(),
 		stdlibHandler: stdlibHandler,
 	}
 }
@@ -430,6 +429,7 @@ func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
 						zerolog.ConsoleWriter{Out: os.Stdout},
 					).With().Timestamp().Logger(),
 				),
+				emulator.Contracts(emulator.CommonContracts),
 			},
 			opts...,
 		)...,
@@ -442,7 +442,11 @@ func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
 }
 
 func (e *EmulatorBackend) UseConfiguration(configuration *stdlib.Configuration) {
-	e.configuration = configuration
+	for contract, address := range configuration.Addresses {
+		// We do not want to override the base configuration,
+		// which includes the mapping for system/common contracts.
+		e.configuration.Addresses[contract] = address
+	}
 }
 
 func (e *EmulatorBackend) replaceImports(code string) string {
@@ -502,4 +506,40 @@ func (e *EmulatorBackend) Reset() {
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
+}
+
+// excludeCommonLocations excludes the common contracts from appearing
+// in the coverage report, as they skew the coverage metrics.
+func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
+	for _, location := range systemContracts {
+		coverageReport.ExcludeLocation(location)
+	}
+	for _, contract := range emulator.CommonContracts {
+		address, _ := common.HexToAddress(contract.Address.String())
+		location := common.AddressLocation{
+			Address: address,
+			Name:    contract.Name,
+		}
+		coverageReport.ExcludeLocation(location)
+	}
+}
+
+// baseConfiguration returns an *stdlib.Configuration with contract to
+// address mappings for system/common contracts.
+func baseConfiguration() *stdlib.Configuration {
+	addresses := make(map[string]common.Address, 0)
+	for _, addressLocation := range systemContracts {
+		contract := addressLocation.Name
+		address := common.Address(addressLocation.Address)
+		addresses[contract] = address
+	}
+	for _, contractDescription := range emulator.CommonContracts {
+		contract := contractDescription.Name
+		address := common.Address(contractDescription.Address)
+		addresses[contract] = address
+	}
+
+	return &stdlib.Configuration{
+		Addresses: addresses,
+	}
 }

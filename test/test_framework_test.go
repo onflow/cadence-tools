@@ -415,6 +415,113 @@ func TestImportContract(t *testing.T) {
 	})
 }
 
+func TestImportBuiltinContracts(t *testing.T) {
+	t.Parallel()
+
+	testCode := `
+	    import Test
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun setup() {
+	        blockchain.useConfiguration(Test.Configuration({
+	            "FooContract": account.address
+	        }))
+	    }
+
+	    pub fun testSetupFUSDVault() {
+	        let code = Test.readFile("../transactions/setup_fusd_vault.cdc")
+	        let tx = Test.Transaction(
+	            code: code,
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: []
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        assert(result.status == Test.ResultStatus.succeeded)
+	    }
+
+	    pub fun testGetIntegerTrait() {
+	        let script = Test.readFile("../scripts/import_common_contracts.cdc")
+	        let result = blockchain.executeScript(script, [])
+
+	        if result.status != Test.ResultStatus.succeeded {
+	            panic(result.error!.message)
+	        }
+	        assert(result.returnValue! as! Bool)
+	    }
+	`
+
+	transactionCode := `
+	    import "FungibleToken"
+	    import "FUSD"
+
+	    transaction {
+	        prepare(signer: AuthAccount) {
+	            // It's OK if the account already has a Vault, but we don't want to replace it
+	            if(signer.borrow<&FUSD.Vault>(from: /storage/fusdVault) != nil) {
+	                return
+	            }
+
+	            // Create a new FUSD Vault and put it in storage
+	            signer.save(<-FUSD.createEmptyVault(), to: /storage/fusdVault)
+
+	            // Create a public capability to the Vault that only exposes
+	            // the deposit function through the Receiver interface
+	            signer.link<&FUSD.Vault{FungibleToken.Receiver}>(
+	                /public/fusdReceiver,
+	                target: /storage/fusdVault
+	            )
+
+	            // Create a public capability to the Vault that only exposes
+	            // the balance field through the Balance interface
+	            signer.link<&FUSD.Vault{FungibleToken.Balance}>(
+	                /public/fusdBalance,
+	                target: /storage/fusdVault
+	            )
+	        }
+	    }
+	`
+
+	scriptCode := `
+	    import "FungibleToken"
+	    import "FlowToken"
+	    import "FUSD"
+	    import "NonFungibleToken"
+	    import "MetadataViews"
+	    import "ExampleNFT"
+	    import "NFTStorefrontV2"
+	    import "NFTStorefront"
+
+	    pub fun main(): Bool {
+	        return true
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../transactions/setup_fusd_vault.cdc":
+			return transactionCode, nil
+		case "../scripts/import_common_contracts.cdc":
+			return scriptCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	runner := NewTestRunner().WithFileResolver(fileResolver)
+
+	result, err := runner.RunTest(testCode, "testSetupFUSDVault")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+
+	result, err = runner.RunTest(testCode, "testSetupFUSDVault")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestUsingEnv(t *testing.T) {
 	t.Parallel()
 
@@ -2981,6 +3088,12 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
+			"A.f8d6e0586b0a20c7.FUSD",
+			"A.f8d6e0586b0a20c7.ExampleNFT",
+			"A.f8d6e0586b0a20c7.MetadataViews",
+			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
+			"A.f8d6e0586b0a20c7.NFTStorefront",
+			"A.f8d6e0586b0a20c7.NonFungibleToken",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
