@@ -19,23 +19,11 @@
 package test
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/rs/zerolog"
-
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/crypto"
-	sdkTest "github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/onflow/flow-go/fvm"
-	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/environment"
-
-	emulator "github.com/onflow/flow-emulator"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
@@ -44,13 +32,25 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-emulator/adapters"
+	"github.com/onflow/flow-emulator/convert"
+	"github.com/onflow/flow-emulator/emulator"
+	"github.com/onflow/flow-emulator/types"
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/crypto"
+	sdkTest "github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/fvm"
+	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 )
 
 var _ stdlib.TestFramework = &EmulatorBackend{}
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
-	blockchain *emulator.Blockchain
+	blockchain emulator.Emulator
 
 	// blockOffset is the offset for the sequence number of the next transaction.
 	// This is equal to the number of transactions in the current block.
@@ -102,7 +102,7 @@ func NewEmulatorBackend(
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
-	var blockchain *emulator.Blockchain
+	var blockchain emulator.Emulator
 	if coverageReport != nil {
 		blockchain = newBlockchain(
 			emulator.WithCoverageReportingEnabled(true),
@@ -183,7 +183,8 @@ func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 	keyGen := sdkTest.AccountKeyGenerator()
 	accountKey, signer := keyGen.NewWithSigner()
 
-	address, err := e.blockchain.CreateAccount([]*sdk.AccountKey{accountKey}, nil)
+	sdkAdapter := adapters.NewSDKAdapter(zerolog.DefaultContextLogger, e.blockchain)
+	address, err := sdkAdapter.CreateAccount(context.Background(), []*sdk.AccountKey{accountKey}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +239,8 @@ func (e *EmulatorBackend) AddTransaction(
 		return err
 	}
 
-	err = e.blockchain.AddTransaction(*tx)
+	flowTx := convert.SDKTransactionToFlow(*tx)
+	err = e.blockchain.AddTransaction(*flowTx)
 	if err != nil {
 		return err
 	}
@@ -308,7 +310,7 @@ func (e *EmulatorBackend) ExecuteNextTransaction() *stdlib.TransactionResult {
 		// If the returned error is `emulator.PendingBlockTransactionsExhaustedError`,
 		// that means there are no transactions to execute.
 		// Hence, return a nil result.
-		if _, ok := err.(*emulator.PendingBlockTransactionsExhaustedError); ok {
+		if _, ok := err.(*types.PendingBlockTransactionsExhaustedError); ok {
 			return nil
 		}
 
@@ -395,7 +397,8 @@ func (e *EmulatorBackend) DeployContract(
 		return err
 	}
 
-	err = e.blockchain.AddTransaction(*tx)
+	flowTx := convert.SDKTransactionToFlow(*tx)
+	err = e.blockchain.AddTransaction(*flowTx)
 	if err != nil {
 		return err
 	}
@@ -420,16 +423,14 @@ func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 }
 
 // newBlockchain returns an emulator blockchain for testing.
-func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
-	b, err := emulator.NewBlockchain(
+func newBlockchain(opts ...emulator.Option) emulator.Emulator {
+	b, err := emulator.New(
 		append(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
-				emulator.WithServerLogger(
-					zerolog.New(
-						zerolog.ConsoleWriter{Out: os.Stdout},
-					).With().Timestamp().Logger(),
-				),
+				emulator.WithServerLogger(zerolog.New(
+					zerolog.ConsoleWriter{Out: os.Stdout},
+				).With().Timestamp().Logger()),
 			},
 			opts...,
 		)...,
