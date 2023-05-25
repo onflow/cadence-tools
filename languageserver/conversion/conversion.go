@@ -127,6 +127,8 @@ func DeclarationToDocumentSymbol(declaration ast.Declaration) protocol.DocumentS
 			name = "init"
 		case common.DeclarationKindDestructor:
 			name = "destroy"
+		case common.DeclarationKindImport:
+			name = "import"
 		}
 
 		declarationStartPos := ASTToProtocolPosition(declaration.StartPosition())
