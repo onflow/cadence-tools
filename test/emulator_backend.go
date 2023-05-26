@@ -493,3 +493,13 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler {
 	return e.stdlibHandler
 }
+
+func (e *EmulatorBackend) Reset() {
+	err := e.blockchain.ReloadBlockchain()
+	if err != nil {
+		panic(err)
+	}
+
+	// Reset the transaction offset.
+	e.blockOffset = 0
+}

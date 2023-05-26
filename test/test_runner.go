@@ -52,6 +52,10 @@ const setupFunctionName = "setup"
 
 const tearDownFunctionName = "tearDown"
 
+const beforeEachFunctionName = "beforeEach"
+
+const afterEachFunctionName = "afterEach"
+
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
 type Results []Result
@@ -128,7 +132,19 @@ func (r *TestRunner) RunTest(script string, funcName string) (result *Result, er
 		return nil, err
 	}
 
+	// Run `beforeEach()` before running the test function.
+	err = r.runBeforeEach(inter)
+	if err != nil {
+		return nil, err
+	}
+
 	_, testResult := inter.Invoke(funcName)
+
+	// Run `afterEach()` after running the test function.
+	err = r.runAfterEach(inter)
+	if err != nil {
+		return nil, err
+	}
 
 	// Run test `tearDown()` once running all test functions are completed.
 	err = r.runTestTearDown(inter)
@@ -167,11 +183,23 @@ func (r *TestRunner) RunTests(script string) (results Results, err error) {
 			continue
 		}
 
-		err := r.invokeTestFunction(inter, funcName)
+		// Run `beforeEach()` before running the test function.
+		err = r.runBeforeEach(inter)
+		if err != nil {
+			return nil, err
+		}
+
+		testErr := r.invokeTestFunction(inter, funcName)
+
+		// Run `afterEach()` after running the test function.
+		err = r.runAfterEach(inter)
+		if err != nil {
+			return nil, err
+		}
 
 		results = append(results, Result{
 			TestName: funcName,
-			Error:    err,
+			Error:    testErr,
 		})
 	}
 
@@ -203,6 +231,30 @@ func (r *TestRunner) runTestTearDown(inter *interpreter.Interpreter) error {
 
 func hasTearDown(inter *interpreter.Interpreter) bool {
 	return inter.Globals.Contains(tearDownFunctionName)
+}
+
+func (r *TestRunner) runBeforeEach(inter *interpreter.Interpreter) error {
+	if !hasBeforeEach(inter) {
+		return nil
+	}
+
+	return r.invokeTestFunction(inter, beforeEachFunctionName)
+}
+
+func hasBeforeEach(inter *interpreter.Interpreter) bool {
+	return inter.Globals.Contains(beforeEachFunctionName)
+}
+
+func (r *TestRunner) runAfterEach(inter *interpreter.Interpreter) error {
+	if !hasAfterEach(inter) {
+		return nil
+	}
+
+	return r.invokeTestFunction(inter, afterEachFunctionName)
+}
+
+func hasAfterEach(inter *interpreter.Interpreter) bool {
+	return inter.Globals.Contains(afterEachFunctionName)
 }
 
 func (r *TestRunner) invokeTestFunction(inter *interpreter.Interpreter, funcName string) (err error) {
