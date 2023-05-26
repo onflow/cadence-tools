@@ -1717,7 +1717,10 @@ func (s *Server) DocumentSymbol(
 
 	for _, declaration := range checker.Program.Declarations() {
 		symbol := conversion.DeclarationToDocumentSymbol(declaration)
-		symbols = append(symbols, &symbol)
+		// symbols with empty names will cause errors in the client
+		if strings.TrimSpace(symbol.Name) != "" {
+			symbols = append(symbols, &symbol)
+		}
 	}
 
 	return
