@@ -120,16 +120,7 @@ func DeclarationToDocumentSymbol(declaration ast.Declaration) protocol.DocumentS
 			identifier.EndPosition(nil),
 		)
 	} else {
-		switch declarationKind {
-		case common.DeclarationKindTransaction:
-			name = "transaction"
-		case common.DeclarationKindInitializer:
-			name = "init"
-		case common.DeclarationKindDestructor:
-			name = "destroy"
-		case common.DeclarationKindImport:
-			name = "import"
-		}
+		name = declarationKind.Keywords()
 
 		declarationStartPos := ASTToProtocolPosition(declaration.StartPosition())
 		selectionRange = protocol.Range{
