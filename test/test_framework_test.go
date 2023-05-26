@@ -1195,6 +1195,115 @@ func TestSetupAndTearDown(t *testing.T) {
 	})
 }
 
+func TestBeforeAndAfterEach(t *testing.T) {
+	t.Parallel()
+
+	t.Run("beforeEach", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+		    pub(set) var counter = 0
+
+		    pub fun beforeEach() {
+		        counter = counter + 1
+		    }
+
+		    pub fun testFuncOne() {
+		        assert(counter == 1)
+		    }
+
+		    pub fun testFuncTwo() {
+		        assert(counter == 2)
+		    }
+		`
+
+		runner := NewTestRunner()
+		results, err := runner.RunTests(code)
+		require.NoError(t, err)
+
+		require.Len(t, results, 2)
+		assert.Equal(t, results[0].TestName, "testFuncOne")
+		require.NoError(t, results[0].Error)
+		assert.Equal(t, results[1].TestName, "testFuncTwo")
+		require.NoError(t, results[1].Error)
+	})
+
+	t.Run("beforeEach failed", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+		    pub fun beforeEach() {
+		        panic("error occurred")
+		    }
+
+		    pub fun testFunc() {
+		        assert(true)
+		    }
+		`
+
+		runner := NewTestRunner()
+		results, err := runner.RunTests(code)
+		require.Error(t, err)
+		require.Empty(t, results)
+	})
+
+	t.Run("afterEach", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+		    pub(set) var counter = 2
+
+		    pub fun afterEach() {
+		        counter = counter - 1
+		    }
+
+		    pub fun testFuncOne() {
+		        assert(counter == 2)
+		    }
+
+		    pub fun testFuncTwo() {
+		        assert(counter == 1)
+		    }
+
+		    pub fun tearDown() {
+		        assert(counter == 0)
+		    }
+		`
+
+		runner := NewTestRunner()
+		results, err := runner.RunTests(code)
+		require.NoError(t, err)
+
+		require.Len(t, results, 2)
+		assert.Equal(t, results[0].TestName, "testFuncOne")
+		require.NoError(t, results[0].Error)
+		assert.Equal(t, results[1].TestName, "testFuncTwo")
+		require.NoError(t, results[1].Error)
+	})
+
+	t.Run("afterEach failed", func(t *testing.T) {
+		t.Parallel()
+
+		code := `
+		    pub(set) var tearDownRan = false
+
+		    pub fun testFunc() {
+		        assert(!tearDownRan)
+		    }
+
+		    pub fun afterEach() {
+		        assert(false)
+		    }
+		`
+
+		runner := NewTestRunner()
+		results, err := runner.RunTests(code)
+
+		require.Error(t, err)
+		require.Len(t, results, 0)
+	})
+}
+
 func TestPrettyPrintTestResults(t *testing.T) {
 	t.Parallel()
 
