@@ -2760,16 +2760,45 @@ func TestReplaceImports(t *testing.T) {
 func TestRetrieveServiceAccount(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+	t.Run("from EmulatorBackend", func(t *testing.T) {
+		t.Parallel()
 
-	serviceAccount, err := emulatorBackend.ServiceAccount()
-	require.NoError(t, err)
+		emulatorBackend := NewEmulatorBackend(nil, nil, nil)
 
-	assert.Equal(
-		t,
-		"0xf8d6e0586b0a20c7",
-		serviceAccount.Address.HexWithPrefix(),
-	)
+		serviceAccount, err := emulatorBackend.ServiceAccount()
+
+		require.NoError(t, err)
+		assert.Equal(
+			t,
+			"0xf8d6e0586b0a20c7",
+			serviceAccount.Address.HexWithPrefix(),
+		)
+	})
+
+	t.Run("from Test framework's blockchain", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+		    import Test
+
+		    pub let blockchain = Test.newEmulatorBlockchain()
+
+		    pub fun testGetServiceAccount() {
+		        // Act
+		        let account = blockchain.serviceAccount()
+
+		        // Assert
+		        Test.assert(account.address.getType() == Type<Address>())
+		        Test.assert(account.publicKey.getType() == Type<PublicKey>())
+		        Test.assert(account.address == Address(0xf8d6e0586b0a20c7))
+		    }
+		`
+
+		runner := NewTestRunner()
+
+		_, err := runner.RunTest(testCode, "testGetServiceAccount")
+		require.NoError(t, err)
+	})
 }
 
 func TestCoverageReportForUnitTests(t *testing.T) {
