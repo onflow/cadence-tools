@@ -51,7 +51,7 @@ var _ stdlib.TestFramework = &EmulatorBackend{}
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
-	blockchain emulator.Emulator
+	blockchain *emulator.Blockchain
 
 	// blockOffset is the offset for the sequence number of the next transaction.
 	// This is equal to the number of transactions in the current block.
@@ -103,7 +103,7 @@ func NewEmulatorBackend(
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
-	var blockchain emulator.Emulator
+	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
 		blockchain = newBlockchain(
 			emulator.WithCoverageReport(coverageReport),
@@ -422,7 +422,7 @@ func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 }
 
 // newBlockchain returns an emulator blockchain for testing.
-func newBlockchain(opts ...emulator.Option) emulator.Emulator {
+func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
