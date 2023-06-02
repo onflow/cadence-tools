@@ -43,6 +43,7 @@ import (
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -509,6 +510,21 @@ func (e *EmulatorBackend) Reset() {
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
+}
+
+func (e *EmulatorBackend) Logs() []string {
+	// TODO
+	return nil
+}
+
+func (e *EmulatorBackend) ServiceAccount() (*stdlib.Account, error) {
+	// TODO
+	return nil, errors.New("TODO")
+}
+
+func (e *EmulatorBackend) Events(_ *interpreter.Interpreter, _ interpreter.StaticType) interpreter.Value {
+	// TODO:
+	return nil
 }
 
 // excludeCommonLocations excludes the common contracts from appearing
