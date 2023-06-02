@@ -106,9 +106,8 @@ func NewEmulatorBackend(
 	var blockchain emulator.Emulator
 	if coverageReport != nil {
 		blockchain = newBlockchain(
-			emulator.WithCoverageReportingEnabled(true),
+			emulator.WithCoverageReport(coverageReport),
 		)
-		blockchain.SetCoverageReport(coverageReport)
 		excludeCommonLocations(coverageReport)
 	} else {
 		blockchain = newBlockchain()
