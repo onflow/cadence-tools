@@ -78,12 +78,21 @@ type keyInfo struct {
 
 var systemContracts = func() []common.AddressLocation {
 	chain := flow.Emulator.Chain()
+	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
-		"FlowServiceAccount": chain.ServiceAddress().HexWithPrefix(),
-		"FlowToken":          fvm.FlowTokenAddress(chain).HexWithPrefix(),
-		"FungibleToken":      fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-		"FlowFees":           environment.FlowFeesAddress(chain).HexWithPrefix(),
-		"FlowStorageFees":    chain.ServiceAddress().HexWithPrefix(),
+		"FlowServiceAccount":    serviceAddress,
+		"FlowToken":             fvm.FlowTokenAddress(chain).HexWithPrefix(),
+		"FungibleToken":         fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+		"FlowFees":              environment.FlowFeesAddress(chain).HexWithPrefix(),
+		"FlowStorageFees":       serviceAddress,
+		"FlowClusterQC":         serviceAddress,
+		"FlowDKG":               serviceAddress,
+		"FlowEpoch":             serviceAddress,
+		"FlowIDTableStaking":    serviceAddress,
+		"FlowStakingCollection": serviceAddress,
+		"LockedTokens":          serviceAddress,
+		"NodeVersionBeacon":     serviceAddress,
+		"StakingProxy":          serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
@@ -105,10 +114,10 @@ func NewEmulatorBackend(
 ) *EmulatorBackend {
 	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
+		excludeCommonLocations(coverageReport)
 		blockchain = newBlockchain(
 			emulator.WithCoverageReport(coverageReport),
 		)
-		excludeCommonLocations(coverageReport)
 	} else {
 		blockchain = newBlockchain()
 	}
