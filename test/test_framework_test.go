@@ -486,14 +486,14 @@ func TestImportBuiltinContracts(t *testing.T) {
 	`
 
 	scriptCode := `
-	    import "FungibleToken"
-	    import "FlowToken"
-	    import "FUSD"
-	    import "NonFungibleToken"
-	    import "MetadataViews"
-	    import "ExampleNFT"
-	    import "NFTStorefrontV2"
-	    import "NFTStorefront"
+	    import FungibleToken from "FungibleToken"
+	    import FlowToken from "FlowToken"
+	    import FUSD from "FUSD"
+	    import NonFungibleToken from "NonFungibleToken"
+	    import MetadataViews from "MetadataViews"
+	    import ExampleNFT from "ExampleNFT"
+	    import NFTStorefrontV2 from "NFTStorefrontV2"
+	    import NFTStorefront from "NFTStorefront"
 
 	    pub fun main(): Bool {
 	        return true
@@ -517,7 +517,7 @@ func TestImportBuiltinContracts(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	result, err = runner.RunTest(testCode, "testSetupFUSDVault")
+	result, err = runner.RunTest(testCode, "testGetIntegerTrait")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
