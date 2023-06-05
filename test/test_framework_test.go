@@ -2757,10 +2757,10 @@ func TestReplaceImports(t *testing.T) {
 	assert.Equal(t, expected, replacedCode)
 }
 
-func TestRetrieveServiceAccount(t *testing.T) {
+func TestServiceAccount(t *testing.T) {
 	t.Parallel()
 
-	t.Run("from EmulatorBackend", func(t *testing.T) {
+	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
 		emulatorBackend := NewEmulatorBackend(nil, nil, nil)
@@ -2775,7 +2775,7 @@ func TestRetrieveServiceAccount(t *testing.T) {
 		)
 	})
 
-	t.Run("from Test framework's blockchain", func(t *testing.T) {
+	t.Run("retrieve from Test framework's blockchain", func(t *testing.T) {
 		t.Parallel()
 
 		const testCode = `
@@ -2790,14 +2790,123 @@ func TestRetrieveServiceAccount(t *testing.T) {
 		        // Assert
 		        Test.assert(account.address.getType() == Type<Address>())
 		        Test.assert(account.publicKey.getType() == Type<PublicKey>())
-		        Test.assert(account.address == Address(0xf8d6e0586b0a20c7))
+		        Test.assert(account.address == 0xf8d6e0586b0a20c7)
 		    }
 		`
 
 		runner := NewTestRunner()
 
-		_, err := runner.RunTest(testCode, "testGetServiceAccount")
+		result, err := runner.RunTest(testCode, "testGetServiceAccount")
 		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("run scripts and transactions with service account", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+		    import Test
+
+		    pub let blockchain = Test.newEmulatorBlockchain()
+
+		    pub fun testGetServiceAccountBalance() {
+		        // Arrange
+		        let account = blockchain.serviceAccount()
+
+		        // Act
+		        var script = Test.readFile("../scripts/get_account_balance.cdc")
+		        let value = blockchain.executeScript(script, [account.address])
+		        Test.assert(value.status == Test.ResultStatus.succeeded)
+		        let balance = value.returnValue! as! UFix64
+
+		        // Assert
+		        Test.assert(balance == 1000000000.0)
+		    }
+
+		    pub fun testTransferFlowTokens() {
+		        // Arrange
+		        let account = blockchain.serviceAccount()
+		        let receiver = blockchain.createAccount()
+
+		        let code = Test.readFile("../transactions/transfer_flow_tokens.cdc")
+		        let tx = Test.Transaction(
+		            code: code,
+		            authorizers: [account.address],
+		            signers: [],
+		            arguments: [receiver.address, 1500.0]
+		        )
+
+		        // Act
+		        let result = blockchain.executeTransaction(tx)
+		        Test.assert(result.status == Test.ResultStatus.succeeded)
+
+		        var script = Test.readFile("../scripts/get_account_balance.cdc")
+		        let value = blockchain.executeScript(script, [receiver.address])
+
+		        Test.assert(value.status == Test.ResultStatus.succeeded)
+
+		        let balance = value.returnValue! as! UFix64
+
+		        // Assert
+		        Test.assert(balance == 1500.0)
+		    }
+		`
+
+		const scriptCode = `
+		    import "FungibleToken"
+		    import "FlowToken"
+
+		    pub fun main(address: Address): UFix64 {
+		        let balanceRef = getAccount(address)
+		            .getCapability(/public/flowTokenBalance)
+		            .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+		            ?? panic("Could not borrow FungibleToken.Balance reference")
+
+		        return balanceRef.balance
+		    }
+		`
+
+		const transactionCode = `
+		    import "FungibleToken"
+		    import "FlowToken"
+
+		    transaction(receiver: Address, amount: UFix64) {
+		        prepare(account: AuthAccount) {
+		            let flowVault = account.borrow<&FlowToken.Vault>(
+		                from: /storage/flowTokenVault
+		            ) ?? panic("Could not borrow BlpToken.Vault reference")
+
+		            let receiverRef = getAccount(receiver)
+		                .getCapability(/public/flowTokenReceiver)
+		                .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+		                ?? panic("Could not borrow FungibleToken.Receiver reference")
+
+		            let tokens <- flowVault.withdraw(amount: amount)
+		            receiverRef.deposit(from: <- tokens)
+		        }
+		    }
+		`
+
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "../scripts/get_account_balance.cdc":
+				return scriptCode, nil
+			case "../transactions/transfer_flow_tokens.cdc":
+				return transactionCode, nil
+			default:
+				return "", fmt.Errorf("cannot find import location: %s", path)
+			}
+		}
+
+		runner := NewTestRunner().WithFileResolver(fileResolver)
+
+		result, err := runner.RunTest(testCode, "testGetServiceAccountBalance")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+
+		result, err = runner.RunTest(testCode, "testTransferFlowTokens")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
 	})
 }
 
