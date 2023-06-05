@@ -3,6 +3,7 @@ module github.com/onflow/cadence-tools/test
 go 1.18
 
 require (
+	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/onflow/cadence v0.39.1
 	github.com/onflow/flow-emulator v0.50.1
 	github.com/onflow/flow-go v0.30.1-0.20230602200347-2a0e824db380
@@ -69,7 +70,6 @@ require (
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.24.2 // indirect
 	github.com/libp2p/go-openssl v0.1.0 // indirect
-	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/m4ksio/wal v1.0.1-0.20221209164835-154a17396e4c // indirect
 	github.com/magiconair/properties v1.8.6 // indirect

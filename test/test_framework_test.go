@@ -37,7 +37,7 @@ import (
 func TestRunningMultipleTests(t *testing.T) {
 	t.Parallel()
 
-	code := `
+	const code = `
         pub fun testFunc1() {
             assert(false)
         }
@@ -65,7 +65,7 @@ func TestRunningMultipleTests(t *testing.T) {
 func TestRunningSingleTest(t *testing.T) {
 	t.Parallel()
 
-	code := `
+	const code = `
         pub fun testFunc1() {
             assert(false)
         }
@@ -89,7 +89,7 @@ func TestRunningSingleTest(t *testing.T) {
 func TestAssertFunction(t *testing.T) {
 	t.Parallel()
 
-	code := `
+	const code = `
         import Test
 
         pub fun testAssertWithNoArgs() {
@@ -136,7 +136,7 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("no args", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -157,7 +157,7 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("with args", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -180,7 +180,7 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("array returns", func(t *testing.T) {
 		t.Parallel()
 
-		code := ` pub fun main(): [UInt64] { return [1, 2, 3]} `
+		const code = ` pub fun main(): [UInt64] { return [1, 2, 3]} `
 
 		testScript := fmt.Sprintf(
 			`
@@ -210,7 +210,7 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("dictionary returns", func(t *testing.T) {
 		t.Parallel()
 
-		code := ` pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}} `
+		const code = ` pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}} `
 
 		testScript := fmt.Sprintf(
 			`
@@ -242,7 +242,7 @@ func TestImportContract(t *testing.T) {
 	t.Run("init no params", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import FooContract from "./FooContract"
 
             pub fun test() {
@@ -252,7 +252,7 @@ func TestImportContract(t *testing.T) {
             }
         `
 
-		fooContract := `
+		const fooContract = `
             pub contract FooContract {
                 init() {}
 
@@ -276,7 +276,7 @@ func TestImportContract(t *testing.T) {
 	t.Run("init with params", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import FooContract from "./FooContract"
 
             pub fun test() {
@@ -286,7 +286,7 @@ func TestImportContract(t *testing.T) {
             }
         `
 
-		fooContract := `
+		const fooContract = `
             pub contract FooContract {
 
                 pub var greeting: String
@@ -315,7 +315,7 @@ func TestImportContract(t *testing.T) {
 	t.Run("invalid import", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import FooContract from "./FooContract"
 
             pub fun test() {
@@ -344,7 +344,7 @@ func TestImportContract(t *testing.T) {
 	t.Run("import resolver not provided", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import FooContract from "./FooContract"
 
             pub fun test() {
@@ -373,20 +373,20 @@ func TestImportContract(t *testing.T) {
 			Name:    "BarContract",
 		}
 
-		code := `
+		const code = `
             import FooContract from "./FooContract"
 
             pub fun test() {}
         `
 
-		fooContract := `
+		const fooContract = `
            import BarContract from 0x01
 
             pub contract FooContract {
                 init() {}
             }
         `
-		barContract := `
+		const barContract = `
             pub contract BarContract {
                 init() {}
             }
@@ -528,7 +528,7 @@ func TestUsingEnv(t *testing.T) {
 	t.Run("public key creation", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             pub fun test() {
                 var publicKey = PublicKey(
                     publicKey: "1234".decodeHex(),
@@ -550,7 +550,7 @@ func TestUsingEnv(t *testing.T) {
 	t.Run("public account", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             pub fun test() {
                 var acc = getAccount(0x01)
                 var bal = acc.balance
@@ -568,7 +568,7 @@ func TestUsingEnv(t *testing.T) {
 	t.Run("account access in imported program", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import FooContract from "./FooContract"
 
             pub fun test() {
@@ -578,7 +578,7 @@ func TestUsingEnv(t *testing.T) {
             }
         `
 
-		fooContract := `
+		const fooContract = `
             pub contract FooContract {
                 init() {}
 
@@ -603,7 +603,7 @@ func TestUsingEnv(t *testing.T) {
 	t.Run("verify using public key of account", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -629,7 +629,7 @@ func TestUsingEnv(t *testing.T) {
 	t.Run("verify using public key returned from blockchain", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -684,7 +684,7 @@ func TestUsingEnv(t *testing.T) {
 func TestCreateAccount(t *testing.T) {
 	t.Parallel()
 
-	code := `
+	const code = `
         import Test
 
         pub fun test() {
@@ -705,7 +705,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("add transaction", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -732,7 +732,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run next transaction", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -762,7 +762,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run next transaction with authorizer", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -792,7 +792,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("transaction failure", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -822,7 +822,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run non existing transaction", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -841,7 +841,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("commit block", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -859,7 +859,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("commit un-executed block", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -890,7 +890,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("commit partially executed block", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -927,7 +927,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("multiple commit block", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -946,7 +946,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run given transaction", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -974,7 +974,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run transaction with args", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1002,7 +1002,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run transaction with multiple authorizers", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1031,7 +1031,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run given transaction unsuccessful", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1059,7 +1059,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run multiple transactions", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1114,7 +1114,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run empty transactions", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1135,7 +1135,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("run transaction with pending transactions", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1174,7 +1174,7 @@ func TestExecutingTransactions(t *testing.T) {
 	t.Run("transaction with array typed args", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1206,7 +1206,7 @@ func TestSetupAndTearDown(t *testing.T) {
 	t.Run("setup", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             pub(set) var setupRan = false
 
             pub fun setup() {
@@ -1232,7 +1232,7 @@ func TestSetupAndTearDown(t *testing.T) {
 	t.Run("setup failed", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             pub fun setup() {
                 panic("error occurred")
             }
@@ -1251,7 +1251,7 @@ func TestSetupAndTearDown(t *testing.T) {
 	t.Run("teardown", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             pub(set) var tearDownRan = false
 
             pub fun testFunc() {
@@ -1276,7 +1276,7 @@ func TestSetupAndTearDown(t *testing.T) {
 	t.Run("teardown failed", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             pub(set) var tearDownRan = false
 
             pub fun testFunc() {
@@ -1414,7 +1414,7 @@ func TestBeforeAndAfterEach(t *testing.T) {
 func TestPrettyPrintTestResults(t *testing.T) {
 	t.Parallel()
 
-	code := `
+	const code = `
         import Test
 
         pub fun testFunc1() {
@@ -1440,7 +1440,7 @@ func TestPrettyPrintTestResults(t *testing.T) {
 
 	resultsStr := PrettyPrintResults(results, "test_script.cdc")
 
-	expected := `Test results: "test_script.cdc"
+	const expected = `Test results: "test_script.cdc"
 - PASS: testFunc1
 - FAIL: testFunc2
 		Execution failed:
@@ -1464,7 +1464,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 	t.Run("read script", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1506,7 +1506,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 	t.Run("read invalid", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1543,7 +1543,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 	t.Run("no resolver set", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1569,7 +1569,7 @@ func TestDeployingContracts(t *testing.T) {
 	t.Run("no args", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1612,7 +1612,7 @@ func TestDeployingContracts(t *testing.T) {
 	t.Run("with args", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1659,7 +1659,7 @@ func TestErrors(t *testing.T) {
 	t.Run("contract deployment error", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1691,7 +1691,7 @@ func TestErrors(t *testing.T) {
 	t.Run("script error", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1721,7 +1721,7 @@ func TestErrors(t *testing.T) {
 	t.Run("transaction error", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun test() {
@@ -1755,7 +1755,7 @@ func TestInterpretFailFunction(t *testing.T) {
 	t.Parallel()
 
 	t.Run("without message", func(t *testing.T) {
-		script := `
+		const script = `
         import Test
 
         pub fun test() {
@@ -1771,7 +1771,7 @@ func TestInterpretFailFunction(t *testing.T) {
 	})
 
 	t.Run("with message", func(t *testing.T) {
-		script := `
+		const script = `
         import Test
 
         pub fun test() {
@@ -1795,7 +1795,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom matcher", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1821,7 +1821,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom matcher primitive type", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1843,7 +1843,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom matcher invalid type usage", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1867,7 +1867,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom resource matcher", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1901,7 +1901,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom resource matcher invalid type", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1925,7 +1925,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom matcher with explicit type", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1947,7 +1947,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("custom matcher with mismatching types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -1969,7 +1969,7 @@ func TestInterpretMatcher(t *testing.T) {
 	t.Run("combined matcher mismatching types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2004,7 +2004,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("equal matcher with primitive", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2022,7 +2022,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("equal matcher with struct", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2043,7 +2043,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("equal matcher with resource", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2067,7 +2067,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("with explicit types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2084,7 +2084,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("with incorrect types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2104,7 +2104,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("matcher or", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2127,7 +2127,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("matcher or fail", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2150,7 +2150,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("matcher and", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2173,7 +2173,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("chained matchers", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2196,7 +2196,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("resource matcher or", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2230,7 +2230,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 	t.Run("resource matcher and", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2267,7 +2267,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2284,7 +2284,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("fail", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2302,7 +2302,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("different types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2320,7 +2320,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("with explicit types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2337,7 +2337,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("mismatching types", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2356,7 +2356,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("resource with resource matcher", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2380,7 +2380,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("resource with struct matcher", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2404,7 +2404,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 	t.Run("struct with resource matcher", func(t *testing.T) {
 		t.Parallel()
 
-		script := `
+		const script = `
             import Test
 
             pub fun test() {
@@ -2432,7 +2432,7 @@ func TestReplacingImports(t *testing.T) {
 	t.Run("file location", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub var blockchain = Test.newEmulatorBlockchain()
@@ -2510,7 +2510,7 @@ func TestReplacingImports(t *testing.T) {
 	t.Run("address location", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub var blockchain = Test.newEmulatorBlockchain()
@@ -2592,7 +2592,7 @@ func TestReplacingImports(t *testing.T) {
 	t.Run("config not provided", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub var blockchain = Test.newEmulatorBlockchain()
@@ -2670,7 +2670,7 @@ func TestReplacingImports(t *testing.T) {
 	t.Run("config with missing imports", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub var blockchain = Test.newEmulatorBlockchain()
@@ -2737,14 +2737,14 @@ func TestReplaceImports(t *testing.T) {
 		},
 	})
 
-	code := `
+	const code = `
         import C1 from "./sample/contract1.cdc"
         import C2 from "./sample/contract2.cdc"
         import C3 from "./sample/contract3.cdc"
 
         pub fun main() {}
     `
-	expected := `
+	const expected = `
         import C1 from 0x0100000000000000
         import C2 from 0x0200000000000000
         import C3 from 0x0300000000000000
@@ -2798,7 +2798,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	    }
 	`
 
-	code := `
+	const code = `
 	    import FooContract from "FooContract.cdc"
 
 	    pub let foo = FooContract()
@@ -2962,7 +2962,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	    }
 	`
 
-	testCode := `
+	const testCode = `
 	    import Test
 
 	    pub let blockchain = Test.newEmulatorBlockchain()
@@ -3010,7 +3010,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	    }
 	`
 
-	transactionCode := `
+	const transactionCode = `
 	    import FooContract from "../contracts/FooContract.cdc"
 
 	    transaction(number: Int, trait: String) {
@@ -3110,4 +3110,427 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 		"Coverage: 96.4% of statements",
 		coverageReport.String(),
 	)
+}
+
+func TestRetrieveLogsFromUnitTests(t *testing.T) {
+	t.Parallel()
+
+	const fooContract = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        init() {
+	            self.specialNumbers = {1729: "Harshad"}
+	            log("init successful")
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	            log("specialNumbers updated")
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Unknown"
+	        }
+	    }
+	`
+
+	const code = `
+	    import FooContract from "FooContract.cdc"
+
+	    pub let foo = FooContract()
+
+	    pub fun setup() {
+	        log("setup successful")
+	    }
+
+	    pub fun testGetIntegerTrait() {
+	        // Act
+	        let result = foo.getIntegerTrait(1729)
+
+	        // Assert
+	        assert(result == "Harshad")
+	        log("getIntegerTrait works")
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        // Act
+	        foo.addSpecialNumber(78557, "Sierpinski")
+
+	        // Assert
+	        assert("Sierpinski" == foo.getIntegerTrait(78557))
+	        log("addSpecialNumber works")
+	    }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		if location == common.StringLocation("FooContract.cdc") {
+			return fooContract, nil
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	runner := NewTestRunner().WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(code)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+
+	logs := runner.Logs()
+	assert.ElementsMatch(
+		t,
+		[]string{
+			"init successful",
+			"setup successful",
+			"getIntegerTrait works",
+			"specialNumbers updated",
+			"addSpecialNumber works",
+		},
+		logs,
+	)
+}
+
+func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
+	t.Parallel()
+
+	const fooContract = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        init() {
+	            self.specialNumbers = {1729: "Harshad"}
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Unknown"
+	        }
+	    }
+	`
+
+	const code = `
+	    import FooContract from "FooContract.cdc"
+
+	    pub let foo = FooContract()
+
+	    pub fun testGetIntegerTrait() {
+	        // Act
+	        let result = foo.getIntegerTrait(1729)
+
+	        // Assert
+	        assert(result == "Harshad")
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        // Act
+	        foo.addSpecialNumber(78557, "Sierpinski")
+
+	        // Assert
+	        assert("Sierpinski" == foo.getIntegerTrait(78557))
+	    }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		if location == common.StringLocation("FooContract.cdc") {
+			return fooContract, nil
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	runner := NewTestRunner().WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(code)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+
+	logs := runner.Logs()
+	assert.Equal(t, []string{}, logs)
+}
+
+func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
+	t.Parallel()
+
+	const contractCode = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        init() {
+	            self.specialNumbers = {1729: "Harshad"}
+	            log("init successful")
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	            log("specialNumbers updated")
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Unknown"
+	        }
+	    }
+	`
+
+	const scriptCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    pub fun main(): Bool {
+	        // Act
+	        let trait = FooContract.getIntegerTrait(1729)
+
+	        // Assert
+	        assert(trait == "Harshad")
+
+	        log("getIntegerTrait works")
+	        return true
+	    }
+	`
+
+	const testCode = `
+	    import Test
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun setup() {
+	        let contractCode = Test.readFile("../contracts/FooContract.cdc")
+	        let err = blockchain.deployContract(
+	            name: "FooContract",
+	            code: contractCode,
+	            account: account,
+	            arguments: []
+	        )
+
+	        if err != nil {
+	            panic(err!.message)
+	        }
+
+	        blockchain.useConfiguration(Test.Configuration({
+	            "../contracts/FooContract.cdc": account.address
+	        }))
+	    }
+
+	    pub fun testGetIntegerTrait() {
+	        let script = Test.readFile("../scripts/get_integer_traits.cdc")
+	        let result = blockchain.executeScript(script, [])
+
+	        if result.status != Test.ResultStatus.succeeded {
+	            panic(result.error!.message)
+	        }
+	        assert(result.returnValue! as! Bool)
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        let code = Test.readFile("../transactions/add_special_number.cdc")
+	        let tx = Test.Transaction(
+	            code: code,
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: [78557, "Sierpinski"]
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        assert(result.status == Test.ResultStatus.succeeded)
+	    }
+
+	    pub fun tearDown() {
+	        let expectedLogs = [
+	            "init successful",
+	            "getIntegerTrait works",
+	            "specialNumbers updated",
+	            "addSpecialNumber works"
+	        ]
+
+	        for logMsg in blockchain.logs() {
+	            Test.assert(expectedLogs.contains(logMsg))
+	        }
+	    }
+	`
+
+	const transactionCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    transaction(number: Int, trait: String) {
+	        prepare(acct: AuthAccount) {}
+
+	        execute {
+	            // Act
+	            FooContract.addSpecialNumber(number, trait)
+
+	            // Assert
+	            assert(trait == FooContract.getIntegerTrait(number))
+	            log("addSpecialNumber works")
+	        }
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return contractCode, nil
+		case "../scripts/get_integer_traits.cdc":
+			return scriptCode, nil
+		case "../transactions/add_special_number.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	runner := NewTestRunner().WithFileResolver(fileResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+}
+
+func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
+	t.Parallel()
+
+	const contractCode = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        init() {
+	            self.specialNumbers = {1729: "Harshad"}
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Unknown"
+	        }
+	    }
+	`
+
+	const scriptCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    pub fun main(): Bool {
+	        // Act
+	        let trait = FooContract.getIntegerTrait(1729)
+
+	        // Assert
+	        assert(trait == "Harshad")
+
+	        return true
+	    }
+	`
+
+	const testCode = `
+	    import Test
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun setup() {
+	        let contractCode = Test.readFile("../contracts/FooContract.cdc")
+	        let err = blockchain.deployContract(
+	            name: "FooContract",
+	            code: contractCode,
+	            account: account,
+	            arguments: []
+	        )
+
+	        if err != nil {
+	            panic(err!.message)
+	        }
+
+	        blockchain.useConfiguration(Test.Configuration({
+	            "../contracts/FooContract.cdc": account.address
+	        }))
+	    }
+
+	    pub fun testGetIntegerTrait() {
+	        let script = Test.readFile("../scripts/get_integer_traits.cdc")
+	        let result = blockchain.executeScript(script, [])
+
+	        if result.status != Test.ResultStatus.succeeded {
+	            panic(result.error!.message)
+	        }
+	        assert(result.returnValue! as! Bool)
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        let code = Test.readFile("../transactions/add_special_number.cdc")
+	        let tx = Test.Transaction(
+	            code: code,
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: [78557, "Sierpinski"]
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        assert(result.status == Test.ResultStatus.succeeded)
+	    }
+
+	    pub fun tearDown() {
+	        Test.assert(blockchain.logs() == [])
+	    }
+	`
+
+	const transactionCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    transaction(number: Int, trait: String) {
+	        prepare(acct: AuthAccount) {}
+
+	        execute {
+	            // Act
+	            FooContract.addSpecialNumber(number, trait)
+
+	            // Assert
+	            assert(trait == FooContract.getIntegerTrait(number))
+	        }
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return contractCode, nil
+		case "../scripts/get_integer_traits.cdc":
+			return scriptCode, nil
+		case "../transactions/add_special_number.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	runner := NewTestRunner().WithFileResolver(fileResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }
