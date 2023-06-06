@@ -486,14 +486,14 @@ func TestImportBuiltinContracts(t *testing.T) {
 	`
 
 	scriptCode := `
-	    import "FungibleToken"
-	    import "FlowToken"
-	    import "FUSD"
-	    import "NonFungibleToken"
-	    import "MetadataViews"
-	    import "ExampleNFT"
-	    import "NFTStorefrontV2"
-	    import "NFTStorefront"
+	    import FungibleToken from "FungibleToken"
+	    import FlowToken from "FlowToken"
+	    import FUSD from "FUSD"
+	    import NonFungibleToken from "NonFungibleToken"
+	    import MetadataViews from "MetadataViews"
+	    import ExampleNFT from "ExampleNFT"
+	    import NFTStorefrontV2 from "NFTStorefrontV2"
+	    import NFTStorefront from "NFTStorefront"
 
 	    pub fun main(): Bool {
 	        return true
@@ -517,7 +517,7 @@ func TestImportBuiltinContracts(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	result, err = runner.RunTest(testCode, "testSetupFUSDVault")
+	result, err = runner.RunTest(testCode, "testGetIntegerTrait")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
@@ -3085,6 +3085,14 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.e5a8b7f23e8b548f.FlowFees",
 			"A.f8d6e0586b0a20c7.FlowStorageFees",
 			"A.f8d6e0586b0a20c7.FlowServiceAccount",
+			"A.f8d6e0586b0a20c7.FlowClusterQC",
+			"A.f8d6e0586b0a20c7.FlowDKG",
+			"A.f8d6e0586b0a20c7.FlowEpoch",
+			"A.f8d6e0586b0a20c7.FlowIDTableStaking",
+			"A.f8d6e0586b0a20c7.FlowStakingCollection",
+			"A.f8d6e0586b0a20c7.LockedTokens",
+			"A.f8d6e0586b0a20c7.NodeVersionBeacon",
+			"A.f8d6e0586b0a20c7.StakingProxy",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
