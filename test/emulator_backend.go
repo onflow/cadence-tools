@@ -19,23 +19,11 @@
 package test
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/rs/zerolog"
-
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/crypto"
-	sdkTest "github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/onflow/flow-go/fvm"
-	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/environment"
-
-	emulator "github.com/onflow/flow-emulator"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
@@ -44,6 +32,19 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-emulator/adapters"
+	"github.com/onflow/flow-emulator/convert"
+	"github.com/onflow/flow-emulator/emulator"
+	"github.com/onflow/flow-emulator/types"
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/crypto"
+	sdkTest "github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/fvm"
+	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 var _ stdlib.TestFramework = &EmulatorBackend{}
@@ -77,12 +78,21 @@ type keyInfo struct {
 
 var systemContracts = func() []common.AddressLocation {
 	chain := flow.Emulator.Chain()
+	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
-		"FlowServiceAccount": chain.ServiceAddress().HexWithPrefix(),
-		"FlowToken":          fvm.FlowTokenAddress(chain).HexWithPrefix(),
-		"FungibleToken":      fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-		"FlowFees":           environment.FlowFeesAddress(chain).HexWithPrefix(),
-		"FlowStorageFees":    chain.ServiceAddress().HexWithPrefix(),
+		"FlowServiceAccount":    serviceAddress,
+		"FlowToken":             fvm.FlowTokenAddress(chain).HexWithPrefix(),
+		"FungibleToken":         fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+		"FlowFees":              environment.FlowFeesAddress(chain).HexWithPrefix(),
+		"FlowStorageFees":       serviceAddress,
+		"FlowClusterQC":         serviceAddress,
+		"FlowDKG":               serviceAddress,
+		"FlowEpoch":             serviceAddress,
+		"FlowIDTableStaking":    serviceAddress,
+		"FlowStakingCollection": serviceAddress,
+		"LockedTokens":          serviceAddress,
+		"NodeVersionBeacon":     serviceAddress,
+		"StakingProxy":          serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
@@ -104,11 +114,10 @@ func NewEmulatorBackend(
 ) *EmulatorBackend {
 	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
-		blockchain = newBlockchain(
-			emulator.WithCoverageReportingEnabled(true),
-		)
-		blockchain.SetCoverageReport(coverageReport)
 		excludeCommonLocations(coverageReport)
+		blockchain = newBlockchain(
+			emulator.WithCoverageReport(coverageReport),
+		)
 	} else {
 		blockchain = newBlockchain()
 	}
@@ -182,7 +191,8 @@ func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 	keyGen := sdkTest.AccountKeyGenerator()
 	accountKey, signer := keyGen.NewWithSigner()
 
-	address, err := e.blockchain.CreateAccount([]*sdk.AccountKey{accountKey}, nil)
+	sdkAdapter := adapters.NewSDKAdapter(zerolog.DefaultContextLogger, e.blockchain)
+	address, err := sdkAdapter.CreateAccount(context.Background(), []*sdk.AccountKey{accountKey}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +247,8 @@ func (e *EmulatorBackend) AddTransaction(
 		return err
 	}
 
-	err = e.blockchain.AddTransaction(*tx)
+	flowTx := convert.SDKTransactionToFlow(*tx)
+	err = e.blockchain.AddTransaction(*flowTx)
 	if err != nil {
 		return err
 	}
@@ -307,7 +318,7 @@ func (e *EmulatorBackend) ExecuteNextTransaction() *stdlib.TransactionResult {
 		// If the returned error is `emulator.PendingBlockTransactionsExhaustedError`,
 		// that means there are no transactions to execute.
 		// Hence, return a nil result.
-		if _, ok := err.(*emulator.PendingBlockTransactionsExhaustedError); ok {
+		if _, ok := err.(*types.PendingBlockTransactionsExhaustedError); ok {
 			return nil
 		}
 
@@ -394,7 +405,8 @@ func (e *EmulatorBackend) DeployContract(
 		return err
 	}
 
-	err = e.blockchain.AddTransaction(*tx)
+	flowTx := convert.SDKTransactionToFlow(*tx)
+	err = e.blockchain.AddTransaction(*flowTx)
 	if err != nil {
 		return err
 	}
@@ -420,7 +432,7 @@ func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 
 // newBlockchain returns an emulator blockchain for testing.
 func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
-	b, err := emulator.NewBlockchain(
+	b, err := emulator.New(
 		append(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
@@ -506,6 +518,21 @@ func (e *EmulatorBackend) Reset() {
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
+}
+
+func (e *EmulatorBackend) Logs() []string {
+	// TODO
+	return nil
+}
+
+func (e *EmulatorBackend) ServiceAccount() (*stdlib.Account, error) {
+	// TODO
+	return nil, errors.New("TODO")
+}
+
+func (e *EmulatorBackend) Events(_ *interpreter.Interpreter, _ interpreter.StaticType) interpreter.Value {
+	// TODO:
+	return nil
 }
 
 // excludeCommonLocations excludes the common contracts from appearing

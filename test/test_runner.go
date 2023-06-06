@@ -283,7 +283,7 @@ func recoverPanics(onError func(error)) {
 
 func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
 	config := runtime.Config{
-		CoverageReportingEnabled: r.coverageReport != nil,
+		CoverageReport: r.coverageReport,
 	}
 	env := runtime.NewBaseInterpreterEnvironment(config)
 
@@ -353,7 +353,8 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 			elaboration = cryptoChecker.Elaboration
 
 		case stdlib.TestContractLocation:
-			elaboration = stdlib.TestContractChecker.Elaboration
+			testChecker := stdlib.GetTestContractType().Checker
+			elaboration = testChecker.Elaboration
 
 		default:
 			_, importedElaboration, err := r.parseAndCheckImport(importedLocation, ctx)
@@ -419,12 +420,13 @@ func (r *TestRunner) interpreterContractValueHandler(
 				stdlibHandler,
 				r.coverageReport,
 			)
-			contract, err := stdlib.NewTestContract(
-				inter,
-				testFramework,
-				constructorGenerator(common.Address{}),
-				invocationRange,
-			)
+			contract, err := stdlib.GetTestContractType().
+				NewTestContract(
+					inter,
+					testFramework,
+					constructorGenerator(common.Address{}),
+					invocationRange,
+				)
 			if err != nil {
 				panic(err)
 			}
@@ -438,7 +440,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 	}
 }
 
-func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
+func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.ImportLocationHandlerFunc {
 	return func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
 		switch location {
 		case stdlib.CryptoCheckerLocation:
@@ -453,7 +455,8 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 			}
 
 		case stdlib.TestContractLocation:
-			program := interpreter.ProgramFromChecker(stdlib.TestContractChecker)
+			testChecker := stdlib.GetTestContractType().Checker
+			program := interpreter.ProgramFromChecker(testChecker)
 			subInterpreter, err := inter.NewSubInterpreter(program, location)
 			if err != nil {
 				panic(err)
@@ -507,7 +510,14 @@ func newScriptEnvironment() environment.Environment {
 	)
 }
 
-func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runtime.Context) (*ast.Program, *sema.Elaboration, error) {
+func (r *TestRunner) parseAndCheckImport(
+	location common.Location,
+	startCtx runtime.Context,
+) (
+	*ast.Program,
+	*sema.Elaboration,
+	error,
+) {
 	if r.importResolver == nil {
 		return nil, nil, ImportResolverNotProvidedError{}
 	}
