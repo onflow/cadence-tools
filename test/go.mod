@@ -8,7 +8,6 @@ require (
 	github.com/onflow/flow-emulator v0.50.1
 	github.com/onflow/flow-go v0.30.1-0.20230602200347-2a0e824db380
 	github.com/onflow/flow-go-sdk v0.41.0
-	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.8.4
 )
@@ -104,6 +103,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect

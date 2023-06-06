@@ -43,7 +43,6 @@ import (
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -189,6 +188,38 @@ func (e *EmulatorBackend) RunScript(
 	return &stdlib.ScriptResult{
 		Value: value,
 	}
+}
+
+func (e *EmulatorBackend) ServiceAccount() (*stdlib.Account, error) {
+	serviceKey := e.blockchain.ServiceKey()
+	serviceAddress := serviceKey.Address
+	serviceSigner, err := serviceKey.Signer()
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey := serviceSigner.PublicKey().Encode()
+	encodedPublicKey := string(publicKey)
+	accountKey := serviceKey.AccountKey()
+
+	// Store the generated key and signer info.
+	// This info is used to sign transactions.
+	e.accountKeys[common.Address(serviceAddress)] = map[string]keyInfo{
+		encodedPublicKey: {
+			accountKey: accountKey,
+			signer:     serviceSigner,
+		},
+	}
+
+	return &stdlib.Account{
+		Address: common.Address(serviceAddress),
+		PublicKey: &stdlib.PublicKey{
+			PublicKey: publicKey,
+			SignAlgo: fvmCrypto.CryptoToRuntimeSigningAlgorithm(
+				serviceSigner.PublicKey().Algorithm(),
+			),
+		},
+	}, nil
 }
 
 func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
@@ -532,11 +563,6 @@ func (e *EmulatorBackend) Reset() {
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
-}
-
-func (e *EmulatorBackend) ServiceAccount() (*stdlib.Account, error) {
-	// TODO
-	return nil, errors.New("TODO")
 }
 
 func (e *EmulatorBackend) Events(_ *interpreter.Interpreter, _ interpreter.StaticType) interpreter.Value {
