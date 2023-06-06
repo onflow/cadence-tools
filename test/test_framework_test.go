@@ -3687,3 +3687,150 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 		require.NoError(t, result.Error)
 	}
 }
+
+func TestGetEventsFromIntegrationTests(t *testing.T) {
+	t.Parallel()
+
+	const contractCode = `
+	    pub contract FooContract {
+	        pub let specialNumbers: {Int: String}
+
+	        pub event ContractInitialized()
+	        pub event NumberAdded(n: Int, trait: String)
+
+	        init() {
+	            self.specialNumbers = {1729: "Harshad"}
+	            emit ContractInitialized()
+	        }
+
+	        pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+	            self.specialNumbers[n] = trait
+	            emit NumberAdded(n: n, trait: trait)
+	        }
+
+	        pub fun getIntegerTrait(_ n: Int): String {
+	            if self.specialNumbers.containsKey(n) {
+	                return self.specialNumbers[n]!
+	            }
+
+	            return "Unknown"
+	        }
+	    }
+	`
+
+	const scriptCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    pub fun main(): Bool {
+	        // Act
+	        let trait = FooContract.getIntegerTrait(1729)
+
+	        // Assert
+	        assert(trait == "Harshad")
+	        return true
+	    }
+	`
+
+	const testCode = `
+	    import Test
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun setup() {
+	        let contractCode = Test.readFile("../contracts/FooContract.cdc")
+	        let err = blockchain.deployContract(
+	            name: "FooContract",
+	            code: contractCode,
+	            account: account,
+	            arguments: []
+	        )
+
+	        if err != nil {
+	            panic(err!.message)
+	        }
+
+	        blockchain.useConfiguration(Test.Configuration({
+	            "../contracts/FooContract.cdc": account.address
+	        }))
+	    }
+
+	    pub fun testGetIntegerTrait() {
+	        let script = Test.readFile("../scripts/get_integer_traits.cdc")
+	        let result = blockchain.executeScript(script, [])
+
+	        if result.status != Test.ResultStatus.succeeded {
+	            panic(result.error!.message)
+	        }
+	        assert(result.returnValue! as! Bool)
+
+	        let typ = CompositeType("A.01cf0e2f2f715450.FooContract.ContractInitialized")!
+	        let events = blockchain.eventsOfType(typ)
+	        Test.assert(events.length == 1)
+	    }
+
+	    pub fun testAddSpecialNumber() {
+	        let code = Test.readFile("../transactions/add_special_number.cdc")
+	        let tx = Test.Transaction(
+	            code: code,
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: [78557, "Sierpinski"]
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        assert(result.status == Test.ResultStatus.succeeded)
+
+	        let typ = CompositeType("A.01cf0e2f2f715450.FooContract.NumberAdded")!
+	        let events = blockchain.eventsOfType(typ)
+	        Test.assert(events.length == 1)
+
+	        let evts = blockchain.events()
+	        log(evts[9])
+	        Test.assert(evts.length == 10)
+	    }
+	`
+
+	const transactionCode = `
+	    import FooContract from "../contracts/FooContract.cdc"
+
+	    transaction(number: Int, trait: String) {
+	        prepare(acct: AuthAccount) {}
+
+	        execute {
+	            // Act
+	            FooContract.addSpecialNumber(number, trait)
+
+	            // Assert
+	            assert(trait == FooContract.getIntegerTrait(number))
+	        }
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return contractCode, nil
+		case "../scripts/get_integer_traits.cdc":
+			return scriptCode, nil
+		case "../transactions/add_special_number.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", nil
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+}
