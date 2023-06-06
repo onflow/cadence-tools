@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
@@ -131,6 +132,8 @@ type TestRunner struct {
 	// the script environment, in order to aggregate and expose
 	// log messages from test cases and contracts.
 	logCollection *LogCollectionHook
+
+	backend *EmulatorBackend
 }
 
 func NewTestRunner() *TestRunner {
@@ -478,7 +481,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			testFramework := NewEmulatorBackend(
+			r.backend = NewEmulatorBackend(
 				r.fileResolver,
 				stdlibHandler,
 				r.coverageReport,
@@ -486,7 +489,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
 					inter,
-					testFramework,
+					r.backend,
 					constructorGenerator(common.Address{}),
 					invocationRange,
 				)
@@ -529,6 +532,55 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 			}
 
 		default:
+			addressLocation, ok := location.(common.AddressLocation)
+			if ok {
+				account, _ := r.backend.blockchain.GetAccount(
+					flow.Address(addressLocation.Address),
+				)
+				programCode := account.Contracts[addressLocation.Name]
+				env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+				newCtx := runtime.Context{
+					Interface:   newScriptEnvironment(zerolog.Nop()),
+					Location:    addressLocation,
+					Environment: env,
+				}
+				env.CheckerConfig.ImportHandler = func(
+					checker *sema.Checker,
+					importedLocation common.Location,
+					importRange ast.Range,
+				) (sema.Import, error) {
+					addressLoc, ok := importedLocation.(common.AddressLocation)
+					if !ok {
+						return nil, fmt.Errorf("no address location given")
+					}
+					account, _ := r.backend.blockchain.GetAccount(
+						flow.Address(addressLoc.Address),
+					)
+					programCode := account.Contracts[addressLoc.Name]
+					program, err := env.ParseAndCheckProgram(
+						programCode, addressLoc, true,
+					)
+					if err != nil {
+						panic(err)
+					}
+
+					return sema.ElaborationImport{
+						Elaboration: program.Elaboration,
+					}, nil
+				}
+				program, err := r.testRuntime.ParseAndCheckProgram(programCode, newCtx)
+				if err != nil {
+					panic(err)
+				}
+
+				subInterpreter, err := inter.NewSubInterpreter(program, addressLocation)
+				if err != nil {
+					panic(err)
+				}
+				return interpreter.InterpreterImport{
+					Interpreter: subInterpreter,
+				}
+			}
 			importedProgram, importedElaboration, err := r.parseAndCheckImport(location, ctx)
 			if err != nil {
 				panic(err)

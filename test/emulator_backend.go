@@ -565,9 +565,69 @@ func (e *EmulatorBackend) Reset() {
 	e.blockOffset = 0
 }
 
-func (e *EmulatorBackend) Events(_ *interpreter.Interpreter, _ interpreter.StaticType) interpreter.Value {
-	// TODO:
-	return nil
+// Events returns all the emitted events up until the latest block,
+// optionally filtered by event type.
+func (e *EmulatorBackend) Events(
+	inter *interpreter.Interpreter,
+	eventType interpreter.StaticType,
+) interpreter.Value {
+	latestBlock, err := e.blockchain.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+
+	latestBlockHeight := latestBlock.Header.Height
+	height := uint64(0)
+	values := make([]interpreter.Value, 0)
+	evtType, _ := eventType.(interpreter.CompositeStaticType)
+
+	for height <= latestBlockHeight {
+		events, err := e.blockchain.GetEventsByHeight(
+			height,
+			evtType.String(),
+		)
+		if err != nil {
+			panic(err)
+		}
+		sdkEvents, err := convert.FlowEventsToSDK(events)
+		if err != nil {
+			panic(err)
+		}
+		for _, event := range sdkEvents {
+			if strings.Contains(event.Type, "flow.") {
+				continue
+			}
+			value, err := runtime.ImportValue(
+				inter,
+				interpreter.EmptyLocationRange,
+				e.stdlibHandler,
+				event.Value,
+				nil,
+			)
+			if err != nil {
+				panic(err)
+			}
+			values = append(values, value)
+
+		}
+		height += 1
+	}
+
+	arrayType := interpreter.NewVariableSizedStaticType(
+		inter,
+		interpreter.NewPrimitiveStaticType(
+			inter,
+			interpreter.PrimitiveStaticTypeAnyStruct,
+		),
+	)
+
+	return interpreter.NewArrayValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		arrayType,
+		common.ZeroAddress,
+		values...,
+	)
 }
 
 // excludeCommonLocations excludes the common contracts from appearing
