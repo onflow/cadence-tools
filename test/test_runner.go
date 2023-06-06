@@ -21,8 +21,10 @@ package test
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
+	"github.com/logrusorgru/aurora"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -65,6 +67,36 @@ type Result struct {
 	Error    error
 }
 
+// LogCollectionHook can be attached to zerolog.Logger objects, in order
+// to aggregate the log messages in a string slice, containing only the
+// string message.
+type LogCollectionHook struct {
+	Logs []string
+}
+
+var _ zerolog.Hook = &LogCollectionHook{}
+
+// NewLogCollectionHook initializes and returns a *LogCollectionHook
+func NewLogCollectionHook() *LogCollectionHook {
+	return &LogCollectionHook{
+		Logs: make([]string, 0),
+	}
+}
+
+func (h *LogCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+	if level != zerolog.NoLevel {
+		msg = strings.Replace(
+			msg,
+			"LOG:",
+			"",
+			1,
+		)
+		re := regexp.MustCompile("\"(.*)\"")
+		match := re.FindStringSubmatch(msg)
+		h.Logs = append(h.Logs, match[1])
+	}
+}
+
 // ImportResolver is used to resolve and get the source code for imports.
 // Must be provided by the user of the TestRunner.
 type ImportResolver func(location common.Location) (string, error)
@@ -90,11 +122,34 @@ type TestRunner struct {
 	testRuntime runtime.Runtime
 
 	coverageReport *runtime.CoverageReport
+
+	// logger is injected as the program logger for the script
+	// environment.
+	logger zerolog.Logger
+
+	// logCollection is a hook attached in the program logger of
+	// the script environment, in order to aggregate and expose
+	// log messages from test cases and contracts.
+	logCollection *LogCollectionHook
 }
 
 func NewTestRunner() *TestRunner {
+	logCollectionHook := NewLogCollectionHook()
+	output := zerolog.ConsoleWriter{Out: os.Stdout}
+	output.FormatMessage = func(i interface{}) string {
+		msg := i.(string)
+		return strings.Replace(
+			msg,
+			"Cadence log:",
+			aurora.Colorize("LOG:", aurora.BlueFg|aurora.BoldFm).String(),
+			1,
+		)
+	}
+	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
 	return &TestRunner{
-		testRuntime: runtime.NewInterpreterRuntime(runtime.Config{}),
+		testRuntime:   runtime.NewInterpreterRuntime(runtime.Config{}),
+		logCollection: logCollectionHook,
+		logger:        logger,
 	}
 }
 
@@ -269,6 +324,14 @@ func (r *TestRunner) invokeTestFunction(inter *interpreter.Interpreter, funcName
 	return err
 }
 
+// Logs returns all the log messages from the script environment that
+// test cases run. Unit tests run in this environment too, so the
+// logs from their respective contracts, also appear in the resulting
+// string slice.
+func (r *TestRunner) Logs() []string {
+	return r.logCollection.Logs
+}
+
 func recoverPanics(onError func(error)) {
 	r := recover()
 	switch r := r.(type) {
@@ -288,7 +351,7 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	env := runtime.NewBaseInterpreterEnvironment(config)
 
 	ctx := runtime.Context{
-		Interface:   newScriptEnvironment(),
+		Interface:   newScriptEnvironment(r.logger),
 		Location:    testScriptLocation,
 		Environment: env,
 	}
@@ -490,14 +553,11 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 
 // newScriptEnvironment creates an environment for test scripts to run.
 // Leverages the functionality of FVM.
-func newScriptEnvironment() environment.Environment {
+func newScriptEnvironment(logger zerolog.Logger) environment.Environment {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
 	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
 	environmentParams := environment.DefaultEnvironmentParams()
-	logger := zerolog.New(
-		zerolog.ConsoleWriter{Out: os.Stdout},
-	).With().Timestamp().Logger()
 	environmentParams.ProgramLoggerParams = environment.ProgramLoggerParams{
 		Logger:                logger,
 		CadenceLoggingEnabled: true,

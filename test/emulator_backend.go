@@ -69,6 +69,10 @@ type EmulatorBackend struct {
 	configuration *stdlib.Configuration
 
 	stdlibHandler stdlib.StandardLibraryHandler
+
+	// logCollection is a hook attached in the server logger, in order
+	// to aggregate and expose log messages from the blockchain.
+	logCollection *LogCollectionHook
 }
 
 type keyInfo struct {
@@ -112,14 +116,16 @@ func NewEmulatorBackend(
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
+	logCollectionHook := NewLogCollectionHook()
 	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
 		excludeCommonLocations(coverageReport)
 		blockchain = newBlockchain(
+			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
 		)
 	} else {
-		blockchain = newBlockchain()
+		blockchain = newBlockchain(logCollectionHook)
 	}
 
 	return &EmulatorBackend{
@@ -129,6 +135,7 @@ func NewEmulatorBackend(
 		fileResolver:  fileResolver,
 		configuration: baseConfiguration(),
 		stdlibHandler: stdlibHandler,
+		logCollection: logCollectionHook,
 	}
 }
 
@@ -430,17 +437,24 @@ func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 	return e.fileResolver(path)
 }
 
+// Logs returns all the log messages from the blockchain.
+func (e *EmulatorBackend) Logs() []string {
+	return e.logCollection.Logs
+}
+
 // newBlockchain returns an emulator blockchain for testing.
-func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
+func newBlockchain(
+	hook *LogCollectionHook,
+	opts ...emulator.Option,
+) *emulator.Blockchain {
+	output := zerolog.ConsoleWriter{Out: os.Stdout}
+	logger := zerolog.New(output).With().Timestamp().Logger().Hook(hook)
+
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
-				emulator.WithServerLogger(
-					zerolog.New(
-						zerolog.ConsoleWriter{Out: os.Stdout},
-					).With().Timestamp().Logger(),
-				),
+				emulator.WithServerLogger(logger),
 				emulator.Contracts(emulator.CommonContracts),
 			},
 			opts...,
@@ -518,11 +532,6 @@ func (e *EmulatorBackend) Reset() {
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
-}
-
-func (e *EmulatorBackend) Logs() []string {
-	// TODO
-	return nil
 }
 
 func (e *EmulatorBackend) ServiceAccount() (*stdlib.Account, error) {
