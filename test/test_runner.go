@@ -662,7 +662,17 @@ func (r *TestRunner) parseAndCheckImport(
 		importedLocation common.Location,
 		importRange ast.Range,
 	) (sema.Import, error) {
-		return nil, fmt.Errorf("nested imports are not supported")
+		switch importedLocation {
+		case stdlib.TestContractLocation:
+			testChecker := stdlib.GetTestContractType().Checker
+			elaboration := testChecker.Elaboration
+			return sema.ElaborationImport{
+				Elaboration: elaboration,
+			}, nil
+
+		default:
+			return nil, fmt.Errorf("nested imports are not supported")
+		}
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler

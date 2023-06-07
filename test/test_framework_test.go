@@ -3836,3 +3836,83 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 		require.NoError(t, result.Error)
 	}
 }
+
+func TestImportingHelperFile(t *testing.T) {
+	t.Parallel()
+
+	const helpersCode = `
+	    import Test
+
+	    pub fun createTransaction(
+	        _ path: String,
+	        account: Test.Account,
+	        args: [AnyStruct]
+	    ): Test.Transaction {
+	        return Test.Transaction(
+	            code: Test.readFile(path),
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: args
+	        )
+	    }
+	`
+
+	const transactionCode = `
+	    transaction() {
+	        prepare(acct: AuthAccount) {}
+
+	        execute {
+	            assert(true)
+	        }
+	    }
+	`
+
+	const testCode = `
+	    import Test
+	    import "test_helpers.cdc"
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun testRunTransaction() {
+	        let tx = createTransaction(
+	            "../transactions/add_special_number.cdc",
+	            account: account,
+	            args: []
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        Test.assert(result.status == Test.ResultStatus.succeeded)
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../transactions/add_special_number.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find file: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.StringLocation:
+			if location == "test_helpers.cdc" {
+				return helpersCode, nil
+			}
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+}
