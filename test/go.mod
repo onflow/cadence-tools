@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v0.39.3
+	github.com/onflow/cadence v0.39.4
 	github.com/onflow/flow-emulator v0.50.4
 	github.com/onflow/flow-go v0.31.1-0.20230607185125-e75265a6c631
 	github.com/onflow/flow-go-sdk v0.41.2
