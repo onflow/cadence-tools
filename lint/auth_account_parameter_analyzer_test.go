@@ -150,3 +150,23 @@ func TestAuthAccountParameterAnalyzerWithPublicAccount(t *testing.T) {
 		diagnostics,
 	)
 }
+
+func TestAuthAccountParameterAnalyzerWithTransaction(t *testing.T) {
+
+	t.Parallel()
+
+	diagnostics := testAnalyzers(t,
+		`
+		    transaction {
+		        prepare(account: AuthAccount) {}
+		    }
+		`,
+		lint.AuthAccountParameterAnalyzer,
+	)
+
+	require.Equal(
+		t,
+		[]analysis.Diagnostic(nil),
+		diagnostics,
+	)
+}

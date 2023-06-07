@@ -53,7 +53,9 @@ var AuthAccountParameterAnalyzer = (func() *analysis.Analyzer {
 						if declaration.DeclarationKind() == common.DeclarationKindInitializer {
 							parameterList = declaration.FunctionDeclaration.ParameterList
 						}
-					default:
+					}
+
+					if parameterList == nil {
 						return
 					}
 
