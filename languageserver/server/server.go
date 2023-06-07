@@ -2878,9 +2878,9 @@ func (s *Server) handleImport(
 			Elaboration: cryptoChecker.Elaboration,
 		}, nil
 	case stdlib.TestContractLocation:
-		elaboration := stdlib.TestContractChecker.Elaboration
+		testChecker := stdlib.GetTestContractType().Checker
 		return sema.ElaborationImport{
-			Elaboration: elaboration,
+			Elaboration: testChecker.Elaboration,
 		}, nil
 	default:
 		if isPathLocation(importedLocation) {
