@@ -3786,8 +3786,10 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	        Test.assert(events.length == 1)
 
 	        let evts = blockchain.events()
-	        log(evts[9])
-	        Test.assert(evts.length == 10)
+	        Test.assert(evts.length == 19)
+
+	        let blockchain2 = Test.newEmulatorBlockchain()
+	        Test.assert(blockchain2.events().length == 19)
 	    }
 	`
 

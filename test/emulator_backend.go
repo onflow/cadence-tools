@@ -594,9 +594,6 @@ func (e *EmulatorBackend) Events(
 			panic(err)
 		}
 		for _, event := range sdkEvents {
-			if strings.Contains(event.Type, "flow.") {
-				continue
-			}
 			value, err := runtime.ImportValue(
 				inter,
 				interpreter.EmptyLocationRange,
