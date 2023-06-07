@@ -316,14 +316,15 @@ func NewServer() (*Server, error) {
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
 func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
 	return &sema.Config{
-		BaseValueActivation:        lib.baseValueActivation,
-		AccessCheckMode:            s.accessCheckMode,
-		PositionInfoEnabled:        true,
-		ExtendedElaborationEnabled: true,
-		LocationHandler:            s.handleLocation,
-		ImportHandler:              s.handleImport,
-		AttachmentsEnabled:         true,
-		AccountLinkingEnabled:      true,
+		BaseValueActivation:          lib.baseValueActivation,
+		AccessCheckMode:              s.accessCheckMode,
+		PositionInfoEnabled:          true,
+		ExtendedElaborationEnabled:   true,
+		LocationHandler:              s.handleLocation,
+		ImportHandler:                s.handleImport,
+		AttachmentsEnabled:           true,
+		AccountLinkingEnabled:        true,
+		CapabilityControllersEnabled: true,
 	}
 }
 
