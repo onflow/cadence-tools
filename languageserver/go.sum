@@ -545,8 +545,8 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
 github.com/onflow/cadence v0.39.2 h1:GfLsLx1O93xAKdItdiy3bWb9OfQXK1z9KFAzZ05smns=
 github.com/onflow/cadence v0.39.2/go.mod h1:OIJLyVBPa339DCBQXBfGaorT4tBjQh9gSKe+ZAIyyh0=
-github.com/onflow/cadence-tools/lint v0.8.0 h1:DGDpuBEUI+RTQFMBEEfinedHgZFYiPW/T4rn2WTMTac=
-github.com/onflow/cadence-tools/lint v0.8.0/go.mod h1:4Y8sKp0yA1iKUVvSKeW2dROcIydTikFVvwIxCM8PYZ4=
+github.com/onflow/cadence-tools/lint v0.8.1 h1:7DaoQXM1xJQ5p8PDd/dWqplT5LuvbXXpAMaYUXoquvE=
+github.com/onflow/cadence-tools/lint v0.8.1/go.mod h1:4Y8sKp0yA1iKUVvSKeW2dROcIydTikFVvwIxCM8PYZ4=
 github.com/onflow/flow-cli/flowkit v1.1.2-0.20230607004725-067568f50e28 h1:CB8Xfqysu1VGMmDWC0fN0J8WVLDeirC+gAmqznxER2o=
 github.com/onflow/flow-cli/flowkit v1.1.2-0.20230607004725-067568f50e28/go.mod h1:Rnz/XTSKgNBizS7j0xzpsBiV5w7c5H5n8zuYQ4ivsjg=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3 h1:wV+gcgOY0oJK4HLZQYQoK+mm09rW1XSxf83yqJwj0n4=
