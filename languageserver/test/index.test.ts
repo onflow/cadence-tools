@@ -530,10 +530,10 @@ describe("contracts", () => {
 
 })
 
-describe("codelensses", () => {
+describe("codelenses", () => {
   const codelensRequest = "textDocument/codeLens"
 
-  test("contract codelensses", async() => {
+  test("contract codelensss", async() => {
     await withConnection(async connection => {
       let code = fs.readFileSync("./foo.cdc")
       let path = `file://${__dirname}/foo.cdc`
@@ -556,7 +556,7 @@ describe("codelensses", () => {
 
   })
 
-  test("transactions codelensses", async() => {
+  test("transactions codelenses", async() => {
     await withConnection(async connection => {
       let code = fs.readFileSync("./transaction.cdc")
       let path = `file://${__dirname}/transaction.cdc`
@@ -579,7 +579,7 @@ describe("codelensses", () => {
 
   })
 
-  test("script codelenss", async() => {
+  test("script codelenses", async() => {
     await withConnection(async connection => {
       let code = fs.readFileSync("./script.cdc")
       let path = `file://${__dirname}/script.cdc`
