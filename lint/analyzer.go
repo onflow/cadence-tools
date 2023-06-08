@@ -30,6 +30,7 @@ const (
 	RemovalCategory         = "removal-hint"
 	UpdateCategory          = "update recommended"
 	UnnecessaryCastCategory = "unnecessary-cast-hint"
+	DeprecatedCategory      = "deprecated"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
