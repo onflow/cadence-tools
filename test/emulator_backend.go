@@ -556,7 +556,7 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 }
 
 func (e *EmulatorBackend) Reset() {
-	err := e.blockchain.ReloadBlockchain()
+	err := e.blockchain.RollbackToBlockHeight(0)
 	if err != nil {
 		panic(err)
 	}
