@@ -3193,6 +3193,12 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	}
 
 	coverageReport := runtime.NewCoverageReport()
+	coverageReport.WithLocationFilter(func(location common.Location) bool {
+		_, addressLoc := location.(common.AddressLocation)
+		_, stringLoc := location.(common.StringLocation)
+		// We only allow inspection of AddressLocation or StringLocation
+		return addressLoc || stringLoc
+	})
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
 		WithCoverageReport(coverageReport)
@@ -3258,9 +3264,10 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
+	assert.Equal(t, 1, coverageReport.TotalLocations())
 	assert.Equal(
 		t,
-		"Coverage: 96.4% of statements",
+		"Coverage: 100.0% of statements",
 		coverageReport.String(),
 	)
 }
