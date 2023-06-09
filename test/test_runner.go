@@ -61,6 +61,8 @@ const afterEachFunctionName = "afterEach"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
+var quotedLog = regexp.MustCompile("\"(.*)\"")
+
 type Results []Result
 
 type Result struct {
@@ -92,8 +94,7 @@ func (h *LogCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg strin
 			"",
 			1,
 		)
-		re := regexp.MustCompile("\"(.*)\"")
-		match := re.FindStringSubmatch(logMsg)
+		match := quotedLog.FindStringSubmatch(logMsg)
 		// Only logs with strings are quoted, eg:
 		// DBG LOG: "setup successful"
 		// We strip the quotes, to keep only the raw value.
