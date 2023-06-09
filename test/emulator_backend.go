@@ -123,6 +123,7 @@ func NewEmulatorBackend(
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
 		)
+		coverageReport.Reset()
 	} else {
 		blockchain = newBlockchain(logCollectionHook)
 	}
@@ -556,7 +557,7 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 }
 
 func (e *EmulatorBackend) Reset() {
-	err := e.blockchain.ReloadBlockchain()
+	err := e.blockchain.RollbackToBlockHeight(0)
 	if err != nil {
 		panic(err)
 	}
@@ -594,9 +595,6 @@ func (e *EmulatorBackend) Events(
 			panic(err)
 		}
 		for _, event := range sdkEvents {
-			if strings.Contains(event.Type, "flow.") {
-				continue
-			}
 			value, err := runtime.ImportValue(
 				inter,
 				interpreter.EmptyLocationRange,
