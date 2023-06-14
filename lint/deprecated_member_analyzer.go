@@ -68,7 +68,7 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 	}
 
 	return &analysis.Analyzer{
-		Description: "Detects usages of the deprecated key management API. It will be removed in a future release.",
+		Description: "Detects uses of deprecated members",
 		Requires: []*analysis.Analyzer{
 			analysis.InspectorAnalyzer,
 		},
