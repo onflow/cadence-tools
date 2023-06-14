@@ -271,6 +271,48 @@ describe("diagnostics", () => {
     )
   )
 
+  test("account linking", async() =>
+      testCode(
+          `
+            #allowAccountLinking
+            transaction {
+                prepare(acct: AuthAccount) {
+                    acct.linkAccount(/private/foo)
+                }
+            }
+          `,
+          [],
+      )
+  )
+
+  test("attachments", async() =>
+      testCode(
+          `
+            pub resource R {}
+
+            pub attachment A for R {}
+
+            pub fun main() {
+                let r <- create R()
+                r[A]
+                destroy r
+            }
+          `,
+          []
+      )
+  )
+
+  test("capability controllers", async() =>
+      testCode(
+          `
+            pub fun main() {
+                getAccount(0x1).capabilities.get
+            }
+          `,
+          []
+      )
+  )
+
   type TestDoc = {
     name: string
     code: string
