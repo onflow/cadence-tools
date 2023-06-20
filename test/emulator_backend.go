@@ -179,7 +179,15 @@ func (e *EmulatorBackend) RunScript(
 		}
 	}
 
-	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, e.stdlibHandler, result.Value, nil)
+	staticType := runtime.ImportType(inter, result.Value.MeteredType(nil))
+	expectedType, _ := inter.ConvertStaticToSemaType(staticType)
+	value, err := runtime.ImportValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		e.stdlibHandler,
+		result.Value,
+		expectedType,
+	)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
