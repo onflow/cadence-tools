@@ -3313,6 +3313,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
 			"A.f8d6e0586b0a20c7.NFTStorefront",
 			"A.f8d6e0586b0a20c7.NonFungibleToken",
+			"A.f8d6e0586b0a20c7.ViewResolver",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
