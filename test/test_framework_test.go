@@ -177,7 +177,7 @@ func TestExecuteScript(t *testing.T) {
 		require.NoError(t, result.Error)
 	})
 
-	t.Run("array returns", func(t *testing.T) {
+	t.Run("non-empty array returns", func(t *testing.T) {
 		t.Parallel()
 
 		const code = ` pub fun main(): [UInt64] { return [1, 2, 3]} `
@@ -207,7 +207,33 @@ func TestExecuteScript(t *testing.T) {
 		require.NoError(t, result.Error)
 	})
 
-	t.Run("dictionary returns", func(t *testing.T) {
+	t.Run("empty array returns", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `pub fun main(): [UInt64] { return [] }`
+
+		testScript := fmt.Sprintf(`
+		    import Test
+
+		    pub fun test() {
+		        let blockchain = Test.newEmulatorBlockchain()
+		        let result = blockchain.executeScript("%s", [])
+
+		        Test.assert(result.status == Test.ResultStatus.succeeded)
+
+		        let resultArray = result.returnValue! as! [UInt64]
+		        Test.assert(resultArray.length == 0)
+		    }`,
+			code,
+		)
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(testScript, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("non-empty dictionary returns", func(t *testing.T) {
 		t.Parallel()
 
 		const code = ` pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}} `
@@ -226,6 +252,32 @@ func TestExecuteScript(t *testing.T) {
                     assert(dictionary["foo"] == 5)
                     assert(dictionary["bar"] == 10)
             }`,
+			code,
+		)
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(testScript, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("empty dictionary returns", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `pub fun main(): {String: Int} { return {} }`
+
+		testScript := fmt.Sprintf(`
+		    import Test
+
+		    pub fun test() {
+		        let blockchain = Test.newEmulatorBlockchain()
+		        let result = blockchain.executeScript("%s", [])
+
+		        Test.assert(result.status == Test.ResultStatus.succeeded)
+
+		        let dictionary = result.returnValue! as! {String: Int}
+		        Test.assert(dictionary["foo"] == nil)
+		    }`,
 			code,
 		)
 
