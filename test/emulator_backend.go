@@ -123,7 +123,6 @@ func NewEmulatorBackend(
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
 		)
-		coverageReport.Reset()
 	} else {
 		blockchain = newBlockchain(logCollectionHook)
 	}
