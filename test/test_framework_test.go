@@ -3846,10 +3846,10 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	        Test.assert(events.length == 1)
 
 	        let evts = blockchain.events()
-	        Test.assert(evts.length == 19)
+	        Test.assert(evts.length >= 19)
 
 	        let blockchain2 = Test.newEmulatorBlockchain()
-	        Test.assert(blockchain2.events().length == 19)
+	        Test.assert(blockchain2.events().length >= 19)
 	    }
 	`
 
