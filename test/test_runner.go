@@ -61,6 +61,8 @@ const afterEachFunctionName = "afterEach"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
+var quotedLog = regexp.MustCompile("\"(.*)\"")
+
 type Results []Result
 
 type Result struct {
@@ -86,15 +88,22 @@ func NewLogCollectionHook() *LogCollectionHook {
 
 func (h *LogCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	if level != zerolog.NoLevel {
-		msg = strings.Replace(
+		logMsg := strings.Replace(
 			msg,
 			"LOG:",
 			"",
 			1,
 		)
-		re := regexp.MustCompile("\"(.*)\"")
-		match := re.FindStringSubmatch(msg)
-		h.Logs = append(h.Logs, match[1])
+		match := quotedLog.FindStringSubmatch(logMsg)
+		// Only logs with strings are quoted, eg:
+		// DBG LOG: "setup successful"
+		// We strip the quotes, to keep only the raw value.
+		// Other logs may not contain quotes, eg:
+		// DBG LOG: flow.AccountCreated(address: 0x01cf0e2f2f715450)
+		if len(match) > 0 {
+			logMsg = match[1]
+		}
+		h.Logs = append(h.Logs, logMsg)
 	}
 }
 
@@ -654,7 +663,17 @@ func (r *TestRunner) parseAndCheckImport(
 		importedLocation common.Location,
 		importRange ast.Range,
 	) (sema.Import, error) {
-		return nil, fmt.Errorf("nested imports are not supported")
+		switch importedLocation {
+		case stdlib.TestContractLocation:
+			testChecker := stdlib.GetTestContractType().Checker
+			elaboration := testChecker.Elaboration
+			return sema.ElaborationImport{
+				Elaboration: elaboration,
+			}, nil
+
+		default:
+			return nil, fmt.Errorf("nested imports are not supported")
+		}
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler

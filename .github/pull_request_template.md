@@ -1,3 +1,7 @@
+---
+title: '[component] title'
+---
+
 Closes #???
 
 ## Description

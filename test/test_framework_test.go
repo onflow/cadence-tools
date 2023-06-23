@@ -177,7 +177,7 @@ func TestExecuteScript(t *testing.T) {
 		require.NoError(t, result.Error)
 	})
 
-	t.Run("array returns", func(t *testing.T) {
+	t.Run("non-empty array returns", func(t *testing.T) {
 		t.Parallel()
 
 		const code = ` pub fun main(): [UInt64] { return [1, 2, 3]} `
@@ -207,7 +207,33 @@ func TestExecuteScript(t *testing.T) {
 		require.NoError(t, result.Error)
 	})
 
-	t.Run("dictionary returns", func(t *testing.T) {
+	t.Run("empty array returns", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `pub fun main(): [UInt64] { return [] }`
+
+		testScript := fmt.Sprintf(`
+		    import Test
+
+		    pub fun test() {
+		        let blockchain = Test.newEmulatorBlockchain()
+		        let result = blockchain.executeScript("%s", [])
+
+		        Test.assert(result.status == Test.ResultStatus.succeeded)
+
+		        let resultArray = result.returnValue! as! [UInt64]
+		        Test.assert(resultArray.length == 0)
+		    }`,
+			code,
+		)
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(testScript, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("non-empty dictionary returns", func(t *testing.T) {
 		t.Parallel()
 
 		const code = ` pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}} `
@@ -226,6 +252,32 @@ func TestExecuteScript(t *testing.T) {
                     assert(dictionary["foo"] == 5)
                     assert(dictionary["bar"] == 10)
             }`,
+			code,
+		)
+
+		runner := NewTestRunner()
+		result, err := runner.RunTest(testScript, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("empty dictionary returns", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `pub fun main(): {String: Int} { return {} }`
+
+		testScript := fmt.Sprintf(`
+		    import Test
+
+		    pub fun test() {
+		        let blockchain = Test.newEmulatorBlockchain()
+		        let result = blockchain.executeScript("%s", [])
+
+		        Test.assert(result.status == Test.ResultStatus.succeeded)
+
+		        let dictionary = result.returnValue! as! {String: Int}
+		        Test.assert(dictionary["foo"] == nil)
+		    }`,
 			code,
 		)
 
@@ -2952,6 +3004,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	`
 
 	const code = `
+	    import Test
 	    import FooContract from "FooContract.cdc"
 
 	    pub let foo = FooContract()
@@ -2975,7 +3028,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	            let result = foo.getIntegerTrait(input)
 
 	            // Assert
-	            assert(result == testInputs[input])
+	            Test.assertEqual(result, testInputs[input]!)
 	        }
 	    }
 
@@ -2984,7 +3037,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	        foo.addSpecialNumber(78557, "Sierpinski")
 
 	        // Assert
-	        assert("Sierpinski" == foo.getIntegerTrait(78557))
+	        Test.assertEqual("Sierpinski", foo.getIntegerTrait(78557))
 	    }
 	`
 
@@ -3032,15 +3085,35 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	assert.ElementsMatch(
 		t,
 		[]string{
+			"A.0ae53cb6e3f42a79.FlowToken",
+			"A.ee82856bf20e2aa6.FungibleToken",
+			"A.e5a8b7f23e8b548f.FlowFees",
+			"A.f8d6e0586b0a20c7.FlowStorageFees",
+			"A.f8d6e0586b0a20c7.FlowServiceAccount",
+			"A.f8d6e0586b0a20c7.FlowClusterQC",
+			"A.f8d6e0586b0a20c7.FlowDKG",
+			"A.f8d6e0586b0a20c7.FlowEpoch",
+			"A.f8d6e0586b0a20c7.FlowIDTableStaking",
+			"A.f8d6e0586b0a20c7.FlowStakingCollection",
+			"A.f8d6e0586b0a20c7.LockedTokens",
+			"A.f8d6e0586b0a20c7.NodeVersionBeacon",
+			"A.f8d6e0586b0a20c7.StakingProxy",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
+			"A.f8d6e0586b0a20c7.FUSD",
+			"A.f8d6e0586b0a20c7.ExampleNFT",
+			"A.f8d6e0586b0a20c7.MetadataViews",
+			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
+			"A.f8d6e0586b0a20c7.NFTStorefront",
+			"A.f8d6e0586b0a20c7.NonFungibleToken",
+			"A.f8d6e0586b0a20c7.ViewResolver",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
 	assert.Equal(
 		t,
-		"Coverage: 100.0% of statements",
+		"Coverage: 97.2% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3193,6 +3266,12 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	}
 
 	coverageReport := runtime.NewCoverageReport()
+	coverageReport.WithLocationFilter(func(location common.Location) bool {
+		_, addressLoc := location.(common.AddressLocation)
+		_, stringLoc := location.(common.StringLocation)
+		// We only allow inspection of AddressLocation or StringLocation
+		return addressLoc || stringLoc
+	})
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
 		WithCoverageReport(coverageReport)
@@ -3255,12 +3334,14 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
 			"A.f8d6e0586b0a20c7.NFTStorefront",
 			"A.f8d6e0586b0a20c7.NonFungibleToken",
+			"A.f8d6e0586b0a20c7.ViewResolver",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
+	assert.Equal(t, 1, coverageReport.TotalLocations())
 	assert.Equal(
 		t,
-		"Coverage: 96.4% of statements",
+		"Coverage: 100.0% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3786,8 +3867,10 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	        Test.assert(events.length == 1)
 
 	        let evts = blockchain.events()
-	        log(evts[9])
-	        Test.assert(evts.length == 10)
+	        Test.assert(evts.length >= 19)
+
+	        let blockchain2 = Test.newEmulatorBlockchain()
+	        Test.assert(blockchain2.events().length >= 19)
 	    }
 	`
 
@@ -3833,4 +3916,187 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	for _, result := range results {
 		require.NoError(t, result.Error)
 	}
+}
+
+func TestImportingHelperFile(t *testing.T) {
+	t.Parallel()
+
+	const helpersCode = `
+	    import Test
+
+	    pub fun createTransaction(
+	        _ path: String,
+	        account: Test.Account,
+	        args: [AnyStruct]
+	    ): Test.Transaction {
+	        return Test.Transaction(
+	            code: Test.readFile(path),
+	            authorizers: [account.address],
+	            signers: [account],
+	            arguments: args
+	        )
+	    }
+	`
+
+	const transactionCode = `
+	    transaction() {
+	        prepare(acct: AuthAccount) {}
+
+	        execute {
+	            assert(true)
+	        }
+	    }
+	`
+
+	const testCode = `
+	    import Test
+	    import "test_helpers.cdc"
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+	    pub let account = blockchain.createAccount()
+
+	    pub fun testRunTransaction() {
+	        let tx = createTransaction(
+	            "../transactions/add_special_number.cdc",
+	            account: account,
+	            args: []
+	        )
+
+	        let result = blockchain.executeTransaction(tx)
+	        Test.assert(result.status == Test.ResultStatus.succeeded)
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../transactions/add_special_number.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find file: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.StringLocation:
+			if location == "test_helpers.cdc" {
+				return helpersCode, nil
+			}
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+}
+
+func TestBlockchainReset(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+	    import Test
+
+	    pub let blockchain = Test.newEmulatorBlockchain()
+
+	    pub fun testBlockchainReset() {
+	        // Arrange
+	        let serviceAccount = blockchain.serviceAccount()
+	        let receiver = blockchain.createAccount()
+
+	        let code = Test.readFile("../transactions/transfer_flow_tokens.cdc")
+	        let tx = Test.Transaction(
+	            code: code,
+	            authorizers: [serviceAccount.address],
+	            signers: [],
+	            arguments: [receiver.address, 1500.0]
+	        )
+
+	        // Act
+	        var result = blockchain.executeTransaction(tx)
+	        Test.assert(result.status == Test.ResultStatus.succeeded)
+
+	        var script = Test.readFile("../scripts/get_account_balance.cdc")
+	        var value = blockchain.executeScript(script, [serviceAccount.address])
+
+	        Test.assert(value.status == Test.ResultStatus.succeeded)
+
+	        var balance = value.returnValue! as! UFix64
+
+	        // Assert
+	        Test.assert(balance == 999998500.0)
+
+	        // Act
+	        blockchain.reset()
+
+	        script = Test.readFile("../scripts/get_account_balance.cdc")
+	        value = blockchain.executeScript(script, [serviceAccount.address])
+
+	        Test.assert(value.status == Test.ResultStatus.succeeded)
+
+	        balance = value.returnValue! as! UFix64
+
+	        // Assert
+	        Test.assert(balance == 1000000000.0)
+	    }
+	`
+
+	const scriptCode = `
+	    import "FungibleToken"
+	    import "FlowToken"
+
+	    pub fun main(address: Address): UFix64 {
+	        let balanceRef = getAccount(address)
+	            .getCapability(/public/flowTokenBalance)
+	            .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+	            ?? panic("Could not borrow FungibleToken.Balance reference")
+
+	        return balanceRef.balance
+	    }
+	`
+
+	const transactionCode = `
+	    import "FungibleToken"
+	    import "FlowToken"
+
+	    transaction(receiver: Address, amount: UFix64) {
+	        prepare(account: AuthAccount) {
+	            let flowVault = account.borrow<&FlowToken.Vault>(
+	                from: /storage/flowTokenVault
+	            ) ?? panic("Could not borrow BlpToken.Vault reference")
+
+	            let receiverRef = getAccount(receiver)
+	                .getCapability(/public/flowTokenReceiver)
+	                .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+	                ?? panic("Could not borrow FungibleToken.Receiver reference")
+
+	            let tokens <- flowVault.withdraw(amount: amount)
+	            receiverRef.deposit(from: <- tokens)
+	        }
+	    }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../scripts/get_account_balance.cdc":
+			return scriptCode, nil
+		case "../transactions/transfer_flow_tokens.cdc":
+			return transactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	runner := NewTestRunner().WithFileResolver(fileResolver)
+
+	result, err := runner.RunTest(testCode, "testBlockchainReset")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
 }
