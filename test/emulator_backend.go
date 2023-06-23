@@ -178,7 +178,20 @@ func (e *EmulatorBackend) RunScript(
 		}
 	}
 
-	value, err := runtime.ImportValue(inter, interpreter.EmptyLocationRange, e.stdlibHandler, result.Value, nil)
+	staticType := runtime.ImportType(inter, result.Value.Type())
+	expectedType, err := inter.ConvertStaticToSemaType(staticType)
+	if err != nil {
+		return &stdlib.ScriptResult{
+			Error: err,
+		}
+	}
+	value, err := runtime.ImportValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		e.stdlibHandler,
+		result.Value,
+		expectedType,
+	)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
@@ -479,7 +492,8 @@ func newBlockchain(
 	opts ...emulator.Option,
 ) *emulator.Blockchain {
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	logger := zerolog.New(output).With().Timestamp().Logger().Hook(hook)
+	logger := zerolog.New(output).With().Timestamp().
+		Logger().Hook(hook).Level(zerolog.InfoLevel)
 
 	b, err := emulator.New(
 		append(
@@ -556,7 +570,7 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 }
 
 func (e *EmulatorBackend) Reset() {
-	err := e.blockchain.ReloadBlockchain()
+	err := e.blockchain.RollbackToBlockHeight(0)
 	if err != nil {
 		panic(err)
 	}
@@ -594,9 +608,6 @@ func (e *EmulatorBackend) Events(
 			panic(err)
 		}
 		for _, event := range sdkEvents {
-			if strings.Contains(event.Type, "flow.") {
-				continue
-			}
 			value, err := runtime.ImportValue(
 				inter,
 				interpreter.EmptyLocationRange,

@@ -543,8 +543,8 @@ github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9/go.mod h1:+6x
 github.com/onflow/atree v0.6.0 h1:j7nQ2r8npznx4NX39zPpBYHmdy45f4xwoi+dm37Jk7c=
 github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVFi0tc=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.39.4 h1:Rg2WUtrgXWADHlN2n0NKo+0sAdijx67oiTNdrG0vJOM=
-github.com/onflow/cadence v0.39.4/go.mod h1:OIJLyVBPa339DCBQXBfGaorT4tBjQh9gSKe+ZAIyyh0=
+github.com/onflow/cadence v0.39.6 h1:rrXfqqfWcuZoxmG5weLj6AS3faPKLV+t80CQJmJaliA=
+github.com/onflow/cadence v0.39.6/go.mod h1:OIJLyVBPa339DCBQXBfGaorT4tBjQh9gSKe+ZAIyyh0=
 github.com/onflow/cadence-tools/lint v0.8.2 h1:iKYmhwhf47XDVlmNOsuRTkE7y5/4aCFoh0NcRmSAFwQ=
 github.com/onflow/cadence-tools/lint v0.8.2/go.mod h1:rwmd8WlZiRXJ7rG/PBXRQlYACHlR26YdYh+g8uY47Ac=
 github.com/onflow/flow-cli/flowkit v1.1.2-0.20230607004725-067568f50e28 h1:CB8Xfqysu1VGMmDWC0fN0J8WVLDeirC+gAmqznxER2o=

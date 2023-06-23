@@ -57,8 +57,8 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
 		[]analysis.Diagnostic{
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 247, Line: 10, Column: 26},
-					EndPos:   ast.Position{Offset: 258, Line: 10, Column: 37},
+					StartPos: ast.Position{Offset: 243, Line: 10, Column: 26},
+					EndPos:   ast.Position{Offset: 254, Line: 10, Column: 37},
 				},
 				Location:         testLocation,
 				Category:         lint.DeprecatedCategory,
@@ -71,8 +71,8 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
 							{
 								Replacement: "keys.add",
 								Range: ast.Range{
-									StartPos: ast.Position{Offset: 247, Line: 10, Column: 26},
-									EndPos:   ast.Position{Offset: 258, Line: 10, Column: 37},
+									StartPos: ast.Position{Offset: 243, Line: 10, Column: 26},
+									EndPos:   ast.Position{Offset: 254, Line: 10, Column: 37},
 								},
 							},
 						},
@@ -81,8 +81,8 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
 			},
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 290, Line: 11, Column: 26},
-					EndPos:   ast.Position{Offset: 304, Line: 11, Column: 40},
+					StartPos: ast.Position{Offset: 286, Line: 11, Column: 26},
+					EndPos:   ast.Position{Offset: 300, Line: 11, Column: 40},
 				},
 				Location:         testLocation,
 				Category:         lint.DeprecatedCategory,
@@ -95,8 +95,8 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
 							{
 								Replacement: "keys.revoke",
 								Range: ast.Range{
-									StartPos: ast.Position{Offset: 290, Line: 11, Column: 26},
-									EndPos:   ast.Position{Offset: 304, Line: 11, Column: 40},
+									StartPos: ast.Position{Offset: 286, Line: 11, Column: 26},
+									EndPos:   ast.Position{Offset: 300, Line: 11, Column: 40},
 								},
 							},
 						},
@@ -105,8 +105,8 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
 			},
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 332, Line: 12, Column: 23},
-					EndPos:   ast.Position{Offset: 334, Line: 12, Column: 25},
+					StartPos: ast.Position{Offset: 328, Line: 12, Column: 23},
+					EndPos:   ast.Position{Offset: 330, Line: 12, Column: 25},
 				},
 				Location: testLocation,
 				Category: lint.DeprecatedCategory,
@@ -114,8 +114,8 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
 			},
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 361, Line: 13, Column: 23},
-					EndPos:   ast.Position{Offset: 363, Line: 13, Column: 25},
+					StartPos: ast.Position{Offset: 357, Line: 13, Column: 23},
+					EndPos:   ast.Position{Offset: 359, Line: 13, Column: 25},
 				},
 				Location:         testLocation,
 				Category:         lint.DeprecatedCategory,
