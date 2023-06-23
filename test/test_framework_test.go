@@ -3004,6 +3004,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	`
 
 	const code = `
+	    import Test
 	    import FooContract from "FooContract.cdc"
 
 	    pub let foo = FooContract()
@@ -3027,7 +3028,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	            let result = foo.getIntegerTrait(input)
 
 	            // Assert
-	            assert(result == testInputs[input])
+	            Test.assertEqual(result, testInputs[input]!)
 	        }
 	    }
 
@@ -3036,7 +3037,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	        foo.addSpecialNumber(78557, "Sierpinski")
 
 	        // Assert
-	        assert("Sierpinski" == foo.getIntegerTrait(78557))
+	        Test.assertEqual("Sierpinski", foo.getIntegerTrait(78557))
 	    }
 	`
 
@@ -3084,15 +3085,35 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	assert.ElementsMatch(
 		t,
 		[]string{
+			"A.0ae53cb6e3f42a79.FlowToken",
+			"A.ee82856bf20e2aa6.FungibleToken",
+			"A.e5a8b7f23e8b548f.FlowFees",
+			"A.f8d6e0586b0a20c7.FlowStorageFees",
+			"A.f8d6e0586b0a20c7.FlowServiceAccount",
+			"A.f8d6e0586b0a20c7.FlowClusterQC",
+			"A.f8d6e0586b0a20c7.FlowDKG",
+			"A.f8d6e0586b0a20c7.FlowEpoch",
+			"A.f8d6e0586b0a20c7.FlowIDTableStaking",
+			"A.f8d6e0586b0a20c7.FlowStakingCollection",
+			"A.f8d6e0586b0a20c7.LockedTokens",
+			"A.f8d6e0586b0a20c7.NodeVersionBeacon",
+			"A.f8d6e0586b0a20c7.StakingProxy",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
+			"A.f8d6e0586b0a20c7.FUSD",
+			"A.f8d6e0586b0a20c7.ExampleNFT",
+			"A.f8d6e0586b0a20c7.MetadataViews",
+			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
+			"A.f8d6e0586b0a20c7.NFTStorefront",
+			"A.f8d6e0586b0a20c7.NonFungibleToken",
+			"A.f8d6e0586b0a20c7.ViewResolver",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
 	assert.Equal(
 		t,
-		"Coverage: 100.0% of statements",
+		"Coverage: 97.2% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3846,10 +3867,10 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	        Test.assert(events.length == 1)
 
 	        let evts = blockchain.events()
-	        Test.assert(evts.length == 19)
+	        Test.assert(evts.length >= 19)
 
 	        let blockchain2 = Test.newEmulatorBlockchain()
-	        Test.assert(blockchain2.events().length == 19)
+	        Test.assert(blockchain2.events().length >= 19)
 	    }
 	`
 

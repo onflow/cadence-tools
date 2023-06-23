@@ -123,7 +123,6 @@ func NewEmulatorBackend(
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
 		)
-		coverageReport.Reset()
 	} else {
 		blockchain = newBlockchain(logCollectionHook)
 	}
@@ -493,7 +492,8 @@ func newBlockchain(
 	opts ...emulator.Option,
 ) *emulator.Blockchain {
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	logger := zerolog.New(output).With().Timestamp().Logger().Hook(hook)
+	logger := zerolog.New(output).With().Timestamp().
+		Logger().Hook(hook).Level(zerolog.InfoLevel)
 
 	b, err := emulator.New(
 		append(
