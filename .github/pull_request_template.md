@@ -1,6 +1,9 @@
----
-title: '[component] title'
----
+<!--
+Prefix the title with one of:
+[LS] 
+[test]
+[lint]
+-->
 
 Closes #???
 
