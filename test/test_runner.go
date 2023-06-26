@@ -21,13 +21,16 @@ package test
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
+	"github.com/logrusorgru/aurora"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
@@ -58,11 +61,50 @@ const afterEachFunctionName = "afterEach"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
+var quotedLog = regexp.MustCompile("\"(.*)\"")
+
 type Results []Result
 
 type Result struct {
 	TestName string
 	Error    error
+}
+
+// LogCollectionHook can be attached to zerolog.Logger objects, in order
+// to aggregate the log messages in a string slice, containing only the
+// string message.
+type LogCollectionHook struct {
+	Logs []string
+}
+
+var _ zerolog.Hook = &LogCollectionHook{}
+
+// NewLogCollectionHook initializes and returns a *LogCollectionHook
+func NewLogCollectionHook() *LogCollectionHook {
+	return &LogCollectionHook{
+		Logs: make([]string, 0),
+	}
+}
+
+func (h *LogCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+	if level != zerolog.NoLevel {
+		logMsg := strings.Replace(
+			msg,
+			"LOG:",
+			"",
+			1,
+		)
+		match := quotedLog.FindStringSubmatch(logMsg)
+		// Only logs with strings are quoted, eg:
+		// DBG LOG: "setup successful"
+		// We strip the quotes, to keep only the raw value.
+		// Other logs may not contain quotes, eg:
+		// DBG LOG: flow.AccountCreated(address: 0x01cf0e2f2f715450)
+		if len(match) > 0 {
+			logMsg = match[1]
+		}
+		h.Logs = append(h.Logs, logMsg)
+	}
 }
 
 // ImportResolver is used to resolve and get the source code for imports.
@@ -90,11 +132,36 @@ type TestRunner struct {
 	testRuntime runtime.Runtime
 
 	coverageReport *runtime.CoverageReport
+
+	// logger is injected as the program logger for the script
+	// environment.
+	logger zerolog.Logger
+
+	// logCollection is a hook attached in the program logger of
+	// the script environment, in order to aggregate and expose
+	// log messages from test cases and contracts.
+	logCollection *LogCollectionHook
+
+	backend *EmulatorBackend
 }
 
 func NewTestRunner() *TestRunner {
+	logCollectionHook := NewLogCollectionHook()
+	output := zerolog.ConsoleWriter{Out: os.Stdout}
+	output.FormatMessage = func(i interface{}) string {
+		msg := i.(string)
+		return strings.Replace(
+			msg,
+			"Cadence log:",
+			aurora.Colorize("LOG:", aurora.BlueFg|aurora.BoldFm).String(),
+			1,
+		)
+	}
+	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
 	return &TestRunner{
-		testRuntime: runtime.NewInterpreterRuntime(runtime.Config{}),
+		testRuntime:   runtime.NewInterpreterRuntime(runtime.Config{}),
+		logCollection: logCollectionHook,
+		logger:        logger,
 	}
 }
 
@@ -269,6 +336,14 @@ func (r *TestRunner) invokeTestFunction(inter *interpreter.Interpreter, funcName
 	return err
 }
 
+// Logs returns all the log messages from the script environment that
+// test cases run. Unit tests run in this environment too, so the
+// logs from their respective contracts, also appear in the resulting
+// string slice.
+func (r *TestRunner) Logs() []string {
+	return r.logCollection.Logs
+}
+
 func recoverPanics(onError func(error)) {
 	r := recover()
 	switch r := r.(type) {
@@ -283,12 +358,12 @@ func recoverPanics(onError func(error)) {
 
 func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
 	config := runtime.Config{
-		CoverageReportingEnabled: r.coverageReport != nil,
+		CoverageReport: r.coverageReport,
 	}
 	env := runtime.NewBaseInterpreterEnvironment(config)
 
 	ctx := runtime.Context{
-		Interface:   newScriptEnvironment(),
+		Interface:   newScriptEnvironment(r.logger),
 		Location:    testScriptLocation,
 		Environment: env,
 	}
@@ -353,7 +428,8 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 			elaboration = cryptoChecker.Elaboration
 
 		case stdlib.TestContractLocation:
-			elaboration = stdlib.TestContractChecker.Elaboration
+			testChecker := stdlib.GetTestContractType().Checker
+			elaboration = testChecker.Elaboration
 
 		default:
 			_, importedElaboration, err := r.parseAndCheckImport(importedLocation, ctx)
@@ -414,17 +490,18 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			testFramework := NewEmulatorBackend(
+			r.backend = NewEmulatorBackend(
 				r.fileResolver,
 				stdlibHandler,
 				r.coverageReport,
 			)
-			contract, err := stdlib.NewTestContract(
-				inter,
-				testFramework,
-				constructorGenerator(common.Address{}),
-				invocationRange,
-			)
+			contract, err := stdlib.GetTestContractType().
+				NewTestContract(
+					inter,
+					r.backend,
+					constructorGenerator(common.Address{}),
+					invocationRange,
+				)
 			if err != nil {
 				panic(err)
 			}
@@ -438,7 +515,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 	}
 }
 
-func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
+func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.ImportLocationHandlerFunc {
 	return func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
 		switch location {
 		case stdlib.CryptoCheckerLocation:
@@ -453,7 +530,8 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 			}
 
 		case stdlib.TestContractLocation:
-			program := interpreter.ProgramFromChecker(stdlib.TestContractChecker)
+			testChecker := stdlib.GetTestContractType().Checker
+			program := interpreter.ProgramFromChecker(testChecker)
 			subInterpreter, err := inter.NewSubInterpreter(program, location)
 			if err != nil {
 				panic(err)
@@ -463,6 +541,55 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 			}
 
 		default:
+			addressLocation, ok := location.(common.AddressLocation)
+			if ok {
+				account, _ := r.backend.blockchain.GetAccount(
+					flow.Address(addressLocation.Address),
+				)
+				programCode := account.Contracts[addressLocation.Name]
+				env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+				newCtx := runtime.Context{
+					Interface:   newScriptEnvironment(zerolog.Nop()),
+					Location:    addressLocation,
+					Environment: env,
+				}
+				env.CheckerConfig.ImportHandler = func(
+					checker *sema.Checker,
+					importedLocation common.Location,
+					importRange ast.Range,
+				) (sema.Import, error) {
+					addressLoc, ok := importedLocation.(common.AddressLocation)
+					if !ok {
+						return nil, fmt.Errorf("no address location given")
+					}
+					account, _ := r.backend.blockchain.GetAccount(
+						flow.Address(addressLoc.Address),
+					)
+					programCode := account.Contracts[addressLoc.Name]
+					program, err := env.ParseAndCheckProgram(
+						programCode, addressLoc, true,
+					)
+					if err != nil {
+						panic(err)
+					}
+
+					return sema.ElaborationImport{
+						Elaboration: program.Elaboration,
+					}, nil
+				}
+				program, err := r.testRuntime.ParseAndCheckProgram(programCode, newCtx)
+				if err != nil {
+					panic(err)
+				}
+
+				subInterpreter, err := inter.NewSubInterpreter(program, addressLocation)
+				if err != nil {
+					panic(err)
+				}
+				return interpreter.InterpreterImport{
+					Interpreter: subInterpreter,
+				}
+			}
 			importedProgram, importedElaboration, err := r.parseAndCheckImport(location, ctx)
 			if err != nil {
 				panic(err)
@@ -487,14 +614,11 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) func(inter *i
 
 // newScriptEnvironment creates an environment for test scripts to run.
 // Leverages the functionality of FVM.
-func newScriptEnvironment() environment.Environment {
+func newScriptEnvironment(logger zerolog.Logger) environment.Environment {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
 	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
 	environmentParams := environment.DefaultEnvironmentParams()
-	logger := zerolog.New(
-		zerolog.ConsoleWriter{Out: os.Stdout},
-	).With().Timestamp().Logger()
 	environmentParams.ProgramLoggerParams = environment.ProgramLoggerParams{
 		Logger:                logger,
 		CadenceLoggingEnabled: true,
@@ -507,7 +631,14 @@ func newScriptEnvironment() environment.Environment {
 	)
 }
 
-func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runtime.Context) (*ast.Program, *sema.Elaboration, error) {
+func (r *TestRunner) parseAndCheckImport(
+	location common.Location,
+	startCtx runtime.Context,
+) (
+	*ast.Program,
+	*sema.Elaboration,
+	error,
+) {
 	if r.importResolver == nil {
 		return nil, nil, ImportResolverNotProvidedError{}
 	}
@@ -532,7 +663,17 @@ func (r *TestRunner) parseAndCheckImport(location common.Location, startCtx runt
 		importedLocation common.Location,
 		importRange ast.Range,
 	) (sema.Import, error) {
-		return nil, fmt.Errorf("nested imports are not supported")
+		switch importedLocation {
+		case stdlib.TestContractLocation:
+			testChecker := stdlib.GetTestContractType().Checker
+			elaboration := testChecker.Elaboration
+			return sema.ElaborationImport{
+				Elaboration: elaboration,
+			}, nil
+
+		default:
+			return nil, fmt.Errorf("nested imports are not supported")
+		}
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler

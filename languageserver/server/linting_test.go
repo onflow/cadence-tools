@@ -59,7 +59,7 @@ func TestLinting(t *testing.T) {
 				Start: protocol.Position{Line: 1, Character: 11},
 				End:   protocol.Position{Line: 1, Character: 19},
 			},
-			Severity: protocol.SeverityInformation,
+			Severity: protocol.SeverityWarning,
 			Message:  "consider replacing with: `-1 as Int8`",
 		}, diagnostic)
 	})
@@ -86,7 +86,7 @@ func TestLinting(t *testing.T) {
 				Start: protocol.Position{Line: 2, Character: 11},
 				End:   protocol.Position{Line: 2, Character: 13},
 			},
-			Severity: protocol.SeverityInformation,
+			Severity: protocol.SeverityWarning,
 			Message:  "unnecessary force operator",
 		}, diagnostic)
 	})
@@ -107,7 +107,7 @@ func TestLinting(t *testing.T) {
 				Start: protocol.Position{Line: 1, Character: 11},
 				End:   protocol.Position{Line: 1, Character: 24},
 			},
-			Severity: protocol.SeverityInformation,
+			Severity: protocol.SeverityWarning,
 			Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
 		}, diagnostic)
 	})
@@ -121,16 +121,26 @@ func TestLinting(t *testing.T) {
 			let y: Bool = 3
 		}`)
 
-		require.Equal(t, 1, len(diagnostics))
-		diagnostic := diagnostics[0]
-
-		require.Equal(t, protocol.Diagnostic{
-			Range: protocol.Range{
-				Start: protocol.Position{Line: 2, Character: 17},
-				End:   protocol.Position{Line: 2, Character: 18},
+		require.Equal(t,
+			[]protocol.Diagnostic{
+				{
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 2, Character: 17},
+						End:   protocol.Position{Line: 2, Character: 18},
+					},
+					Severity: protocol.SeverityError,
+					Message:  "mismatched types. expected `Bool`, got `Int`",
+				},
+				{
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 1, Character: 11},
+						End:   protocol.Position{Line: 1, Character: 24},
+					},
+					Severity: protocol.SeverityWarning,
+					Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
+				},
 			},
-			Severity: protocol.SeverityError,
-			Message:  "mismatched types. expected `Bool`, got `Int`",
-		}, diagnostic)
+			diagnostics,
+		)
 	})
 }

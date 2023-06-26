@@ -334,14 +334,15 @@ func NewServer() (*Server, error) {
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
 func newCheckerConfig(s *Server, lib standardLibrary) func (node *checkerNode) *sema.Config {
 	cfg := &sema.Config{
-		BaseValueActivation:        lib.baseValueActivation,
-		AccessCheckMode:            s.accessCheckMode,
-		PositionInfoEnabled:        true,
-		ExtendedElaborationEnabled: true,
-		LocationHandler:            s.handleLocation,
-		ImportHandler:              nil,
-		AttachmentsEnabled:         true,
-		AccountLinkingEnabled:      true,
+		BaseValueActivation:          lib.baseValueActivation,
+		AccessCheckMode:              s.accessCheckMode,
+		PositionInfoEnabled:          true,
+		ExtendedElaborationEnabled:   true,
+		LocationHandler:              s.handleLocation,
+		ImportHandler:                nil,
+		AttachmentsEnabled:           true,
+		AccountLinkingEnabled:        true,
+		CapabilityControllersEnabled: true,
 	}
 	return func (node *checkerNode) *sema.Config {
 		cfg.ImportHandler = s.handleImport(node)
@@ -1466,6 +1467,10 @@ func (s *Server) prepareFunctionMemberCompletionItem(
 		return
 	}
 
+	if linter.MemberIsDeprecated(member.DocString) {
+		item.Tags = append(item.Tags, protocol.ComplDeprecated)
+	}
+
 	s.prepareParametersCompletionItem(item, name, functionType.Parameters)
 }
 
@@ -1810,6 +1815,10 @@ func (s *Server) InlayHint(
 			continue // todo this should never occur
 		}
 
+		if targetType.IsInvalidType() {
+			continue
+		}
+
 		typeAnnotation := sema.TypeAnnotation{
 			Type:       targetType,
 			IsResource: targetType.IsResourceType(),
@@ -1978,10 +1987,6 @@ func (s *Server) getDiagnostics(
 			return
 		}
 		diagnostics = append(diagnostics, extraDiagnostics...)
-	}
-
-	if checkError != nil {
-		return
 	}
 
 	analysisProgram := analysis.Program{
@@ -2943,9 +2948,9 @@ func (s *Server) handleImport(parent *checkerNode) func (
 				Elaboration: cryptoChecker.Elaboration,
 			}, nil
 		case stdlib.TestContractLocation:
-			elaboration := stdlib.TestContractChecker.Elaboration
+			testChecker := stdlib.GetTestContractType().Checker
 			return sema.ElaborationImport{
-				Elaboration: elaboration,
+				Elaboration: testChecker.Elaboration,
 			}, nil
 		default:
 			if isPathLocation(importedLocation) {
@@ -3275,13 +3280,20 @@ func convertDiagnostic(
 	var message string
 
 	var codeActionsResolver func() []*protocol.CodeAction
+	var tags []protocol.DiagnosticTag
+	severity := protocol.SeverityWarning
 
 	switch linterDiagnostic.Category {
 	case linter.ReplacementCategory:
+		message = fmt.Sprintf(
+			"%s `%s`",
+			linterDiagnostic.Message,
+			linterDiagnostic.SecondaryMessage,
+		)
 		codeActionsResolver = func() []*protocol.CodeAction {
 			return []*protocol.CodeAction{
 				{
-					Title:       fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage),
+					Title:       message,
 					Kind:        protocol.QuickFix,
 					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
 					Edit: &protocol.WorkspaceEdit{
@@ -3298,7 +3310,7 @@ func convertDiagnostic(
 				},
 			}
 		}
-		message = fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage)
+
 	case linter.RemovalCategory:
 		codeActionsResolver = func() []*protocol.CodeAction {
 			return []*protocol.CodeAction{
@@ -3320,6 +3332,49 @@ func convertDiagnostic(
 				},
 			}
 		}
+
+	case linter.DeprecatedCategory:
+		if linterDiagnostic.SecondaryMessage != "" {
+			message = fmt.Sprintf(
+				"%s. %s",
+				linterDiagnostic.Message,
+				linterDiagnostic.SecondaryMessage,
+			)
+		}
+		severity = protocol.SeverityHint
+		tags = append(tags, protocol.Deprecated)
+
+		codeActionsResolver = func() []*protocol.CodeAction {
+			var codeActions []*protocol.CodeAction
+			for _, suggestedFix := range linterDiagnostic.SuggestedFixes {
+
+				codeActionTextEdits := make([]protocol.TextEdit, 0, len(suggestedFix.TextEdits))
+
+				for _, suggestedFixTextEdit := range suggestedFix.TextEdits {
+					codeActionTextEdit := protocol.TextEdit{
+						Range: conversion.ASTToProtocolRange(
+							suggestedFixTextEdit.StartPos,
+							suggestedFixTextEdit.EndPos,
+						),
+						NewText: suggestedFixTextEdit.Replacement,
+					}
+					codeActionTextEdits = append(codeActionTextEdits, codeActionTextEdit)
+				}
+
+				codeAction := &protocol.CodeAction{
+					Title:       suggestedFix.Message,
+					Kind:        protocol.QuickFix,
+					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+					Edit: &protocol.WorkspaceEdit{
+						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+							uri: codeActionTextEdits,
+						},
+					},
+				}
+				codeActions = append(codeActions, codeAction)
+			}
+			return codeActions
+		}
 	}
 
 	if message == "" {
@@ -3327,11 +3382,10 @@ func convertDiagnostic(
 	}
 
 	protocolDiagnostic = protocol.Diagnostic{
-		Message: message,
-		// protocol.SeverityHint doesn't look prominent enough in VS Code,
-		// only the first character of the range is highlighted.
-		Severity: protocol.SeverityInformation,
+		Message:  message,
+		Severity: severity,
 		Range:    protocolRange,
+		Tags:     tags,
 	}
 
 	return protocolDiagnostic, codeActionsResolver
