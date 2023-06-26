@@ -21,11 +21,13 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-cli/flowkit/accounts"
-	"github.com/onflow/flow-cli/flowkit/transactions"
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/onflow/flow-cli/flowkit/accounts"
+	"github.com/onflow/flow-cli/flowkit/transactions"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-cli/flowkit"
@@ -92,6 +94,72 @@ func newFlowkitClient(loader flowkit.ReaderWriter) *flowkitClient {
 	}
 }
 
+type accountResolver struct {
+	client							flowkitClient
+	nextBlockHeight 		uint64
+	currentBlockHeight 	uint64
+}
+
+func (r *accountResolver) CreateAccount(address flow.Address) (*clientAccount, error) {
+	clientAccount := &clientAccount{
+		Account: &flow.Account{
+			Address: address,
+			Balance: 0,
+			Code:    nil,
+			Keys:    nil,
+		},
+		Name:    address.String(),
+	}
+	r.client.accounts = append(r.client.accounts, clientAccount)
+
+	return clientAccount, nil
+}
+
+func (r *accountResolver) outer() {
+	getBlockHeight := func() (uint64, error) {
+		block, err := r.client.services.GetBlock(context.Background(), flowkit.LatestBlockQuery)
+		return block.Height, err
+	}
+
+	nextBlockHeight, err := getBlockHeight()
+	if err == nil {
+		r.nextBlockHeight = nextBlockHeight
+	}
+
+	// loop from current block height to next block height
+	for r.currentBlockHeight < r.nextBlockHeight {
+		err := r.inner(r.currentBlockHeight)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		} else {
+			r.currentBlockHeight++
+		}
+	}
+
+	time.Sleep(1 * time.Second)
+	r.outer()
+}
+
+func (r *accountResolver) inner(height uint64) error {
+	events, err := r.client.services.GetEvents(context.Background(), []string{flow.EventAccountCreated}, height, height, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, eventArray := range events {
+		for _, event := range eventArray.Events {
+			switch event.Type {
+			case flow.EventAccountCreated:
+				accountCreatedEvent := flow.AccountCreatedEvent(event)
+				address := accountCreatedEvent.Address()
+				r.CreateAccount(address)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) error {
 	f.configPath = configPath
 	state, err := flowkit.Load([]string{f.configPath}, f.loader)
@@ -124,19 +192,11 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
 	}
 
-	// create base accounts
-	f.accounts = make([]*clientAccount, 0)
-	for i := 0; i < numberOfAccounts; i++ {
-		_, err := f.CreateAccount()
-		if err != nil {
-			return err
-		}
+	// create account resolver
+	resolver := &accountResolver{
+		client: *f,
 	}
-
-	f.accounts = append(f.accounts, f.accountsFromState()...)
-
-	f.accounts[0].Active = true // make first active by default
-	f.activeAccount = f.accounts[0]
+	go resolver.outer()
 
 	return nil
 }

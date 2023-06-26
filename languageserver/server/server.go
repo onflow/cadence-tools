@@ -159,7 +159,8 @@ type InitializationOptionsHandler func(initializationOptions any) error
 
 type Server struct {
 	protocolServer       *protocol.Server
-	checkers             map[common.Location]*sema.Checker
+	checkers             map[common.Location]*checkerNode
+	rootCheckers         map[common.Location]*checkerNode
 	documents            map[protocol.DocumentURI]Document
 	memberResolvers      map[protocol.DocumentURI]map[string]sema.MemberResolver
 	ranges               map[protocol.DocumentURI]map[string]sema.Range
@@ -184,9 +185,9 @@ type Server struct {
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
 	// checkerStandardConfig is a config used to check contracts and transactions
-	checkerStandardConfig *sema.Config
+	checkerStandardConfig func (*checkerNode) *sema.Config
 	// checkerScriptConfig is a config used to check scripts
-	checkerScriptConfig *sema.Config
+	checkerScriptConfig func (*checkerNode) *sema.Config
 }
 
 type Option func(*Server) error
@@ -194,6 +195,11 @@ type Option func(*Server) error
 type Command struct {
 	Name    string
 	Handler CommandHandler
+}
+
+type checkerNode struct {
+	checker *sema.Checker
+	dependencies map[common.Location]*checkerNode
 }
 
 // WithCommand returns a server options that adds the given command
@@ -271,8 +277,19 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 // determines whether the access is allowed based on the location of program and the called member.
 func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
 	return func(server *Server) error {
-		server.checkerStandardConfig.MemberAccountAccessHandler = handler
-		server.checkerScriptConfig.MemberAccountAccessHandler = handler
+		checkerStandardConfig := server.checkerStandardConfig
+		checkerScriptConfig := server.checkerScriptConfig
+
+		server.checkerStandardConfig = func(n *checkerNode) *sema.Config {
+			cfg := checkerStandardConfig(n)
+			cfg.MemberAccountAccessHandler = handler
+			return cfg
+		}
+		server.checkerScriptConfig = func(n *checkerNode) *sema.Config {
+			cfg := checkerScriptConfig(n)
+			cfg.MemberAccountAccessHandler = handler
+			return cfg
+		}
 		return nil
 	}
 }
@@ -283,7 +300,8 @@ const ParseEntryPointArgumentsCommand = "cadence.server.parseEntryPointArguments
 
 func NewServer() (*Server, error) {
 	server := &Server{
-		checkers:             make(map[common.Location]*sema.Checker),
+		checkers:             make(map[common.Location]*checkerNode),
+		rootCheckers:         make(map[common.Location]*checkerNode),
 		documents:            make(map[protocol.DocumentURI]Document),
 		memberResolvers:      make(map[protocol.DocumentURI]map[string]sema.MemberResolver),
 		ranges:               make(map[protocol.DocumentURI]map[string]sema.Range),
@@ -314,16 +332,20 @@ func NewServer() (*Server, error) {
 }
 
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
-func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
-	return &sema.Config{
+func newCheckerConfig(s *Server, lib standardLibrary) func (node *checkerNode) *sema.Config {
+	cfg := &sema.Config{
 		BaseValueActivation:        lib.baseValueActivation,
 		AccessCheckMode:            s.accessCheckMode,
 		PositionInfoEnabled:        true,
 		ExtendedElaborationEnabled: true,
 		LocationHandler:            s.handleLocation,
-		ImportHandler:              s.handleImport,
+		ImportHandler:              nil,
 		AttachmentsEnabled:         true,
 		AccountLinkingEnabled:      true,
+	}
+	return func (node *checkerNode) *sema.Config {
+		cfg.ImportHandler = s.handleImport(node)
+		return cfg
 	}
 }
 
@@ -347,7 +369,7 @@ func (s *Server) Stop() error {
 
 func (s *Server) checkerForDocument(uri protocol.DocumentURI) *sema.Checker {
 	location := uriToLocation(uri)
-	return s.checkers[location]
+	return s.checkers[location].checker
 }
 
 func (s *Server) Initialize(
@@ -385,8 +407,18 @@ func (s *Server) Initialize(
 	s.configure(options)
 
 	// update the value after config is initialized
-	s.checkerStandardConfig.AccessCheckMode = s.accessCheckMode
-	s.checkerScriptConfig.AccessCheckMode = s.accessCheckMode
+	checkerStandardConfig := s.checkerStandardConfig
+	checkerScriptConfig := s.checkerScriptConfig
+	s.checkerStandardConfig = func(n *checkerNode) *sema.Config {
+		cfg := checkerStandardConfig(n)
+		cfg.AccessCheckMode = s.accessCheckMode
+		return cfg
+	}
+	s.checkerScriptConfig = func(n *checkerNode) *sema.Config {
+		cfg := checkerScriptConfig(n)
+		cfg.AccessCheckMode = s.accessCheckMode
+		return cfg
+	}
 
 	for _, handler := range s.initializationOptionsHandlers {
 		err := handler(options)
@@ -523,7 +555,6 @@ func (s *Server) registerCommands(conn protocol.Conn) {
 // DidOpenTextDocument is called whenever a new file is opened.
 // We parse and check the text and publish diagnostics about the document.
 func (s *Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpenTextDocumentParams) error {
-
 	uri := params.TextDocument.URI
 	text := params.TextDocument.Text
 	version := params.TextDocument.Version
@@ -534,6 +565,16 @@ func (s *Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpe
 	}
 
 	s.checkAndPublishDiagnostics(conn, uri, text, version)
+
+	return nil
+}
+
+func (s *Server) DidCloseTextDocument(conn protocol.Conn, params *protocol.DidCloseTextDocumentParams) error {
+	uri := params.TextDocument.URI
+	location := uriToLocation(uri)
+
+	delete(s.rootCheckers, location)
+	s.cleanupChecker(location)
 
 	return nil
 }
@@ -551,12 +592,6 @@ func (s *Server) DidChangeTextDocument(
 	s.documents[uri] = Document{
 		Text:    text,
 		Version: version,
-	}
-
-	// todo implement smarter cache invalidation with dependency resolution using https://github.com/onflow/cadence/pull/1634
-	// we should build dependency tree upfront and then based on the changes only reset checkers contained in that tree
-	for locationID := range s.checkers {
-		delete(s.checkers, locationID)
 	}
 
 	s.checkAndPublishDiagnostics(conn, uri, text, version)
@@ -1833,12 +1868,12 @@ var lintingAnalyzers = maps.Values(linter.Analyzers)
 // decideCheckerConfig based on the program type
 //
 // if a program is a script return the augmented config containing additional values
-func (s *Server) decideCheckerConfig(program *ast.Program) *sema.Config {
+func (s *Server) decideCheckerConfig(program *ast.Program, node *checkerNode) *sema.Config {
 	if program.SoleTransactionDeclaration() != nil || program.SoleContractDeclaration() != nil {
-		return s.checkerStandardConfig
+		return s.checkerStandardConfig(node)
 	}
 
-	return s.checkerScriptConfig
+	return s.checkerScriptConfig(node)
 }
 
 // getDiagnostics parses and checks the given file and generates diagnostics
@@ -1879,21 +1914,37 @@ func (s *Server) getDiagnostics(
 
 	location := uriToLocation(uri)
 
-	if program == nil {
-		delete(s.checkers, location)
-		return
+	node := &checkerNode{
+		checker: nil,
+		dependencies: make(map[common.Location]*checkerNode),
 	}
 
 	var checker *sema.Checker
-	checker, diagnosticsErr = sema.NewChecker(
-		program,
-		location,
-		nil,
-		s.decideCheckerConfig(program),
-	)
-	if diagnosticsErr != nil {
+	if program == nil {
+		checker = nil
+	} else {
+		checker, diagnosticsErr = sema.NewChecker(
+			program,
+			location,
+			nil,
+			s.decideCheckerConfig(program, node),
+		)
+		node.checker = checker
+	}
+
+	s.checkers[location] = node
+	s.rootCheckers[location] = node
+
+	if checker == nil {
 		return
 	}
+
+	priorDependencies := make(map[common.Location]*checkerNode)
+	for k, v := range node.dependencies {
+		priorDependencies[k] = v
+	}
+
+	node.dependencies = make(map[common.Location]*checkerNode)
 
 	start := time.Now()
 	checkError := checker.Check()
@@ -1905,7 +1956,13 @@ func (s *Server) getDiagnostics(
 		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
 	})
 
-	s.checkers[location] = checker
+	// Check if any locations are no longer dependencies
+	for l := range priorDependencies {
+		_,ok := node.dependencies[l]
+		if !ok {
+			s.cleanupChecker(l)
+		}
+	}
 
 	if checkError != nil {
 		if parentErr, ok := checkError.(errors.ParentError); ok {
@@ -2863,7 +2920,7 @@ func (s *Server) handleLocation(
 	return resolvedLocations, nil
 }
 
-func (s *Server) handleImport(
+func (s *Server) handleImport(parent *checkerNode) func (
 	checker *sema.Checker,
 	importedLocation common.Location,
 	_ ast.Range,
@@ -2871,57 +2928,77 @@ func (s *Server) handleImport(
 	sema.Import,
 	error,
 ) {
-	switch importedLocation {
-	case stdlib.CryptoCheckerLocation:
-		cryptoChecker := stdlib.CryptoChecker()
-		return sema.ElaborationImport{
-			Elaboration: cryptoChecker.Elaboration,
-		}, nil
-	case stdlib.TestContractLocation:
-		elaboration := stdlib.TestContractChecker.Elaboration
-		return sema.ElaborationImport{
-			Elaboration: elaboration,
-		}, nil
-	default:
-		if isPathLocation(importedLocation) {
-			// import may be a relative path and therefore should be normalized
-			// against the current location
-			importedLocation = normalizePathLocation(checker.Location, importedLocation)
-
-			if checker.Location == importedLocation {
-				return nil, &sema.CheckerError{
-					Errors: []error{fmt.Errorf("cannot import current file: %s", importedLocation)},
+	return func (
+		checker *sema.Checker,
+		importedLocation common.Location,
+		_ ast.Range,
+	) (
+		sema.Import,
+		error,
+	) {
+		switch importedLocation {
+		case stdlib.CryptoCheckerLocation:
+			cryptoChecker := stdlib.CryptoChecker()
+			return sema.ElaborationImport{
+				Elaboration: cryptoChecker.Elaboration,
+			}, nil
+		case stdlib.TestContractLocation:
+			elaboration := stdlib.TestContractChecker.Elaboration
+			return sema.ElaborationImport{
+				Elaboration: elaboration,
+			}, nil
+		default:
+			if isPathLocation(importedLocation) {
+				// import may be a relative path and therefore should be normalized
+				// against the current location
+				importedLocation = normalizePathLocation(checker.Location, importedLocation)
+	
+				if checker.Location == importedLocation {
+					return nil, &sema.CheckerError{
+						Errors: []error{fmt.Errorf("cannot import current file: %s", importedLocation)},
+					}
 				}
 			}
-		}
+	
+			importedNode, ok := s.checkers[importedLocation]
+			if !ok {
+				importedProgram, err := s.resolveImport(importedLocation)
+	
+				if err != nil {
+					return nil, err
+				}
+				if importedProgram == nil {
+					return nil, &sema.CheckerError{
+						Errors: []error{fmt.Errorf("cannot import %s", importedLocation)},
+					}
+				}
+	
+				importedNode := &checkerNode{
+					checker: nil,
+					dependencies: make(map[common.Location]*checkerNode),
+				}
+				importedChecker, err := sema.NewChecker(importedProgram, importedLocation, nil, s.decideCheckerConfig(importedProgram, importedNode))
+				if err != nil {
+					return nil, err
+				}
 
-		importedChecker, ok := s.checkers[importedLocation]
-		if !ok {
-			importedProgram, err := s.resolveImport(importedLocation)
+				importedNode.checker = importedChecker
+				s.checkers[importedLocation] = importedNode
+				s.rootCheckers[importedLocation] = importedNode
+				
+				err = importedNode.checker.Check()
 
-			if err != nil {
-				return nil, err
-			}
-			if importedProgram == nil {
-				return nil, &sema.CheckerError{
-					Errors: []error{fmt.Errorf("cannot import %s", importedLocation)},
+				if err != nil {
+					return nil, err
 				}
 			}
 
-			importedChecker, err = checker.SubChecker(importedProgram, importedLocation)
-			if err != nil {
-				return nil, err
-			}
-			s.checkers[importedLocation] = importedChecker
-			err = importedChecker.Check()
-			if err != nil {
-				return nil, err
-			}
+			parent.dependencies[importedLocation] = importedNode
+	
+			return sema.ElaborationImport{
+				Elaboration: importedNode.checker.Elaboration,
+			}, nil
 		}
-
-		return sema.ElaborationImport{
-			Elaboration: importedChecker.Elaboration,
-		}, nil
 	}
 }
 
@@ -3258,4 +3335,25 @@ func convertDiagnostic(
 	}
 
 	return protocolDiagnostic, codeActionsResolver
+}
+
+func (s *Server) cleanupChecker(l common.Location) {
+	var checkIfUsed func (map[common.Location]*checkerNode) bool
+	
+	checkIfUsed = func (nodes map[common.Location]*checkerNode) bool {
+		for k,v := range nodes {
+			if k == l || checkIfUsed(v.dependencies) {
+				return true
+			}
+		}
+		return false
+	}
+	
+	if !checkIfUsed(s.rootCheckers) {
+		dependencies := s.checkers[l].dependencies
+		delete(s.checkers, l)
+		for depLocation := range dependencies {
+			s.cleanupChecker(depLocation)
+		}
+	}
 }
