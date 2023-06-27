@@ -333,20 +333,18 @@ func NewServer() (*Server, error) {
 
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
 func newCheckerConfig(s *Server, lib standardLibrary) func (node *checkerNode) *sema.Config {
-	cfg := &sema.Config{
-		BaseValueActivation:          lib.baseValueActivation,
-		AccessCheckMode:              s.accessCheckMode,
-		PositionInfoEnabled:          true,
-		ExtendedElaborationEnabled:   true,
-		LocationHandler:              s.handleLocation,
-		ImportHandler:                nil,
-		AttachmentsEnabled:           true,
-		AccountLinkingEnabled:        true,
-		CapabilityControllersEnabled: true,
-	}
 	return func (node *checkerNode) *sema.Config {
-		cfg.ImportHandler = s.handleImport(node)
-		return cfg
+		return &sema.Config{
+			BaseValueActivation:          lib.baseValueActivation,
+			AccessCheckMode:              s.accessCheckMode,
+			PositionInfoEnabled:          true,
+			ExtendedElaborationEnabled:   true,
+			LocationHandler:              s.handleLocation,
+			ImportHandler:                s.handleImport(node),
+			AttachmentsEnabled:           true,
+			AccountLinkingEnabled:        true,
+			CapabilityControllersEnabled: true,
+		}
 	}
 }
 
@@ -575,7 +573,7 @@ func (s *Server) DidCloseTextDocument(conn protocol.Conn, params *protocol.DidCl
 	location := uriToLocation(uri)
 
 	delete(s.rootCheckers, location)
-	s.cleanupChecker(location)
+	s.refreshCheckerMap()
 
 	return nil
 }
@@ -1966,12 +1964,7 @@ func (s *Server) getDiagnostics(
 	})
 
 	// Check if any locations are no longer dependencies
-	for l := range priorDependencies {
-		_,ok := node.dependencies[l]
-		if !ok {
-			s.cleanupChecker(l)
-		}
-	}
+	s.refreshCheckerMap()
 
 	if checkError != nil {
 		if parentErr, ok := checkError.(errors.ParentError); ok {
@@ -2978,7 +2971,7 @@ func (s *Server) handleImport(parent *checkerNode) func (
 					}
 				}
 	
-				importedNode := &checkerNode{
+				importedNode = &checkerNode{
 					checker: nil,
 					dependencies: make(map[common.Location]*checkerNode),
 				}
@@ -2989,7 +2982,6 @@ func (s *Server) handleImport(parent *checkerNode) func (
 
 				importedNode.checker = importedChecker
 				s.checkers[importedLocation] = importedNode
-				s.rootCheckers[importedLocation] = importedNode
 				
 				err = importedNode.checker.Check()
 
@@ -3391,23 +3383,16 @@ func convertDiagnostic(
 	return protocolDiagnostic, codeActionsResolver
 }
 
-func (s *Server) cleanupChecker(l common.Location) {
-	var checkIfUsed func (map[common.Location]*checkerNode) bool
-	
-	checkIfUsed = func (nodes map[common.Location]*checkerNode) bool {
-		for k,v := range nodes {
-			if k == l || checkIfUsed(v.dependencies) {
-				return true
-			}
-		}
-		return false
-	}
-	
-	if !checkIfUsed(s.rootCheckers) {
-		dependencies := s.checkers[l].dependencies
-		delete(s.checkers, l)
-		for depLocation := range dependencies {
-			s.cleanupChecker(depLocation)
+func (s *Server) refreshCheckerMap() {
+	s.checkers = make(map[common.Location]*checkerNode)
+
+	// Recursively resolve all checkers
+	var helper func (nodes map[common.Location]*checkerNode)
+	helper = func (nodes map[common.Location]*checkerNode) {
+		for l,n := range nodes {
+			s.checkers[l] = n
 		}
 	}
+	
+	helper(s.rootCheckers)
 }

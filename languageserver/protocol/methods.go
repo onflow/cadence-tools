@@ -39,6 +39,16 @@ func (s *Server) handleDidOpenTextDocument(req *json.RawMessage) (any, error) {
 	return nil, err
 }
 
+func (s *Server) handleDidCloseTextDocument(req *json.RawMessage) (any, error) {
+	var params DidCloseTextDocumentParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	err := s.Handler.DidCloseTextDocument(s.conn, &params)
+	return nil, err
+}
+
 func (s *Server) handleDidChangeTextDocument(req *json.RawMessage) (any, error) {
 	var params DidChangeTextDocumentParams
 	if err := json.Unmarshal(*req, &params); err != nil {

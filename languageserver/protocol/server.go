@@ -80,6 +80,7 @@ func (conn *connection) RegisterCapability(params *RegistrationParams) error {
 type Handler interface {
 	Initialize(conn Conn, params *InitializeParams) (*InitializeResult, error)
 	DidOpenTextDocument(conn Conn, params *DidOpenTextDocumentParams) error
+	DidCloseTextDocument(conn Conn, params *DidCloseTextDocumentParams) error
 	DidChangeTextDocument(conn Conn, params *DidChangeTextDocumentParams) error
 	Hover(conn Conn, params *TextDocumentPositionParams) (*Hover, error)
 	Definition(conn Conn, params *TextDocumentPositionParams) (*Location, error)
@@ -117,6 +118,9 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["textDocument/didOpen"] =
 		server.handleDidOpenTextDocument
+
+	jsonrpc2Server.Methods["textDocument/didClose"] =
+		server.handleDidCloseTextDocument
 
 	jsonrpc2Server.Methods["textDocument/didChange"] =
 		server.handleDidChangeTextDocument
