@@ -551,7 +551,14 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 			continue
 		}
 
-		addressStr := fmt.Sprintf("0x%s", address)
+		var addressStr string
+		if strings.Contains(importDeclaration.String(), "from") {
+			addressStr = fmt.Sprintf("0x%s", address)
+		} else {
+			// Imports of the form `import "FungibleToken"` should be
+			// expanded to `import FungibleToken from 0xee82856bf20e2aa6`
+			addressStr = fmt.Sprintf("%s from 0x%s", location, address)
+		}
 
 		locationStart := importDeclaration.LocationPos.Offset
 

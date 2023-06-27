@@ -538,14 +538,14 @@ func TestImportBuiltinContracts(t *testing.T) {
 	`
 
 	scriptCode := `
-	    import FungibleToken from "FungibleToken"
-	    import FlowToken from "FlowToken"
-	    import FUSD from "FUSD"
-	    import NonFungibleToken from "NonFungibleToken"
-	    import MetadataViews from "MetadataViews"
-	    import ExampleNFT from "ExampleNFT"
-	    import NFTStorefrontV2 from "NFTStorefrontV2"
-	    import NFTStorefront from "NFTStorefront"
+	    import "FungibleToken"
+	    import "FlowToken"
+	    import "FUSD"
+	    import "NonFungibleToken"
+	    import "MetadataViews"
+	    import "ExampleNFT"
+	    import "NFTStorefrontV2"
+	    import "NFTStorefront"
 
 	    pub fun main(): Bool {
 	        return true
