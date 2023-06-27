@@ -1916,42 +1916,43 @@ func (s *Server) getDiagnostics(
 			diagnostics = append(diagnostics, parserDiagnostics...)
 		}
 	}
+
 	// If there is a parse result succeeded proceed with resolving imports and checking the parsed program,
 	// even if there might have been parsing errors.
-
 	location := uriToLocation(uri)
 
-	node := &checkerNode{
-		checker: nil,
-		dependencies: make(map[common.Location]*checkerNode),
-	}
-
-	var checker *sema.Checker
 	if program == nil {
-		checker = nil
-	} else {
-		checker, diagnosticsErr = sema.NewChecker(
-			program,
-			location,
-			nil,
-			s.decideCheckerConfig(program, node),
-		)
-		node.checker = checker
-	}
-
-	s.checkers[location] = node
-	s.rootCheckers[location] = node
-
-	if checker == nil {
+		delete(s.rootCheckers, location)
+		s.refreshCheckerMap()
 		return
 	}
 
-	priorDependencies := make(map[common.Location]*checkerNode)
-	for k, v := range node.dependencies {
-		priorDependencies[k] = v
+	// Create new node to replace existing node/set node in tree
+	newCheckerNode := checkerNode{
+		checker: nil,
+		dependencies: make(map[common.Location]*checkerNode),
+	}
+	checker, diagnosticsErr := sema.NewChecker(
+		program,
+		location,
+		nil,
+		s.decideCheckerConfig(program, &newCheckerNode),
+	)
+	newCheckerNode.checker = checker
+
+	// If error, abort and don't set checker
+	if diagnosticsErr != nil {
+		delete(s.rootCheckers, location)
+		s.refreshCheckerMap()
+		return
 	}
 
-	node.dependencies = make(map[common.Location]*checkerNode)
+	// Modify existing checker node if exists, else allocate new node
+	if nodePtr, ok := s.rootCheckers[location]; ok {
+		*nodePtr = newCheckerNode
+	} else {
+		s.rootCheckers[location] = &newCheckerNode
+	}
 
 	start := time.Now()
 	checkError := checker.Check()
@@ -3391,6 +3392,7 @@ func (s *Server) refreshCheckerMap() {
 	helper = func (nodes map[common.Location]*checkerNode) {
 		for l,n := range nodes {
 			s.checkers[l] = n
+			helper(n.dependencies)
 		}
 	}
 	
