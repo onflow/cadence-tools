@@ -1313,7 +1313,7 @@ func (s *Server) memberCompletions(
 	s.memberResolvers[uri] = memberResolvers
 
 	for name, resolver := range memberResolvers {
-		kind := convertDeclarationKindToCompletionItemType(resolver.Kind)
+		kind := conversion.DeclarationKindToCompletionItemType(resolver.Kind)
 		commitCharacters := declarationKindCommitCharacters(resolver.Kind)
 
 		item := &protocol.CompletionItem{
@@ -1363,7 +1363,7 @@ func (s *Server) rangeCompletions(
 
 	for index, r := range ranges {
 		id := strconv.Itoa(index)
-		kind := convertDeclarationKindToCompletionItemType(r.DeclarationKind)
+		kind := conversion.DeclarationKindToCompletionItemType(r.DeclarationKind)
 		item := &protocol.CompletionItem{
 			Label: r.Identifier,
 			Kind:  kind,
@@ -1468,38 +1468,6 @@ func (s *Server) prepareParametersCompletionItem(
 
 	builder.WriteRune(')')
 	item.InsertText = builder.String()
-}
-
-func convertDeclarationKindToCompletionItemType(kind common.DeclarationKind) protocol.CompletionItemKind {
-	switch kind {
-	case common.DeclarationKindFunction:
-		return protocol.FunctionCompletion
-
-	case common.DeclarationKindField:
-		return protocol.FieldCompletion
-
-	case common.DeclarationKindStructure,
-		common.DeclarationKindResource,
-		common.DeclarationKindEvent,
-		common.DeclarationKindContract,
-		common.DeclarationKindType:
-		return protocol.ClassCompletion
-
-	case common.DeclarationKindStructureInterface,
-		common.DeclarationKindResourceInterface,
-		common.DeclarationKindContractInterface:
-		return protocol.InterfaceCompletion
-
-	case common.DeclarationKindVariable:
-		return protocol.VariableCompletion
-
-	case common.DeclarationKindConstant,
-		common.DeclarationKindParameter:
-		return protocol.ConstantCompletion
-
-	default:
-		return protocol.TextCompletion
-	}
 }
 
 func declarationKindCommitCharacters(kind common.DeclarationKind) []string {
@@ -1681,7 +1649,7 @@ func (s *Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteComm
 }
 
 // DidChangeConfiguration is called to propagate new values set in the client configuration.
-func (s *Server) DidChangeConfiguration(conn protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
+func (s *Server) DidChangeConfiguration(_ protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
 	optsMap, ok := params.Settings.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("invalid configuration parameters")
@@ -2370,6 +2338,17 @@ func (s *Server) convertError(
 					}
 				},
 			)
+		}
+
+	case sema.HasSuggestedFixes:
+		if document, ok := s.documents[uri]; ok {
+			codeActionsResolver = func() []*protocol.CodeAction {
+				return conversion.SuggestedFixesToCodeActions(
+					err.SuggestFixes(document.Text),
+					diagnostic,
+					uri,
+				)
+			}
 		}
 	}
 
@@ -3197,7 +3176,10 @@ func convertDiagnostic(
 	func() []*protocol.CodeAction,
 ) {
 
-	protocolRange := conversion.ASTToProtocolRange(linterDiagnostic.StartPos, linterDiagnostic.EndPos)
+	protocolRange := conversion.ASTToProtocolRange(
+		linterDiagnostic.StartPos,
+		linterDiagnostic.EndPos,
+	)
 
 	var protocolDiagnostic protocol.Diagnostic
 	var message string
@@ -3268,35 +3250,11 @@ func convertDiagnostic(
 		tags = append(tags, protocol.Deprecated)
 
 		codeActionsResolver = func() []*protocol.CodeAction {
-			var codeActions []*protocol.CodeAction
-			for _, suggestedFix := range linterDiagnostic.SuggestedFixes {
-
-				codeActionTextEdits := make([]protocol.TextEdit, 0, len(suggestedFix.TextEdits))
-
-				for _, suggestedFixTextEdit := range suggestedFix.TextEdits {
-					codeActionTextEdit := protocol.TextEdit{
-						Range: conversion.ASTToProtocolRange(
-							suggestedFixTextEdit.StartPos,
-							suggestedFixTextEdit.EndPos,
-						),
-						NewText: suggestedFixTextEdit.Replacement,
-					}
-					codeActionTextEdits = append(codeActionTextEdits, codeActionTextEdit)
-				}
-
-				codeAction := &protocol.CodeAction{
-					Title:       suggestedFix.Message,
-					Kind:        protocol.QuickFix,
-					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-					Edit: &protocol.WorkspaceEdit{
-						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-							uri: codeActionTextEdits,
-						},
-					},
-				}
-				codeActions = append(codeActions, codeAction)
-			}
-			return codeActions
+			return conversion.SuggestedFixesToCodeActions(
+				linterDiagnostic.SuggestedFixes,
+				protocolDiagnostic,
+				uri,
+			)
 		}
 	}
 

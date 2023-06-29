@@ -22,12 +22,12 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 // ASTToProtocolPosition converts an AST position to a LSP position
-//
 func ASTToProtocolPosition(pos ast.Position) protocol.Position {
 	return protocol.Position{
 		Line:      uint32(pos.Line - 1),
@@ -36,7 +36,6 @@ func ASTToProtocolPosition(pos ast.Position) protocol.Position {
 }
 
 // ASTToProtocolRange converts an AST range to a LSP range
-//
 func ASTToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	return protocol.Range{
 		Start: ASTToProtocolPosition(startPos),
@@ -45,7 +44,6 @@ func ASTToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 }
 
 // ProtocolToSemaPosition converts a LSP position to a sema position
-//
 func ProtocolToSemaPosition(pos protocol.Position) sema.Position {
 	return sema.Position{
 		Line:   int(pos.Line + 1),
@@ -95,7 +93,6 @@ func DeclarationKindToSymbolKind(kind common.DeclarationKind) protocol.SymbolKin
 }
 
 // DeclarationToDocumentSymbol converts AST Declaration to a DocumentSymbol
-//
 func DeclarationToDocumentSymbol(declaration ast.Declaration) protocol.DocumentSymbol {
 	var children []protocol.DocumentSymbol
 
@@ -141,4 +138,85 @@ func DeclarationToDocumentSymbol(declaration ast.Declaration) protocol.DocumentS
 	}
 
 	return symbol
+}
+
+func DeclarationKindToCompletionItemType(kind common.DeclarationKind) protocol.CompletionItemKind {
+	switch kind {
+	case common.DeclarationKindFunction:
+		return protocol.FunctionCompletion
+
+	case common.DeclarationKindField:
+		return protocol.FieldCompletion
+
+	case common.DeclarationKindStructure,
+		common.DeclarationKindResource,
+		common.DeclarationKindEvent,
+		common.DeclarationKindContract,
+		common.DeclarationKindType:
+		return protocol.ClassCompletion
+
+	case common.DeclarationKindStructureInterface,
+		common.DeclarationKindResourceInterface,
+		common.DeclarationKindContractInterface:
+		return protocol.InterfaceCompletion
+
+	case common.DeclarationKindVariable:
+		return protocol.VariableCompletion
+
+	case common.DeclarationKindConstant,
+		common.DeclarationKindParameter:
+		return protocol.ConstantCompletion
+
+	default:
+		return protocol.TextCompletion
+	}
+}
+
+func SuggestedFixesToCodeActions(
+	suggestedFixes []analysis.SuggestedFix,
+	protocolDiagnostic protocol.Diagnostic,
+	uri protocol.DocumentURI,
+) []*protocol.CodeAction {
+	var codeActions []*protocol.CodeAction
+	for _, suggestedFix := range suggestedFixes {
+
+		codeActionTextEdits := make([]protocol.TextEdit, 0, len(suggestedFix.TextEdits))
+
+		for _, suggestedFixTextEdit := range suggestedFix.TextEdits {
+			var codeActionTextEdit protocol.TextEdit
+
+			if len(suggestedFixTextEdit.Insertion) > 0 {
+				codeActionTextEdit = protocol.TextEdit{
+					Range: protocol.Range{
+						Start: ASTToProtocolPosition(suggestedFixTextEdit.StartPos),
+						End:   ASTToProtocolPosition(suggestedFixTextEdit.EndPos),
+					},
+					NewText: suggestedFixTextEdit.Insertion,
+				}
+			} else {
+				codeActionTextEdit = protocol.TextEdit{
+					Range: ASTToProtocolRange(
+						suggestedFixTextEdit.StartPos,
+						suggestedFixTextEdit.EndPos,
+					),
+					NewText: suggestedFixTextEdit.Replacement,
+				}
+			}
+
+			codeActionTextEdits = append(codeActionTextEdits, codeActionTextEdit)
+		}
+
+		codeAction := &protocol.CodeAction{
+			Title:       suggestedFix.Message,
+			Kind:        protocol.QuickFix,
+			Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+			Edit: &protocol.WorkspaceEdit{
+				Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+					uri: codeActionTextEdits,
+				},
+			},
+		}
+		codeActions = append(codeActions, codeAction)
+	}
+	return codeActions
 }
