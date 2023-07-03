@@ -19,7 +19,9 @@
 package protocol
 
 import "encoding/json"
-
+type OkMan struct {
+	Ok bool `json:"ok"`
+}
 func (s *Server) handleInitialize(req *json.RawMessage) (any, error) {
 	var params InitializeParams
 	if err := json.Unmarshal(*req, &params); err != nil {

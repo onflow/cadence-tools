@@ -69,3 +69,9 @@ func uriToLocation(uri protocol.DocumentURI) common.StringLocation {
 		strings.TrimPrefix(string(uri), filePrefix),
 	)
 }
+
+func locationToUri(location common.Location) protocol.DocumentURI {
+	test := protocol.OkMan{Ok: true}
+	_ = test
+	return protocol.DocumentURI(filePrefix + location.String())
+}

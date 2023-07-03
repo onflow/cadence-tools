@@ -159,7 +159,9 @@ type InitializationOptionsHandler func(initializationOptions any) error
 
 type Server struct {
 	protocolServer       *protocol.Server
+	// Map of location to checker node for all checkers in use (open files & dependencies)
 	checkers             map[common.Location]*checkerNode
+	// Map of location to checker node for all root checkers in use (open files)
 	rootCheckers         map[common.Location]*checkerNode
 	documents            map[protocol.DocumentURI]Document
 	memberResolvers      map[protocol.DocumentURI]map[string]sema.MemberResolver
@@ -199,7 +201,21 @@ type Command struct {
 
 type checkerNode struct {
 	checker *sema.Checker
+	checkErr error
 	dependencies map[common.Location]*checkerNode
+	dependents map[common.Location]*checkerNode
+}
+
+func (n *checkerNode) getAllDependents() map[common.Location]*checkerNode {
+	// set of dependents
+	dependents := make(map[common.Location]*checkerNode)
+	for depLocation,dep := range n.dependents {
+		dependents[depLocation] = dep
+		for childLocation,childDep := range dep.getAllDependents() {
+			dependents[childLocation] = childDep
+		}
+	}
+	return dependents
 }
 
 // WithCommand returns a server options that adds the given command
@@ -568,12 +584,14 @@ func (s *Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpe
 	return nil
 }
 
+// DidCloseDocument is closed whenever a document is closed
+// We remove the document from the checker cache when this happens
 func (s *Server) DidCloseTextDocument(conn protocol.Conn, params *protocol.DidCloseTextDocumentParams) error {
 	uri := params.TextDocument.URI
 	location := uriToLocation(uri)
 
-	delete(s.rootCheckers, location)
-	s.refreshCheckerMap()
+	// Remove the checker and recalculate the checker map
+	s.deleteRootChecker(location)
 
 	return nil
 }
@@ -616,29 +634,39 @@ func (s *Server) checkAndPublishDiagnostics(
 	text string,
 	version int32,
 ) {
+	checkAndPublish := func(location common.Location) {
+		depUri := locationToUri(location)
+		diagnostics, _ := s.getDiagnostics(depUri, conn.LogMessage)
 
-	diagnostics, _ := s.getDiagnostics(uri, text, version, conn.LogMessage)
-
-	// NOTE: always publish diagnostics and inform the client the checking completed
-
-	_ = conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
-		URI:         uri,
-		Diagnostics: diagnostics,
-	})
-
-	valid := true
-
-	for _, diagnostic := range diagnostics {
-		if diagnostic.Severity == protocol.SeverityError {
-			valid = false
-			break
+		// NOTE: always publish diagnostics and inform the client the checking completed
+	
+		_ = conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
+			URI:         depUri,
+			Diagnostics: diagnostics,
+		})
+	
+		valid := true
+	
+		for _, diagnostic := range diagnostics {
+			if diagnostic.Severity == protocol.SeverityError {
+				valid = false
+				break
+			}
 		}
+	
+		_ = conn.Notify(cadenceCheckCompletedMethodName, &CadenceCheckCompletedParams{
+			URI:   depUri,
+			Valid: valid,
+		})
 	}
 
-	_ = conn.Notify(cadenceCheckCompletedMethodName, &CadenceCheckCompletedParams{
-		URI:   uri,
-		Valid: valid,
-	})
+	location := uriToLocation(uri)
+	checkAndPublish(location)
+
+	dependents := s.checkers[location].getAllDependents()
+	for depLocation := range dependents {
+		checkAndPublish(depLocation)
+	}
 }
 
 // Hover returns contextual type information about the variable at the given
@@ -1873,6 +1901,8 @@ const filePrefix = "file://"
 var lintingAnalyzers = maps.Values(linter.Analyzers)
 
 // decideCheckerConfig based on the program type
+// a pointer to a checker node is injected into the config
+// and these dependencies are resolved during checking
 //
 // if a program is a script return the augmented config containing additional values
 func (s *Server) decideCheckerConfig(program *ast.Program, node *checkerNode) *sema.Config {
@@ -1890,13 +1920,13 @@ func (s *Server) decideCheckerConfig(program *ast.Program, node *checkerNode) *s
 // Returns an error if an unexpected error occurred.
 func (s *Server) getDiagnostics(
 	uri protocol.DocumentURI,
-	text string,
-	version int32,
 	log func(*protocol.LogMessageParams),
 ) (
 	diagnostics []protocol.Diagnostic,
 	diagnosticsErr error,
 ) {
+	document := s.documents[uri]
+
 	// Always reset the code actions for this document
 	codeActionsResolvers := map[uuid.UUID]func() []*protocol.CodeAction{}
 	s.codeActionsResolvers[uri] = codeActionsResolvers
@@ -1905,7 +1935,7 @@ func (s *Server) getDiagnostics(
 	// The later will be ignored instead of being treated as no items
 	diagnostics = []protocol.Diagnostic{}
 
-	program, parseError := parse(text, string(uri), log)
+	program, parseError := parse(document.Text, string(uri), log)
 
 	// If there were parsing errors, convert each one to a diagnostic and exit
 	// without checking.
@@ -1922,36 +1952,38 @@ func (s *Server) getDiagnostics(
 	location := uriToLocation(uri)
 
 	if program == nil {
-		delete(s.rootCheckers, location)
-		s.refreshCheckerMap()
+		s.deleteRootChecker(location)
 		return
 	}
 
-	// Create new node to replace existing node/set node in tree
-	newCheckerNode := checkerNode{
-		checker: nil,
-		dependencies: make(map[common.Location]*checkerNode),
+	// Refresh existing checker node if exists, else allocate new node
+	node, ok := s.checkers[location]
+	if !ok {
+		node = &checkerNode{
+			checker: nil,
+			dependencies: make(map[common.Location]*checkerNode),
+			dependents: make(map[common.Location]*checkerNode),
+		}
+		s.checkers[location] = node
+		s.rootCheckers[location] = node
 	}
 	checker, diagnosticsErr := sema.NewChecker(
 		program,
 		location,
 		nil,
-		s.decideCheckerConfig(program, &newCheckerNode),
+		s.decideCheckerConfig(program, node),
 	)
-	newCheckerNode.checker = checker
+	// Set check error to nil
+	node.checkErr = nil
+	// Set node checker
+	node.checker = checker
+	// Set dependencies to empty map as the checker will populate this
+	node.dependencies = make(map[common.Location]*checkerNode)
 
 	// If error, abort and don't set checker
 	if diagnosticsErr != nil {
-		delete(s.rootCheckers, location)
-		s.refreshCheckerMap()
+		s.deleteRootChecker(location)
 		return
-	}
-
-	// Modify existing checker node if exists, else allocate new node
-	if nodePtr, ok := s.rootCheckers[location]; ok {
-		*nodePtr = newCheckerNode
-	} else {
-		s.rootCheckers[location] = &newCheckerNode
 	}
 
 	start := time.Now()
@@ -1964,10 +1996,11 @@ func (s *Server) getDiagnostics(
 		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
 	})
 
-	// Check if any locations are no longer dependencies
+	// Refresh checker map after checking
 	s.refreshCheckerMap()
 
 	if checkError != nil {
+		node.checkErr = checkError
 		if parentErr, ok := checkError.(errors.ParentError); ok {
 			checkerDiagnostics := s.getDiagnosticsForParentError(uri, parentErr, codeActionsResolvers, log)
 			diagnostics = append(diagnostics, checkerDiagnostics...)
@@ -1976,7 +2009,7 @@ func (s *Server) getDiagnostics(
 
 	for _, provider := range s.diagnosticProviders {
 		var extraDiagnostics []protocol.Diagnostic
-		extraDiagnostics, diagnosticsErr = provider(uri, version, checker)
+		extraDiagnostics, diagnosticsErr = provider(uri, document.Version, checker)
 		if diagnosticsErr != nil {
 			return
 		}
@@ -1987,7 +2020,7 @@ func (s *Server) getDiagnostics(
 		Program:     program,
 		Elaboration: checker.Elaboration,
 		Location:    checker.Location,
-		Code:        []byte(text),
+		Code:        []byte(document.Text),
 	}
 
 	var reportLock sync.Mutex
@@ -2111,6 +2144,10 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	s.documents[locationToUri(location)] = Document{
+		Text: code,
 	}
 
 	return parser.ParseProgram(nil, []byte(code), parser.Config{})
@@ -2919,6 +2956,8 @@ func (s *Server) handleLocation(
 	return resolvedLocations, nil
 }
 
+// handleImport returns a handler for a given checker node
+// it will populate the node dependencies with those imported by the checked program
 func (s *Server) handleImport(parent *checkerNode) func (
 	checker *sema.Checker,
 	importedLocation common.Location,
@@ -2973,8 +3012,8 @@ func (s *Server) handleImport(parent *checkerNode) func (
 				}
 	
 				importedNode = &checkerNode{
-					checker: nil,
 					dependencies: make(map[common.Location]*checkerNode),
+					dependents: make(map[common.Location]*checkerNode),
 				}
 				importedChecker, err := sema.NewChecker(importedProgram, importedLocation, nil, s.decideCheckerConfig(importedProgram, importedNode))
 				if err != nil {
@@ -2987,11 +3026,16 @@ func (s *Server) handleImport(parent *checkerNode) func (
 				err = importedNode.checker.Check()
 
 				if err != nil {
-					return nil, err
+					importedNode.checkErr = err
 				}
 			}
 
+			if importedNode.checkErr != nil {
+				return nil, importedNode.checkErr
+			}
+
 			parent.dependencies[importedLocation] = importedNode
+			importedNode.dependents[parent.checker.Location] = parent
 	
 			return sema.ElaborationImport{
 				Elaboration: importedNode.checker.Elaboration,
@@ -3384,17 +3428,33 @@ func convertDiagnostic(
 	return protocolDiagnostic, codeActionsResolver
 }
 
+// refreshCheckerMap traverses the checker tree and serves 2 purposes
+// 1. ensure global s.checkers hashmap is synchronized with checker tree
+// 2. ensure that all checkers have their dependents (parent) pointers set correctly
 func (s *Server) refreshCheckerMap() {
 	s.checkers = make(map[common.Location]*checkerNode)
 
 	// Recursively resolve all checkers
-	var helper func (nodes map[common.Location]*checkerNode)
-	helper = func (nodes map[common.Location]*checkerNode) {
+	var helper func (parent *checkerNode, nodes map[common.Location]*checkerNode)
+	helper = func (parent *checkerNode, nodes map[common.Location]*checkerNode) {
 		for l,n := range nodes {
-			s.checkers[l] = n
-			helper(n.dependencies)
+			if _,ok := s.checkers[l]; !ok {
+				n.dependents = make(map[common.Location]*checkerNode)
+				s.checkers[l] = n
+				helper(n, n.dependencies)
+			}
+			if parent != nil {
+				n.dependents[parent.checker.Location] = parent
+			}
 		}
 	}
 	
-	helper(s.rootCheckers)
+	helper(nil, s.rootCheckers)
+}
+
+func (s *Server) deleteRootChecker(location common.Location) {
+	if _,ok := s.rootCheckers[location]; ok {
+		delete(s.rootCheckers, location)
+		s.refreshCheckerMap()
+	}
 }
