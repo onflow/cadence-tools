@@ -65,27 +65,27 @@ func TestImplicitCapabilityLeak(t *testing.T) {
 		)
 	})
 
-	//t.Run("valid", func(t *testing.T) {
-	//
-	//	t.Parallel()
-	//
-	//	diagnostics := testAnalyzers(t,
-	//		`
-	//		pub contract MyContract {
-	//			pub let myCapArray: [Capability]
-	//
-	//			init() {
-	//   				 self.myCapArray = []
-	//			}
-	//		}
-	//		`,
-	//		lint.UnnecessaryForceAnalyzer,
-	//	)
-	//
-	//	require.Equal(
-	//		t,
-	//		[]analysis.Diagnostic(nil),
-	//		diagnostics,
-	//	)
-	//})
+	t.Run("valid", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+			pub contract MyContract {
+				priv let myCapArray: [Capability]
+	
+				init() {
+	  				 self.myCapArray = []
+				}
+			}
+			`,
+			lint.ImplicitCapabilityLeak,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
 }
