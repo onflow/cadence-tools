@@ -1,10 +1,3 @@
-package lint
-
-import (
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/tools/analysis"
-)
-
 /*
  * Cadence-lint - The Cadence linter
  *
@@ -22,6 +15,13 @@ import (
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package lint
+
+import (
+	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/tools/analysis"
+)
 
 var ImplicitCapabilityLeak = (func() *analysis.Analyzer {
 
