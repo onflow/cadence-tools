@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestImplicitCapabilityLeak(t *testing.T) {
+func TestImplicitCapabilityLeakViaArray(t *testing.T) {
 
 	t.Parallel()
 
