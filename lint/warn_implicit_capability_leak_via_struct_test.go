@@ -66,8 +66,8 @@ func TestImplicitCapabilityLeakViaStruct(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 383, Line: 20, Column: 5},
-						EndPos:   ast.Position{Offset: 416, Line: 20, Column: 38},
+						StartPos: ast.Position{Offset: 312, Line: 18, Column: 5},
+						EndPos:   ast.Position{Offset: 345, Line: 18, Column: 38},
 					},
 					Location: testLocation,
 					Category: lint.ReplacementCategory,
@@ -85,14 +85,31 @@ func TestImplicitCapabilityLeakViaStruct(t *testing.T) {
 		diagnostics := testAnalyzers(t,
 			`
 			pub contract MyContract {
-				priv let myCapArray: [Capability]
-	
-				init() {
-	 				 self.myCapArray = []
-				}
+			   pub resource Counter {
+				 priv var count: Int
+			
+				 init(count: Int) {
+				   self.count = count
+				 }
+			   }
+		
+			   pub struct ContractData {
+				   pub var owner: Capability
+				   init(cap: Capability) {
+					   self.owner = cap
+				   }
+			   }
+		
+               priv var contractData: ContractData
+		
+			   init(){
+				   self.contractData = ContractData(cap:
+					   self.account.getCapability<&Counter>(/public/counter)
+				   )
+			   }
 			}
 			`,
-			lint.ImplicitCapabilityLeak,
+			lint.ImplicitCapabilityLeakViaStruct,
 		)
 
 		require.Equal(

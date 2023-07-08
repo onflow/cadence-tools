@@ -44,22 +44,33 @@ var ImplicitCapabilityLeakViaStruct = (func() *analysis.Analyzer {
 					switch declaration := element.(type) {
 					case *ast.CompositeDeclaration:
 						{
-							if declaration.CompositeKind == common.CompositeKindStructure {
-								for _, d := range declaration.Members.Declarations() {
-									if fd, ok := d.(*ast.FieldDeclaration); ok {
-										if nd, ok := fd.TypeAnnotation.Type.(*ast.NominalType); ok {
-											if nd.Identifier.Identifier == "Capability" && fd.Access == ast.AccessPublic {
-												structIdentifier = &declaration.Identifier.Identifier
-											}
-										}
-									}
+							if declaration.CompositeKind != common.CompositeKindStructure {
+								return
+							}
+							for _, d := range declaration.Members.Declarations() {
+								fd, ok := d.(*ast.FieldDeclaration)
+								if !ok {
+									return
+								}
+
+								if fd.Access != ast.AccessPublic {
+									return
+								}
+
+								nd, ok := fd.TypeAnnotation.Type.(*ast.NominalType)
+								if !ok {
+									return
+								}
+
+								if nd.Identifier.Identifier == "Capability" {
+									structIdentifier = &declaration.Identifier.Identifier
 								}
 							}
 						}
 					}
 				},
 			)
-			
+
 			if structIdentifier != nil {
 				inspector.Preorder(
 					[]ast.Element{(*ast.FieldDeclaration)(nil)},
@@ -67,18 +78,27 @@ var ImplicitCapabilityLeakViaStruct = (func() *analysis.Analyzer {
 						switch declaration := element.(type) {
 						case *ast.FieldDeclaration:
 							{
-								if nt, ok := declaration.TypeAnnotation.Type.(*ast.NominalType); ok {
-									if nt.Identifier.Identifier == *structIdentifier && declaration.Access == ast.AccessPublic {
-										report(
-											analysis.Diagnostic{
-												Location: location,
-												Range:    ast.NewRangeFromPositioned(nil, element),
-												Category: ReplacementCategory,
-												Message:  "capability might be leaking via public struct field",
-											},
-										)
-									}
+								nt, ok := declaration.TypeAnnotation.Type.(*ast.NominalType)
+								if !ok {
+									return
 								}
+								
+								if declaration.Access != ast.AccessPublic {
+									return
+								}
+
+								if nt.Identifier.Identifier != *structIdentifier {
+									return
+								}
+
+								report(
+									analysis.Diagnostic{
+										Location: location,
+										Range:    ast.NewRangeFromPositioned(nil, element),
+										Category: ReplacementCategory,
+										Message:  "capability might be leaking via public struct field",
+									},
+								)
 							}
 						}
 					},
