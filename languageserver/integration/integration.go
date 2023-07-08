@@ -24,7 +24,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/sema"
 
-	"github.com/onflow/flow-cli/pkg/flowkit"
+	"github.com/onflow/flow-cli/flowkit"
 	"github.com/spf13/afero"
 
 	"github.com/onflow/cadence-tools/languageserver/protocol"
