@@ -159,6 +159,7 @@ type InitializationOptionsHandler func(initializationOptions any) error
 
 type Server struct {
 	protocolServer       *protocol.Server
+	conn                 protocol.Conn
 	// Map of location to checker node for all checkers in use (open files & dependencies)
 	checkers             map[common.Location]*checkerNode
 	// Map of location to checker node for all root checkers in use (open files)
@@ -383,6 +384,8 @@ func (s *Server) Initialize(
 	*protocol.InitializeResult,
 	error,
 ) {
+	s.conn = conn
+	
 	result := &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
 			TextDocumentSync:   protocol.Full,
@@ -3401,16 +3404,17 @@ func convertDiagnostic(
 // refreshCheckerMap traverses the checker tree and serves 2 purposes
 // 1. ensure global s.checkers hashmap is synchronized with checker tree
 // 2. ensure that all checkers have their dependents (parent) pointers set correctly
+// 3. any checkers that are no longer in the hashmap will have their diagnostics cleared as they are no longer in use
 func (s *Server) refreshCheckerMap() {
-	s.checkers = make(map[common.Location]*checkerNode)
+	newCheckers := make(map[common.Location]*checkerNode)
 
 	// Recursively resolve all checkers
 	var helper func (parent *checkerNode, nodes map[common.Location]*checkerNode)
 	helper = func (parent *checkerNode, nodes map[common.Location]*checkerNode) {
 		for l,n := range nodes {
-			if _,ok := s.checkers[l]; !ok {
+			if _,ok := newCheckers[l]; !ok {
 				n.dependents = make(map[common.Location]*checkerNode)
-				s.checkers[l] = n
+				newCheckers[l] = n
 				helper(n, n.dependencies)
 			}
 			if parent != nil {
@@ -3419,7 +3423,21 @@ func (s *Server) refreshCheckerMap() {
 		}
 	}
 	
+	// Call recursive helper
 	helper(nil, s.rootCheckers)
+
+	// Clear diagnostics for any checkers that are no longer in use
+	for l := range s.checkers {
+		if _,ok := newCheckers[l]; !ok {
+			s.conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
+				URI:         locationToUri(l),
+				Diagnostics: []protocol.Diagnostic{},
+			})
+		}
+	}
+
+	// Update global checkers hashmap
+	s.checkers = newCheckers
 }
 
 func (s *Server) deleteRootChecker(location common.Location) {
