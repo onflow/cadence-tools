@@ -29,8 +29,12 @@ import (
 
 func checkProgram(t *testing.T, text string) []protocol.Diagnostic {
 	server, err := NewServer()
+	uri := protocol.DocumentURI("file:///test.cdc")
+	server.documents[uri] = Document{
+		Text: text,
+	}
 	assert.NoError(t, err)
-	diagnostics, err := server.getDiagnostics("", text, 0, func(_ *protocol.LogMessageParams) {})
+	diagnostics, err := server.getDiagnostics(uri, func(_ *protocol.LogMessageParams) {})
 	assert.NoError(t, err)
 	return diagnostics
 }
