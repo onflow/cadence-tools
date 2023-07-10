@@ -206,13 +206,15 @@ type checkerNode struct {
 	dependents map[common.Location]*checkerNode
 }
 
-func (n *checkerNode) getAllDependents() map[common.Location]*checkerNode {
-	// set of dependents
-	dependents := make(map[common.Location]*checkerNode)
-	for depLocation,dep := range n.dependents {
-		dependents[depLocation] = dep
-		for childLocation,childDep := range dep.getAllDependents() {
-			dependents[childLocation] = childDep
+func (n *checkerNode) getAllDependents() []*checkerNode {
+	dependents := []*checkerNode{}
+	seen := make(map[*checkerNode]bool)
+	for _,dep := range n.dependents {
+		dependents = append(dependents, dep)
+		seen[dep] = true
+		for _,parentDep := range dep.getAllDependents() {
+			dependents = append(dependents, parentDep)
+			seen[parentDep] = true
 		}
 	}
 	return dependents
@@ -664,8 +666,8 @@ func (s *Server) checkAndPublishDiagnostics(
 	checkAndPublish(location)
 
 	dependents := s.checkers[location].getAllDependents()
-	for depLocation := range dependents {
-		checkAndPublish(depLocation)
+	for _,dependent := range dependents {
+		checkAndPublish(dependent.checker.Location)
 	}
 }
 
@@ -3030,12 +3032,12 @@ func (s *Server) handleImport(parent *checkerNode) func (
 				}
 			}
 
+			parent.dependencies[importedLocation] = importedNode
+			importedNode.dependents[parent.checker.Location] = parent
+
 			if importedNode.checkErr != nil {
 				return nil, importedNode.checkErr
 			}
-
-			parent.dependencies[importedLocation] = importedNode
-			importedNode.dependents[parent.checker.Location] = parent
 	
 			return sema.ElaborationImport{
 				Elaboration: importedNode.checker.Elaboration,
