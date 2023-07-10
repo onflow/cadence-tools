@@ -1980,6 +1980,11 @@ func (s *Server) getDiagnostics(
 	// Refresh checker map after checking
 	s.refreshCheckerMap()
 
+	// Cache parsing error if exists for future imports of this file
+	if parseError != nil {
+		node.checkErr = parseError
+	}
+
 	if checkError != nil {
 		node.checkErr = checkError
 		if parentErr, ok := checkError.(errors.ParentError); ok {

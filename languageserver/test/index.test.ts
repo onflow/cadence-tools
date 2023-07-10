@@ -1,5 +1,6 @@
 import {
   createProtocolConnection,
+  DidChangeTextDocumentNotification,
   DidOpenTextDocumentNotification,
   ExecuteCommandRequest,
   ExitNotification,
@@ -644,4 +645,222 @@ describe("codelenses", () => {
 
   })
 
+  test("codelens multiple open files", async() => {
+    await withConnection(async connection => {
+      let scriptCode = fs.readFileSync("./script.cdc")
+      let scriptPath = `file://${__dirname}/script.cdc`
+      let txCode = fs.readFileSync("./transaction.cdc")
+      let txPath = `file://${__dirname}/transaction.cdc`
+
+      let scriptDocument = TextDocumentItem.create(scriptPath, "cadence", 1, scriptCode.toString())
+      let txDocument = TextDocumentItem.create(txPath, "cadence", 1, txCode.toString())
+
+      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+        textDocument: scriptDocument
+      })
+
+      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+        textDocument: txDocument
+      })
+
+      let scriptCodelens = await connection.sendRequest(codelensRequest, {
+        textDocument: scriptDocument,
+      })
+
+      let txCodelens = await connection.sendRequest(codelensRequest, {
+        textDocument: txDocument,
+      })
+
+      expect(scriptCodelens).toHaveLength(1)
+      let c1 = scriptCodelens[0].command
+      expect(c1.command).toEqual("cadence.server.flow.executeScript")
+      expect(c1.title).toEqual("💡 Execute script")
+      expect(c1.arguments).toEqual([scriptPath, '[]'])
+
+      expect(txCodelens).toHaveLength(1)
+      let c2 = txCodelens[0].command
+      expect(c2.command).toEqual("cadence.server.flow.sendTransaction")
+      expect(c2.title).toEqual("💡 Send signed by Alice")
+      expect(c2.arguments).toEqual([txPath, "[]", ["Alice"]])
+    }, true)
+  })
+})
+
+describe("checker", () => {
+  test("check script no error", async() => {
+    await withConnection(async connection => {
+      let code = fs.readFileSync("./script.cdc")
+      let path = `file://${__dirname}/script.cdc`
+      let document = TextDocumentItem.create(path, "cadence", 1, code.toString())
+
+      const diagnostics = await new Promise<PublishDiagnosticsParams>(async resolve => {
+        connection.onNotification(PublishDiagnosticsNotification.type, (notification) => {
+          if (notification.uri == path) {
+            resolve(notification)
+          }
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: document
+        })
+      })
+
+      expect(diagnostics.uri).toEqual(path)
+      expect(diagnostics.diagnostics).toHaveLength(0)
+    }, true)
+  })
+
+  test("check script with error", async() => {
+    await withConnection(async connection => {
+      let code = fs.readFileSync("./script-error.cdc")
+      let path = `file://${__dirname}/script-error.cdc`
+      let document = TextDocumentItem.create(path, "cadence", 1, code.toString())
+
+      const diagnostics = await new Promise<PublishDiagnosticsParams>(async resolve => {
+        connection.onNotification(PublishDiagnosticsNotification.type, (notification) => {
+          if (notification.uri == path) {
+            resolve(notification)
+          }
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: document
+        })
+      })
+
+      expect(diagnostics.uri).toEqual(path)
+      expect(diagnostics.diagnostics).toHaveLength(1)
+      expect(diagnostics.diagnostics[0].message).toEqual("mismatched types. expected `UInt16`, got `String`")
+    }, true)
+  })
+
+  test("check transaction no error", async() => {
+    await withConnection(async connection => {
+      let code = fs.readFileSync("./transaction.cdc")
+      let path = `file://${__dirname}/transaction.cdc`
+      let document = TextDocumentItem.create(path, "cadence", 1, code.toString())
+
+      const diagnostics = await new Promise<PublishDiagnosticsParams>(async resolve => {
+        connection.onNotification(PublishDiagnosticsNotification.type, (notification) => {
+          if (notification.uri == path) {
+            resolve(notification)
+          }
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: document
+        })
+      })
+
+      expect(diagnostics.uri).toEqual(path)
+      expect(diagnostics.diagnostics).toHaveLength(0)
+    }, true)
+  })
+
+  test("check contract no error", async() => {
+    await withConnection(async connection => {
+      let code = fs.readFileSync("./foo.cdc")
+      let path = `file://${__dirname}/foo.cdc`
+      let document = TextDocumentItem.create(path, "cadence", 1, code.toString())
+
+      const diagnostics = await new Promise<PublishDiagnosticsParams>(async resolve => {
+        connection.onNotification(PublishDiagnosticsNotification.type, (notification) => {
+          if (notification.uri == path) {
+            resolve(notification)
+          }
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: document
+        })
+      })
+
+      expect(diagnostics.uri).toEqual(path)
+      expect(diagnostics.diagnostics).toHaveLength(0)
+    }, true)
+  })
+
+  test("contract dependency change triggers parent check", async() => {
+    await withConnection(async connection => {
+      let fooCode = fs.readFileSync("./foo.cdc")
+      let fooPath = `file://${__dirname}/foo.cdc`
+      let fooDocument = TextDocumentItem.create(fooPath, "cadence", 1, fooCode.toString())
+
+      let barCode = fs.readFileSync("./bar.cdc")
+      let barPath = `file://${__dirname}/bar.cdc`
+      let barDocument = TextDocumentItem.create(barPath, "cadence", 1, barCode.toString())
+
+      const diagnostics = await new Promise<PublishDiagnosticsParams>(async resolve => {
+        // take second notification, since first comes from textDocument/didOpen
+        let counter = 0
+        connection.onNotification(PublishDiagnosticsNotification.type, (notification) => {
+          if (notification.uri == barPath && ++counter == 2) {
+            resolve(notification)
+          }
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: fooDocument
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: barDocument
+        })
+
+        // send dummy document change notification to trigger check
+        await connection.sendNotification(DidChangeTextDocumentNotification.type, {
+          textDocument: fooDocument,
+          contentChanges: [{
+            text: fooCode.toString() + "\n"
+          }]
+        })
+      })
+
+      expect(diagnostics.uri).toEqual(barPath)
+      expect(diagnostics.diagnostics).toHaveLength(0)
+    }, true)
+  })
+
+  test("contract dependency error triggers parent error", async() => {
+    await withConnection(async connection => {
+      let fooCode = fs.readFileSync("./foo.cdc")
+      let fooPath = `file://${__dirname}/foo.cdc`
+      let fooDocument = TextDocumentItem.create(fooPath, "cadence", 1, fooCode.toString())
+
+      let barCode = fs.readFileSync("./bar.cdc")
+      let barPath = `file://${__dirname}/bar.cdc`
+      let barDocument = TextDocumentItem.create(barPath, "cadence", 1, barCode.toString())
+
+      const diagnostics = await new Promise<PublishDiagnosticsParams>(async resolve => {
+        // take second notification, since first comes from textDocument/didOpen
+        let counter = 0
+        connection.onNotification(PublishDiagnosticsNotification.type, (notification) => {
+          if (notification.uri == barPath && ++counter == 2) {
+            resolve(notification)
+          }
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: fooDocument
+        })
+
+        await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+          textDocument: barDocument
+        })
+
+        // send dummy document change notification to trigger check
+        await connection.sendNotification(DidChangeTextDocumentNotification.type, {
+          textDocument: fooDocument,
+          contentChanges: [{
+            text: fooCode.toString() + "I WILL BREAK THIS\n"
+          }]
+        })
+      })
+
+      expect(diagnostics.uri).toEqual(barPath)
+      expect(diagnostics.diagnostics).toHaveLength(2)
+      expect(diagnostics.diagnostics[0].message).toEqual("checking of imported program `./foo.cdc` failed")
+      expect(diagnostics.diagnostics[1].message).toEqual("cannot find variable in this scope: `Foo`. not found in this scope")
+    }, true)
+  })
 })
