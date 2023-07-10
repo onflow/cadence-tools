@@ -2942,8 +2942,6 @@ func (s *Server) handleLocation(
 	return resolvedLocations, nil
 }
 
-// handleImport returns a handler for a given checker node
-// it will populate the node dependencies with those imported by the checked program
 func (s *Server) handleImport(
 	checker *sema.Checker,
 	importedLocation common.Location,
