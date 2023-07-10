@@ -187,9 +187,9 @@ type Server struct {
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
 	// checkerStandardConfig is a config used to check contracts and transactions
-	checkerStandardConfig func (*checkerNode) *sema.Config
+	checkerStandardConfig *sema.Config
 	// checkerScriptConfig is a config used to check scripts
-	checkerScriptConfig func (*checkerNode) *sema.Config
+	checkerScriptConfig *sema.Config
 }
 
 type Option func(*Server) error
@@ -295,19 +295,8 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 // determines whether the access is allowed based on the location of program and the called member.
 func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
 	return func(server *Server) error {
-		checkerStandardConfig := server.checkerStandardConfig
-		checkerScriptConfig := server.checkerScriptConfig
-
-		server.checkerStandardConfig = func(n *checkerNode) *sema.Config {
-			cfg := checkerStandardConfig(n)
-			cfg.MemberAccountAccessHandler = handler
-			return cfg
-		}
-		server.checkerScriptConfig = func(n *checkerNode) *sema.Config {
-			cfg := checkerScriptConfig(n)
-			cfg.MemberAccountAccessHandler = handler
-			return cfg
-		}
+		server.checkerStandardConfig.MemberAccountAccessHandler = handler
+		server.checkerScriptConfig.MemberAccountAccessHandler = handler
 		return nil
 	}
 }
@@ -350,19 +339,17 @@ func NewServer() (*Server, error) {
 }
 
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
-func newCheckerConfig(s *Server, lib standardLibrary) func (node *checkerNode) *sema.Config {
-	return func (node *checkerNode) *sema.Config {
-		return &sema.Config{
-			BaseValueActivation:          lib.baseValueActivation,
-			AccessCheckMode:              s.accessCheckMode,
-			PositionInfoEnabled:          true,
-			ExtendedElaborationEnabled:   true,
-			LocationHandler:              s.handleLocation,
-			ImportHandler:                s.handleImport(node),
-			AttachmentsEnabled:           true,
-			AccountLinkingEnabled:        true,
-			CapabilityControllersEnabled: true,
-		}
+func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
+	return &sema.Config{
+		BaseValueActivation:          lib.baseValueActivation,
+		AccessCheckMode:              s.accessCheckMode,
+		PositionInfoEnabled:          true,
+		ExtendedElaborationEnabled:   true,
+		LocationHandler:              s.handleLocation,
+		ImportHandler:                s.handleImport,
+		AttachmentsEnabled:           true,
+		AccountLinkingEnabled:        true,
+		CapabilityControllersEnabled: true,
 	}
 }
 
@@ -424,18 +411,8 @@ func (s *Server) Initialize(
 	s.configure(options)
 
 	// update the value after config is initialized
-	checkerStandardConfig := s.checkerStandardConfig
-	checkerScriptConfig := s.checkerScriptConfig
-	s.checkerStandardConfig = func(n *checkerNode) *sema.Config {
-		cfg := checkerStandardConfig(n)
-		cfg.AccessCheckMode = s.accessCheckMode
-		return cfg
-	}
-	s.checkerScriptConfig = func(n *checkerNode) *sema.Config {
-		cfg := checkerScriptConfig(n)
-		cfg.AccessCheckMode = s.accessCheckMode
-		return cfg
-	}
+	s.checkerStandardConfig.AccessCheckMode = s.accessCheckMode
+	s.checkerScriptConfig.AccessCheckMode = s.accessCheckMode
 
 	for _, handler := range s.initializationOptionsHandlers {
 		err := handler(options)
@@ -1907,12 +1884,12 @@ var lintingAnalyzers = maps.Values(linter.Analyzers)
 // and these dependencies are resolved during checking
 //
 // if a program is a script return the augmented config containing additional values
-func (s *Server) decideCheckerConfig(program *ast.Program, node *checkerNode) *sema.Config {
+func (s *Server) decideCheckerConfig(program *ast.Program) *sema.Config {
 	if program.SoleTransactionDeclaration() != nil || program.SoleContractDeclaration() != nil {
-		return s.checkerStandardConfig(node)
+		return s.checkerStandardConfig
 	}
 
-	return s.checkerScriptConfig(node)
+	return s.checkerScriptConfig
 }
 
 // getDiagnostics parses and checks the given file and generates diagnostics
@@ -1936,7 +1913,6 @@ func (s *Server) getDiagnostics(
 	// NOTE: Always initialize to an empty slice, i.e DON'T use nil:
 	// The later will be ignored instead of being treated as no items
 	diagnostics = []protocol.Diagnostic{}
-
 	program, parseError := parse(document.Text, string(uri), log)
 
 	// If there were parsing errors, convert each one to a diagnostic and exit
@@ -1973,7 +1949,7 @@ func (s *Server) getDiagnostics(
 		program,
 		location,
 		nil,
-		s.decideCheckerConfig(program, node),
+		s.decideCheckerConfig(program),
 	)
 	// Set check error to nil
 	node.checkErr = nil
@@ -2960,7 +2936,7 @@ func (s *Server) handleLocation(
 
 // handleImport returns a handler for a given checker node
 // it will populate the node dependencies with those imported by the checked program
-func (s *Server) handleImport(parent *checkerNode) func (
+func (s *Server) handleImport(
 	checker *sema.Checker,
 	importedLocation common.Location,
 	_ ast.Range,
@@ -2968,81 +2944,73 @@ func (s *Server) handleImport(parent *checkerNode) func (
 	sema.Import,
 	error,
 ) {
-	return func (
-		checker *sema.Checker,
-		importedLocation common.Location,
-		_ ast.Range,
-	) (
-		sema.Import,
-		error,
-	) {
-		switch importedLocation {
-		case stdlib.CryptoCheckerLocation:
-			cryptoChecker := stdlib.CryptoChecker()
-			return sema.ElaborationImport{
-				Elaboration: cryptoChecker.Elaboration,
-			}, nil
-		case stdlib.TestContractLocation:
-			testChecker := stdlib.GetTestContractType().Checker
-			return sema.ElaborationImport{
-				Elaboration: testChecker.Elaboration,
-			}, nil
-		default:
-			if isPathLocation(importedLocation) {
-				// import may be a relative path and therefore should be normalized
-				// against the current location
-				importedLocation = normalizePathLocation(checker.Location, importedLocation)
-	
-				if checker.Location == importedLocation {
-					return nil, &sema.CheckerError{
-						Errors: []error{fmt.Errorf("cannot import current file: %s", importedLocation)},
-					}
+	switch importedLocation {
+	case stdlib.CryptoCheckerLocation:
+		cryptoChecker := stdlib.CryptoChecker()
+		return sema.ElaborationImport{
+			Elaboration: cryptoChecker.Elaboration,
+		}, nil
+	case stdlib.TestContractLocation:
+		testChecker := stdlib.GetTestContractType().Checker
+		return sema.ElaborationImport{
+			Elaboration: testChecker.Elaboration,
+		}, nil
+	default:
+		if isPathLocation(importedLocation) {
+			// import may be a relative path and therefore should be normalized
+			// against the current location
+			importedLocation = normalizePathLocation(checker.Location, importedLocation)
+
+			if checker.Location == importedLocation {
+				return nil, &sema.CheckerError{
+					Errors: []error{fmt.Errorf("cannot import current file: %s", importedLocation)},
 				}
 			}
-	
-			importedNode, ok := s.checkers[importedLocation]
-			if !ok {
-				importedProgram, err := s.resolveImport(importedLocation)
-	
-				if err != nil {
-					return nil, err
-				}
-				if importedProgram == nil {
-					return nil, &sema.CheckerError{
-						Errors: []error{fmt.Errorf("cannot import %s", importedLocation)},
-					}
-				}
-	
-				importedNode = &checkerNode{
-					dependencies: make(map[common.Location]*checkerNode),
-					dependents: make(map[common.Location]*checkerNode),
-				}
-				importedChecker, err := sema.NewChecker(importedProgram, importedLocation, nil, s.decideCheckerConfig(importedProgram, importedNode))
-				if err != nil {
-					return nil, err
-				}
-
-				importedNode.checker = importedChecker
-				s.checkers[importedLocation] = importedNode
-				
-				err = importedNode.checker.Check()
-
-				if err != nil {
-					importedNode.checkErr = err
-				}
-			}
-
-			parent.dependencies[importedLocation] = importedNode
-			importedNode.dependents[parent.checker.Location] = parent
-
-			if importedNode.checkErr != nil {
-				return nil, importedNode.checkErr
-			}
-	
-			return sema.ElaborationImport{
-				Elaboration: importedNode.checker.Elaboration,
-			}, nil
 		}
+
+		parentNode := s.checkers[checker.Location]
+		importedNode, ok := s.checkers[importedLocation]
+		if !ok {
+			importedProgram, err := s.resolveImport(importedLocation)
+
+			if err != nil {
+				return nil, err
+			}
+			if importedProgram == nil {
+				return nil, &sema.CheckerError{
+					Errors: []error{fmt.Errorf("cannot import %s", importedLocation)},
+				}
+			}
+
+			importedNode = &checkerNode{
+				dependencies: make(map[common.Location]*checkerNode),
+				dependents: make(map[common.Location]*checkerNode),
+			}
+			importedChecker, err := sema.NewChecker(importedProgram, importedLocation, nil, s.decideCheckerConfig(importedProgram))
+			if err != nil {
+				return nil, err
+			}
+
+			importedNode.checker = importedChecker
+			s.checkers[importedLocation] = importedNode
+			
+			err = importedNode.checker.Check()
+
+			if err != nil {
+				importedNode.checkErr = err
+			}
+		}
+
+		parentNode.dependencies[importedLocation] = importedNode
+		importedNode.dependents[checker.Location] = parentNode
+
+		if importedNode.checkErr != nil {
+			return nil, importedNode.checkErr
+		}
+
+		return sema.ElaborationImport{
+			Elaboration: importedNode.checker.Elaboration,
+		}, nil
 	}
 }
 
