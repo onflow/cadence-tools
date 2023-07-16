@@ -38,7 +38,6 @@ var ImplicitCapabilityLeak = (func() *analysis.Analyzer {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 
 			location := pass.Program.Location
-			//elaboration := pass.Program.Elaboration
 			report := pass.Report
 
 			inspector.Preorder(
