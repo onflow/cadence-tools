@@ -1,7 +1,7 @@
 /*
  * Cadence-lint - The Cadence linter
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright 2019-2023 Dapper Labs, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,26 +24,26 @@ import (
 )
 
 func DetectCapabilityType(typeToCheck ast.Type) bool {
-	const capabilityTypeLiteral = "Capability"
-	switch upcastedType := typeToCheck.(type) {
+	const capabilityTypeName = "Capability"
+	switch downcastedType := typeToCheck.(type) {
 	case *ast.NominalType:
-		return upcastedType.Identifier.Identifier == capabilityTypeLiteral
+		return downcastedType.Identifier.Identifier == capabilityTypeName
 	case *ast.OptionalType:
-		return DetectCapabilityType(upcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type)
 	case *ast.VariableSizedType:
-		return DetectCapabilityType(upcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type)
 	case *ast.ConstantSizedType:
-		return DetectCapabilityType(upcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type)
 	case *ast.DictionaryType:
-		return DetectCapabilityType(upcastedType.KeyType) || DetectCapabilityType(upcastedType.ValueType)
+		return DetectCapabilityType(downcastedType.KeyType) || DetectCapabilityType(downcastedType.ValueType)
 	case *ast.FunctionType:
 		return false
 	case *ast.ReferenceType:
-		return DetectCapabilityType(upcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type)
 	case *ast.RestrictedType:
 		return false
 	case *ast.InstantiationType:
-		return DetectCapabilityType(upcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type)
 	default:
 		panic("Unknown type")
 	}

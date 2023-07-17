@@ -1,7 +1,7 @@
 /*
  * Cadence-lint - The Cadence linter
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright 2019-2023 Dapper Labs, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -139,10 +139,10 @@ func TestPrivateCapabilityAndNonCapabilityTypeFieldInContract(t *testing.T) {
 		`
 		    pub contract ExposingCapability {
 			    priv let my_capability : Capability?
-				pub let data: Int
+			    pub let data: Int
 			    init() {
 				    self.my_capability = nil
-					self.data = 42
+				    self.data = 42
 			    }
 		    }
 		`,
