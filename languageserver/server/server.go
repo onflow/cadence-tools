@@ -316,12 +316,15 @@ func NewServer() (*Server, error) {
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
 func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
 	return &sema.Config{
-		BaseValueActivation:        lib.baseValueActivation,
-		AccessCheckMode:            s.accessCheckMode,
-		PositionInfoEnabled:        true,
-		ExtendedElaborationEnabled: true,
-		LocationHandler:            s.handleLocation,
-		ImportHandler:              s.handleImport,
+		BaseValueActivation:          lib.baseValueActivation,
+		AccessCheckMode:              s.accessCheckMode,
+		PositionInfoEnabled:          true,
+		ExtendedElaborationEnabled:   true,
+		LocationHandler:              s.handleLocation,
+		ImportHandler:                s.handleImport,
+		AttachmentsEnabled:           true,
+		AccountLinkingEnabled:        true,
+		CapabilityControllersEnabled: true,
 	}
 }
 
@@ -358,19 +361,19 @@ func (s *Server) Initialize(
 	result := &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
 			TextDocumentSync:   protocol.Full,
-			HoverProvider:      true,
-			DefinitionProvider: true,
-			CodeLensProvider: protocol.CodeLensOptions{
+			HoverProvider:      &protocol.Or_ServerCapabilities_hoverProvider{Value: true},
+			DefinitionProvider: &protocol.Or_ServerCapabilities_definitionProvider{Value: true},
+			CodeLensProvider: &protocol.CodeLensOptions{
 				ResolveProvider: false,
 			},
-			CompletionProvider: protocol.CompletionOptions{
+			CompletionProvider: &protocol.CompletionOptions{
 				TriggerCharacters: []string{"."},
 				ResolveProvider:   true,
 			},
-			DocumentHighlightProvider: true,
-			DocumentSymbolProvider:    true,
+			DocumentHighlightProvider: &protocol.Or_ServerCapabilities_documentHighlightProvider{Value: true},
+			DocumentSymbolProvider:    &protocol.Or_ServerCapabilities_documentSymbolProvider{Value: true},
 			RenameProvider:            true,
-			SignatureHelpProvider: protocol.SignatureHelpOptions{
+			SignatureHelpProvider: &protocol.SignatureHelpOptions{
 				TriggerCharacters: []string{"("},
 			},
 			CodeActionProvider: true,
@@ -979,52 +982,54 @@ type CompletionItemData struct {
 	ID  string               `json:"id"`
 }
 
+var insertTextFormat = protocol.SnippetTextFormat
+
 var statementCompletionItems = []*protocol.CompletionItem{
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "for",
 		Detail:           "for-in loop",
 		InsertText:       "for $1 in $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "while",
 		Detail:           "while loop",
 		InsertText:       "while $1 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "if",
 		Detail:           "if statement",
 		InsertText:       "if $1 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "if else",
 		Detail:           "if-else statement",
 		InsertText:       "if $1 {\n\t$2\n} else {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "else",
 		Detail:           "else block",
 		InsertText:       "else {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "if let",
 		Detail:           "if-let statement",
 		InsertText:       "if let $1 = $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "return",
 		Detail:           "return statement",
 		InsertText:       "return $0",
@@ -1041,28 +1046,28 @@ var statementCompletionItems = []*protocol.CompletionItem{
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "emit",
 		Detail:           "emit statement",
 		InsertText:       "emit $0",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "destroy",
 		Detail:           "destroy expression",
 		InsertText:       "destroy $0",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "pre",
 		Detail:           "pre conditions",
 		InsertText:       "pre {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "post",
 		Detail:           "post conditions",
 		InsertText:       "post {\n\t$0\n}",
@@ -1072,28 +1077,28 @@ var statementCompletionItems = []*protocol.CompletionItem{
 var expressionCompletionItems = []*protocol.CompletionItem{
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "create",
 		Detail:           "create statement",
 		InsertText:       "create $0",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "create",
 		Detail:           "create statement",
 		InsertText:       "create $0",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "let",
 		Detail:           "constant declaration",
 		InsertText:       "let $1 = $0",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "var",
 		Detail:           "variable declaration",
 		InsertText:       "var $1 = $0",
@@ -1114,63 +1119,63 @@ var readAccessOptionsCommaSeparated = strings.Join(readAccessOptions, ",")
 var declarationCompletionItems = []*protocol.CompletionItem{
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "struct",
 		Detail:           "struct declaration",
 		InsertText:       "struct $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "resource",
 		Detail:           "resource declaration",
 		InsertText:       "resource $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "contract",
 		Detail:           "contract declaration",
 		InsertText:       "contract $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "struct interface",
 		Detail:           "struct interface declaration",
 		InsertText:       "struct interface $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "resource interface",
 		Detail:           "resource interface declaration",
 		InsertText:       "resource interface $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "contract interface",
 		Detail:           "contract interface declaration",
 		InsertText:       "contract interface $2 {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "event",
 		Detail:           "event declaration",
 		InsertText:       "event $2($0)",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "fun",
 		Detail:           "function declaration",
 		InsertText:       "fun $2($3)${4:: $5} {\n\t$0\n}",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "enum",
 		Detail:           "enum declaration",
 		InsertText:       "enum $2: $3 {\n\t$0\n}",
@@ -1185,14 +1190,14 @@ var declarationCompletionItems = []*protocol.CompletionItem{
 var containerCompletionItems = []*protocol.CompletionItem{
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "var",
 		Detail:           "variable field",
 		InsertText:       "var $2: $0",
 	},
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "let",
 		Detail:           "constant field",
 		InsertText:       "let $2: $0",
@@ -1200,7 +1205,7 @@ var containerCompletionItems = []*protocol.CompletionItem{
 	// alias for the above
 	{
 		Kind:             protocol.KeywordCompletion,
-		InsertTextFormat: protocol.SnippetTextFormat,
+		InsertTextFormat: &insertTextFormat,
 		Label:            "const",
 		Detail:           "constant field",
 		InsertText:       "let $2: $0",
@@ -1427,6 +1432,10 @@ func (s *Server) prepareFunctionMemberCompletionItem(
 		return
 	}
 
+	if linter.MemberIsDeprecated(member.DocString) {
+		item.Tags = append(item.Tags, protocol.ComplDeprecated)
+	}
+
 	s.prepareParametersCompletionItem(item, name, functionType.Parameters)
 }
 
@@ -1435,7 +1444,7 @@ func (s *Server) prepareParametersCompletionItem(
 	name string,
 	parameters []sema.Parameter,
 ) {
-	item.InsertTextFormat = protocol.SnippetTextFormat
+	item.InsertTextFormat = &insertTextFormat
 
 	var builder strings.Builder
 	builder.WriteString(name)
@@ -1551,9 +1560,11 @@ func (s *Server) maybeResolveMember(uri protocol.DocumentURI, id string, result 
 
 	member := resolver.Resolve(nil, result.Label, ast.Range{}, func(err error) { /* NO-OP */ })
 
-	result.Documentation = protocol.MarkupContent{
-		Kind:  "markdown",
-		Value: member.DocString,
+	result.Documentation = &protocol.Or_CompletionItem_documentation{
+		Value: protocol.MarkupContent{
+			Kind:  "markdown",
+			Value: member.DocString,
+		},
 	}
 
 	switch member.DeclarationKind {
@@ -1631,7 +1642,9 @@ func (s *Server) maybeResolveRange(uri protocol.DocumentURI, id string, result *
 		)
 	}
 
-	result.Documentation = r.DocString
+	result.Documentation = &protocol.Or_CompletionItem_documentation{
+		Value: r.DocString,
+	}
 
 	return true
 }
@@ -1709,7 +1722,10 @@ func (s *Server) DocumentSymbol(
 
 	for _, declaration := range checker.Program.Declarations() {
 		symbol := conversion.DeclarationToDocumentSymbol(declaration)
-		symbols = append(symbols, &symbol)
+		// symbols with empty names will cause errors in the client
+		if strings.TrimSpace(symbol.Name) != "" {
+			symbols = append(symbols, &symbol)
+		}
 	}
 
 	return
@@ -1764,16 +1780,35 @@ func (s *Server) InlayHint(
 			continue // todo this should never occur
 		}
 
+		if targetType.IsInvalidType() {
+			continue
+		}
+
+		typeAnnotation := sema.TypeAnnotation{
+			Type:       targetType,
+			IsResource: targetType.IsResourceType(),
+		}
+		typeAnnotationString := fmt.Sprintf(": %s", typeAnnotation.QualifiedString())
+
 		identifierEndPosition := variableDeclaration.Identifier.EndPosition(nil)
 		inlayHintPosition := conversion.ASTToProtocolPosition(identifierEndPosition.Shifted(nil, 1))
 		inlayHint := protocol.InlayHint{
-			Position: &inlayHintPosition,
+			Position: inlayHintPosition,
 			Label: []protocol.InlayHintLabelPart{
 				{
-					Value: fmt.Sprintf(": %s", targetType.QualifiedString()),
+					Value: typeAnnotationString,
 				},
 			},
 			Kind: protocol.Type,
+			TextEdits: []protocol.TextEdit{
+				{
+					Range: protocol.Range{
+						Start: inlayHintPosition,
+						End:   inlayHintPosition,
+					},
+					NewText: typeAnnotationString,
+				},
+			},
 		}
 
 		inlayHints = append(inlayHints, &inlayHint)
@@ -1895,10 +1930,6 @@ func (s *Server) getDiagnostics(
 			return
 		}
 		diagnostics = append(diagnostics, extraDiagnostics...)
-	}
-
-	if checkError != nil {
-		return
 	}
 
 	analysisProgram := analysis.Program{
@@ -2448,7 +2479,7 @@ func (s *Server) maybeReturnTypeChangeCodeActionsResolver(
 				Title:       title,
 				Kind:        protocol.QuickFix,
 				Diagnostics: []protocol.Diagnostic{diagnostic},
-				Edit: protocol.WorkspaceEdit{
+				Edit: &protocol.WorkspaceEdit{
 					Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 						uri: {textEdit},
 					},
@@ -2514,7 +2545,7 @@ func maybeAddMissingMembersCodeActionResolver(
 				Title:       "Add missing members",
 				Kind:        protocol.QuickFix,
 				Diagnostics: []protocol.Diagnostic{diagnostic},
-				Edit: protocol.WorkspaceEdit{
+				Edit: &protocol.WorkspaceEdit{
 					Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 						uri: {textEdit},
 					},
@@ -2852,9 +2883,9 @@ func (s *Server) handleImport(
 			Elaboration: cryptoChecker.Elaboration,
 		}, nil
 	case stdlib.TestContractLocation:
-		elaboration := stdlib.TestContractChecker.Elaboration
+		testChecker := stdlib.GetTestContractType().Checker
 		return sema.ElaborationImport{
-			Elaboration: elaboration,
+			Elaboration: testChecker.Elaboration,
 		}, nil
 	default:
 		if isPathLocation(importedLocation) {
@@ -2987,7 +3018,7 @@ func functionDeclarationCodeActions(
 			Title:       "Declare function",
 			Kind:        protocol.QuickFix,
 			Diagnostics: []protocol.Diagnostic{diagnostic},
-			Edit: protocol.WorkspaceEdit{
+			Edit: &protocol.WorkspaceEdit{
 				Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 					uri: {textEdit},
 				},
@@ -3077,7 +3108,7 @@ func variableDeclarationCodeActions(
 			Title:       fmt.Sprintf("Declare %s", variableKind.Name()),
 			Kind:        protocol.QuickFix,
 			Diagnostics: []protocol.Diagnostic{diagnostic},
-			Edit: protocol.WorkspaceEdit{
+			Edit: &protocol.WorkspaceEdit{
 				Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 					uri: {textEdit},
 				},
@@ -3144,7 +3175,7 @@ func fieldDeclarationCodeActions(
 			Title:       fmt.Sprintf("Declare %s field", variableKind.Name()),
 			Kind:        protocol.QuickFix,
 			Diagnostics: []protocol.Diagnostic{diagnostic},
-			Edit: protocol.WorkspaceEdit{
+			Edit: &protocol.WorkspaceEdit{
 				Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 					uri: {textEdit},
 				},
@@ -3172,16 +3203,23 @@ func convertDiagnostic(
 	var message string
 
 	var codeActionsResolver func() []*protocol.CodeAction
+	var tags []protocol.DiagnosticTag
+	severity := protocol.SeverityWarning
 
 	switch linterDiagnostic.Category {
 	case linter.ReplacementCategory:
+		message = fmt.Sprintf(
+			"%s `%s`",
+			linterDiagnostic.Message,
+			linterDiagnostic.SecondaryMessage,
+		)
 		codeActionsResolver = func() []*protocol.CodeAction {
 			return []*protocol.CodeAction{
 				{
-					Title:       fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage),
+					Title:       message,
 					Kind:        protocol.QuickFix,
 					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-					Edit: protocol.WorkspaceEdit{
+					Edit: &protocol.WorkspaceEdit{
 						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 							uri: {
 								{
@@ -3195,7 +3233,7 @@ func convertDiagnostic(
 				},
 			}
 		}
-		message = fmt.Sprintf("%s `%s`", linterDiagnostic.Message, linterDiagnostic.SecondaryMessage)
+
 	case linter.RemovalCategory:
 		codeActionsResolver = func() []*protocol.CodeAction {
 			return []*protocol.CodeAction{
@@ -3203,7 +3241,7 @@ func convertDiagnostic(
 					Title:       "Remove unnecessary code",
 					Kind:        protocol.QuickFix,
 					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-					Edit: protocol.WorkspaceEdit{
+					Edit: &protocol.WorkspaceEdit{
 						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
 							uri: {
 								{
@@ -3217,6 +3255,49 @@ func convertDiagnostic(
 				},
 			}
 		}
+
+	case linter.DeprecatedCategory:
+		if linterDiagnostic.SecondaryMessage != "" {
+			message = fmt.Sprintf(
+				"%s. %s",
+				linterDiagnostic.Message,
+				linterDiagnostic.SecondaryMessage,
+			)
+		}
+		severity = protocol.SeverityHint
+		tags = append(tags, protocol.Deprecated)
+
+		codeActionsResolver = func() []*protocol.CodeAction {
+			var codeActions []*protocol.CodeAction
+			for _, suggestedFix := range linterDiagnostic.SuggestedFixes {
+
+				codeActionTextEdits := make([]protocol.TextEdit, 0, len(suggestedFix.TextEdits))
+
+				for _, suggestedFixTextEdit := range suggestedFix.TextEdits {
+					codeActionTextEdit := protocol.TextEdit{
+						Range: conversion.ASTToProtocolRange(
+							suggestedFixTextEdit.StartPos,
+							suggestedFixTextEdit.EndPos,
+						),
+						NewText: suggestedFixTextEdit.Replacement,
+					}
+					codeActionTextEdits = append(codeActionTextEdits, codeActionTextEdit)
+				}
+
+				codeAction := &protocol.CodeAction{
+					Title:       suggestedFix.Message,
+					Kind:        protocol.QuickFix,
+					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+					Edit: &protocol.WorkspaceEdit{
+						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+							uri: codeActionTextEdits,
+						},
+					},
+				}
+				codeActions = append(codeActions, codeAction)
+			}
+			return codeActions
+		}
 	}
 
 	if message == "" {
@@ -3224,11 +3305,10 @@ func convertDiagnostic(
 	}
 
 	protocolDiagnostic = protocol.Diagnostic{
-		Message: message,
-		// protocol.SeverityHint doesn't look prominent enough in VS Code,
-		// only the first character of the range is highlighted.
-		Severity: protocol.SeverityInformation,
+		Message:  message,
+		Severity: severity,
 		Range:    protocolRange,
+		Tags:     tags,
 	}
 
 	return protocolDiagnostic, codeActionsResolver

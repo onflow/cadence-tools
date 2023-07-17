@@ -71,7 +71,6 @@ func Test_ExecuteScript(t *testing.T) {
 		})
 
 	t.Run("successful script execution with arguments", func(t *testing.T) {
-		t.Parallel()
 		location, _ := url.Parse(locationString)
 		result, _ := cadence.NewString("hoo")
 
@@ -101,7 +100,6 @@ func Test_ExecuteTransaction(t *testing.T) {
 		})
 
 	t.Run("successful transaction execution", func(t *testing.T) {
-		t.Parallel()
 		address := flow.HexToAddress("0x1")
 		list := []flow.Address{address}
 		location, _ := url.Parse(locationString)
@@ -175,7 +173,6 @@ func Test_DeployContract(t *testing.T) {
 		})
 
 	t.Run("successful deploy contract", func(t *testing.T) {
-		t.Parallel()
 		address := "0x1"
 		signerName := "alice"
 		location, _ := url.Parse(locationString)
@@ -201,7 +198,6 @@ func Test_DeployContract(t *testing.T) {
 	})
 
 	t.Run("successful deploy contract without signer", func(t *testing.T) {
-		t.Parallel()
 		address := "0x1"
 		location, _ := url.Parse(locationString)
 		signerArg, _ := json.Marshal("")

@@ -271,6 +271,48 @@ describe("diagnostics", () => {
     )
   )
 
+  test("account linking", async() =>
+      testCode(
+          `
+            #allowAccountLinking
+            transaction {
+                prepare(acct: AuthAccount) {
+                    acct.linkAccount(/private/foo)
+                }
+            }
+          `,
+          ["function 'linkAccount' is deprecated. Use `capabilities.account.issue` instead."],
+      )
+  )
+
+  test("attachments", async() =>
+      testCode(
+          `
+            pub resource R {}
+
+            pub attachment A for R {}
+
+            pub fun main() {
+                let r <- create R()
+                r[A]
+                destroy r
+            }
+          `,
+          []
+      )
+  )
+
+  test("capability controllers", async() =>
+      testCode(
+          `
+            pub fun main() {
+                getAccount(0x1).capabilities.get
+            }
+          `,
+          []
+      )
+  )
+
   type TestDoc = {
     name: string
     code: string
@@ -530,10 +572,10 @@ describe("contracts", () => {
 
 })
 
-describe("codelensses", () => {
+describe("codelenses", () => {
   const codelensRequest = "textDocument/codeLens"
 
-  test("contract codelensses", async() => {
+  test("contract codelensss", async() => {
     await withConnection(async connection => {
       let code = fs.readFileSync("./foo.cdc")
       let path = `file://${__dirname}/foo.cdc`
@@ -556,7 +598,7 @@ describe("codelensses", () => {
 
   })
 
-  test("transactions codelensses", async() => {
+  test("transactions codelenses", async() => {
     await withConnection(async connection => {
       let code = fs.readFileSync("./transaction.cdc")
       let path = `file://${__dirname}/transaction.cdc`
@@ -579,7 +621,7 @@ describe("codelensses", () => {
 
   })
 
-  test("script codelenss", async() => {
+  test("script codelenses", async() => {
     await withConnection(async connection => {
       let code = fs.readFileSync("./script.cdc")
       let path = `file://${__dirname}/script.cdc`

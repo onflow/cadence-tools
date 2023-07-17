@@ -258,7 +258,7 @@ func resolveAccounts(client flowClient, signers []string) ([]string, []string) {
 func makeActionlessCodelens(title string, lensRange protocol.Range) *protocol.CodeLens {
 	return &protocol.CodeLens{
 		Range: lensRange,
-		Command: protocol.Command{
+		Command: &protocol.Command{
 			Title: title,
 		},
 	}
@@ -272,7 +272,7 @@ func makeCodeLens(
 ) *protocol.CodeLens {
 	return &protocol.CodeLens{
 		Range: lensRange,
-		Command: protocol.Command{
+		Command: &protocol.Command{
 			Title:     title,
 			Command:   command,
 			Arguments: arguments,
