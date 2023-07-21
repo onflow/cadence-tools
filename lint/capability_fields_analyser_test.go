@@ -155,3 +155,134 @@ func TestPrivateCapabilityAndNonCapabilityTypeFieldInContract(t *testing.T) {
 		diagnostics,
 	)
 }
+func TestImplicitCapabilityLeakViaArray(t *testing.T) {
+
+	t.Parallel()
+
+	t.Run("valid", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+			pub contract MyContract {
+				priv let myCapArray: [Capability]
+	
+				init() {
+					   self.myCapArray = []
+				}
+			}
+			`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+}
+
+func TestImplicitCapabilityLeakViaStruct2(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+ 			pub contract MyContract {
+ 			   pub resource Counter {
+ 				 priv var count: Int
+ 			
+ 				 init(count: Int) {
+ 				   self.count = count
+ 				 }
+ 			   }
+ 		
+ 			   pub struct ContractData {
+ 				   pub var owner: Capability
+ 				   init(cap: Capability) {
+ 					   self.owner = cap
+ 				   }
+ 			   }
+ 		
+                priv var contractData: ContractData
+ 		
+ 			   init(){
+ 				   self.contractData = ContractData(cap:
+ 					   self.account.getCapability<&Counter>(/public/counter)
+ 				   )
+ 			   }
+ 			}
+ 			`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+}
+
+func TestImplicitCapabilityLeakViaStruct3(t *testing.T) {
+
+	t.Parallel()
+	t.Run("leak via struct field", func(t *testing.T) {
+
+		diagnostics := testAnalyzers(t,
+			`
+ 		pub contract MyContract {
+ 		   pub resource Counter {
+ 		     priv var count: Int
+ 		
+ 		     init(count: Int) {
+ 		       self.count = count
+ 		     }
+ 		   }
+ 		
+ 		   pub struct ContractData {
+ 			   pub var owner: Capability
+ 		       init(cap: Capability) {
+ 		           self.owner = cap
+ 		       }
+ 		   }
+
+			pub struct ContractDataIgnored {
+ 			   pub var owner: Capability
+ 		       init(cap: Capability) {
+ 		           self.owner = cap
+ 		       }
+ 		   }
+ 		
+ 		   pub var contractData: ContractData
+ 		
+ 		   init(){
+ 		       self.contractData = ContractData(cap:
+ 		           self.account.getCapability<&Counter>(/public/counter)
+ 		       )
+ 		   }
+ 		}`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 484, Line: 25, Column: 6},
+						EndPos:   ast.Position{Offset: 517, Line: 25, Column: 39},
+					},
+					Location:         testLocation,
+					Category:         lint.UpdateCategory,
+					Message:          "It is an anti-pattern to have public Capability fields.",
+					SecondaryMessage: "Consider restricting access.",
+				},
+			},
+			diagnostics,
+		)
+	})
+}

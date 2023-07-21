@@ -20,6 +20,7 @@ package lint
 
 import (
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
@@ -49,6 +50,38 @@ func DetectCapabilityType(typeToCheck ast.Type) bool {
 	}
 }
 
+func CollectCompositeIdentifiers(inspector *ast.Inspector) (map[string]bool, map[ast.Identifier]bool) {
+	compositeIdsCapabilitiesPropery := make(map[string]bool)
+	fieldsInStruct := make(map[ast.Identifier]bool)
+	inspector.Preorder(
+		[]ast.Element{(*ast.CompositeDeclaration)(nil)},
+		func(element ast.Element) {
+			switch declaration := element.(type) {
+			case *ast.CompositeDeclaration:
+				{
+					if declaration.CompositeKind != common.CompositeKindStructure {
+						return
+					}
+					for _, d := range declaration.Members.Declarations() {
+						fd, ok := d.(*ast.FieldDeclaration)
+						if !ok {
+							return
+						}
+						if fd.Access != ast.AccessPublic {
+							return
+						}
+						if fd.Access == ast.AccessPublic && DetectCapabilityType(fd.TypeAnnotation.Type) {
+							fieldsInStruct[fd.Identifier] = true
+							compositeIdsCapabilitiesPropery[declaration.Identifier.Identifier] = true
+						}
+					}
+				}
+			}
+		},
+	)
+	return compositeIdsCapabilitiesPropery, fieldsInStruct
+}
+
 var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
 
 	elementFilter := []ast.Element{
@@ -62,9 +95,9 @@ var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
 		},
 		Run: func(pass *analysis.Pass) interface{} {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
-
 			location := pass.Program.Location
 			report := pass.Report
+			compositeIdsCapabilitiesPropery, fieldsInStruct := CollectCompositeIdentifiers(inspector)
 
 			inspector.Preorder(
 				elementFilter,
@@ -74,6 +107,32 @@ var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
 					if !ok {
 						return
 					}
+
+					nt, ok := field.TypeAnnotation.Type.(*ast.NominalType)
+					if ok {
+						hasCapability, found := compositeIdsCapabilitiesPropery[nt.Identifier.Identifier]
+
+						if found {
+							if hasCapability && field.Access == ast.AccessPublic {
+								report(
+									analysis.Diagnostic{
+										Location:         location,
+										Range:            ast.NewRangeFromPositioned(nil, element),
+										Category:         UpdateCategory,
+										Message:          "It is an anti-pattern to have public Capability fields.",
+										SecondaryMessage: "Consider restricting access.",
+									},
+								)
+								return
+							}
+						}
+					}
+					_, found := fieldsInStruct[field.Identifier]
+					if found {
+						//if its in a struct it is treated by another check
+						return
+					}
+
 					if field.Access == ast.AccessPublic && DetectCapabilityType(field.TypeAnnotation.Type) {
 						report(
 							analysis.Diagnostic{
