@@ -482,8 +482,8 @@ func TestImportBuiltinContracts(t *testing.T) {
 	        }))
 	    }
 
-	    pub fun testSetupFUSDVault() {
-	        let code = Test.readFile("../transactions/setup_fusd_vault.cdc")
+	    pub fun testSetupExampleNFTCollection() {
+	        let code = Test.readFile("../transactions/setup_example_nft_collection.cdc")
 	        let tx = Test.Transaction(
 	            code: code,
 	            authorizers: [account.address],
@@ -507,31 +507,28 @@ func TestImportBuiltinContracts(t *testing.T) {
 	`
 
 	transactionCode := `
-	    import "FungibleToken"
-	    import "FUSD"
+	    import "NonFungibleToken"
+	    import "ExampleNFT"
+	    import "MetadataViews"
 
 	    transaction {
+
 	        prepare(signer: AuthAccount) {
-	            // It's OK if the account already has a Vault, but we don't want to replace it
-	            if(signer.borrow<&FUSD.Vault>(from: /storage/fusdVault) != nil) {
+	            // Return early if the account already has a collection
+	            if signer.borrow<&ExampleNFT.Collection>(from: ExampleNFT.CollectionStoragePath) != nil {
 	                return
 	            }
 
-	            // Create a new FUSD Vault and put it in storage
-	            signer.save(<-FUSD.createEmptyVault(), to: /storage/fusdVault)
+	            // Create a new empty collection
+	            let collection <- ExampleNFT.createEmptyCollection()
 
-	            // Create a public capability to the Vault that only exposes
-	            // the deposit function through the Receiver interface
-	            signer.link<&FUSD.Vault{FungibleToken.Receiver}>(
-	                /public/fusdReceiver,
-	                target: /storage/fusdVault
-	            )
+	            // save it to the account
+	            signer.save(<-collection, to: ExampleNFT.CollectionStoragePath)
 
-	            // Create a public capability to the Vault that only exposes
-	            // the balance field through the Balance interface
-	            signer.link<&FUSD.Vault{FungibleToken.Balance}>(
-	                /public/fusdBalance,
-	                target: /storage/fusdVault
+	            // create a public capability for the collection
+	            signer.link<&{NonFungibleToken.CollectionPublic, ExampleNFT.ExampleNFTCollectionPublic, MetadataViews.ResolverCollection}>(
+	                ExampleNFT.CollectionPublicPath,
+	                target: ExampleNFT.CollectionStoragePath
 	            )
 	        }
 	    }
@@ -540,7 +537,6 @@ func TestImportBuiltinContracts(t *testing.T) {
 	scriptCode := `
 	    import "FungibleToken"
 	    import "FlowToken"
-	    import "FUSD"
 	    import "NonFungibleToken"
 	    import "MetadataViews"
 	    import "ExampleNFT"
@@ -554,7 +550,7 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	fileResolver := func(path string) (string, error) {
 		switch path {
-		case "../transactions/setup_fusd_vault.cdc":
+		case "../transactions/setup_example_nft_collection.cdc":
 			return transactionCode, nil
 		case "../scripts/import_common_contracts.cdc":
 			return scriptCode, nil
@@ -565,7 +561,7 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	runner := NewTestRunner().WithFileResolver(fileResolver)
 
-	result, err := runner.RunTest(testCode, "testSetupFUSDVault")
+	result, err := runner.RunTest(testCode, "testSetupExampleNFTCollection")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
@@ -3101,19 +3097,15 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
-			"A.f8d6e0586b0a20c7.FUSD",
 			"A.f8d6e0586b0a20c7.ExampleNFT",
-			"A.f8d6e0586b0a20c7.MetadataViews",
 			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
 			"A.f8d6e0586b0a20c7.NFTStorefront",
-			"A.f8d6e0586b0a20c7.NonFungibleToken",
-			"A.f8d6e0586b0a20c7.ViewResolver",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
 	assert.Equal(
 		t,
-		"Coverage: 97.2% of statements",
+		"Coverage: 97.4% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3328,13 +3320,9 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
-			"A.f8d6e0586b0a20c7.FUSD",
 			"A.f8d6e0586b0a20c7.ExampleNFT",
-			"A.f8d6e0586b0a20c7.MetadataViews",
 			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
 			"A.f8d6e0586b0a20c7.NFTStorefront",
-			"A.f8d6e0586b0a20c7.NonFungibleToken",
-			"A.f8d6e0586b0a20c7.ViewResolver",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -3867,10 +3855,10 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	        Test.assert(events.length == 1)
 
 	        let evts = blockchain.events()
-	        Test.assert(evts.length >= 19)
+	        Test.assert(evts.length > 1)
 
 	        let blockchain2 = Test.newEmulatorBlockchain()
-	        Test.assert(blockchain2.events().length >= 19)
+	        Test.assert(blockchain2.events().length > 1)
 	    }
 	`
 
