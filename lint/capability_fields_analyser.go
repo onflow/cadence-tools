@@ -24,35 +24,36 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
-func DetectCapabilityType(typeToCheck ast.Type) bool {
+func DetectCapabilityType(typeToCheck ast.Type, structWithPubCapabilities map[string]struct{}) bool {
 	const capabilityTypeName = "Capability"
 	switch downcastedType := typeToCheck.(type) {
 	case *ast.NominalType:
-		return downcastedType.Identifier.Identifier == capabilityTypeName
+		_, found := structWithPubCapabilities[downcastedType.Identifier.Identifier]
+		return downcastedType.Identifier.Identifier == capabilityTypeName || found
 	case *ast.OptionalType:
-		return DetectCapabilityType(downcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
 	case *ast.VariableSizedType:
-		return DetectCapabilityType(downcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
 	case *ast.ConstantSizedType:
-		return DetectCapabilityType(downcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
 	case *ast.DictionaryType:
-		return DetectCapabilityType(downcastedType.KeyType) || DetectCapabilityType(downcastedType.ValueType)
+		return DetectCapabilityType(downcastedType.KeyType, structWithPubCapabilities) || DetectCapabilityType(downcastedType.ValueType, structWithPubCapabilities)
 	case *ast.FunctionType:
 		return false
 	case *ast.ReferenceType:
-		return DetectCapabilityType(downcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
 	case *ast.RestrictedType:
 		return false
 	case *ast.InstantiationType:
-		return DetectCapabilityType(downcastedType.Type)
+		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
 	default:
 		panic("Unknown type")
 	}
 }
 
-func CollectCompositeIdentifiers(inspector *ast.Inspector) (map[string]bool, map[ast.Identifier]bool) {
-	compositeIdsCapabilitiesPropery := make(map[string]bool)
-	fieldsInStruct := make(map[ast.Identifier]bool)
+func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]struct{}, map[ast.Identifier]struct{}) {
+	structWithPubCapabilities := make(map[string]struct{})
+	fieldsInStruct := make(map[ast.Identifier]struct{})
 	inspector.Preorder(
 		[]ast.Element{(*ast.CompositeDeclaration)(nil)},
 		func(element ast.Element) {
@@ -63,23 +64,23 @@ func CollectCompositeIdentifiers(inspector *ast.Inspector) (map[string]bool, map
 						return
 					}
 					for _, d := range declaration.Members.Declarations() {
-						fd, ok := d.(*ast.FieldDeclaration)
+						field, ok := d.(*ast.FieldDeclaration)
 						if !ok {
 							return
 						}
-						if fd.Access != ast.AccessPublic {
+						if field.Access != ast.AccessPublic {
 							return
 						}
-						if fd.Access == ast.AccessPublic && DetectCapabilityType(fd.TypeAnnotation.Type) {
-							fieldsInStruct[fd.Identifier] = true
-							compositeIdsCapabilitiesPropery[declaration.Identifier.Identifier] = true
+						if field.Access == ast.AccessPublic && DetectCapabilityType(field.TypeAnnotation.Type, structWithPubCapabilities) {
+							fieldsInStruct[field.Identifier] = struct{}{}
+							structWithPubCapabilities[declaration.Identifier.Identifier] = struct{}{}
 						}
 					}
 				}
 			}
 		},
 	)
-	return compositeIdsCapabilitiesPropery, fieldsInStruct
+	return structWithPubCapabilities, fieldsInStruct
 }
 
 var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
@@ -97,43 +98,20 @@ var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 			location := pass.Program.Location
 			report := pass.Report
-			compositeIdsCapabilitiesPropery, fieldsInStruct := CollectCompositeIdentifiers(inspector)
+			structTypesPublicCapability, fieldsInStruct := CollectStructsWithPublicCapabilities(inspector)
 
 			inspector.Preorder(
 				elementFilter,
 				func(element ast.Element) {
-
 					field, ok := element.(*ast.FieldDeclaration)
 					if !ok {
 						return
 					}
-
-					nt, ok := field.TypeAnnotation.Type.(*ast.NominalType)
-					if ok {
-						hasCapability, found := compositeIdsCapabilitiesPropery[nt.Identifier.Identifier]
-
-						if found {
-							if hasCapability && field.Access == ast.AccessPublic {
-								report(
-									analysis.Diagnostic{
-										Location:         location,
-										Range:            ast.NewRangeFromPositioned(nil, element),
-										Category:         UpdateCategory,
-										Message:          "It is an anti-pattern to have public Capability fields.",
-										SecondaryMessage: "Consider restricting access.",
-									},
-								)
-								return
-							}
-						}
-					}
 					_, found := fieldsInStruct[field.Identifier]
 					if found {
-						//if its in a struct it is treated by another check
 						return
 					}
-
-					if field.Access == ast.AccessPublic && DetectCapabilityType(field.TypeAnnotation.Type) {
+					if field.Access == ast.AccessPublic && DetectCapabilityType(field.TypeAnnotation.Type, structTypesPublicCapability) {
 						report(
 							analysis.Diagnostic{
 								Location:         location,
