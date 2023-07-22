@@ -28,38 +28,68 @@ import (
 	"github.com/onflow/cadence-tools/lint"
 )
 
-func TestPublicCapabilityFieldInContract(t *testing.T) {
+func TestCapabilityFieldInContract(t *testing.T) {
 
 	t.Parallel()
 
-	diagnostics := testAnalyzers(t,
-		`
-		    pub contract ExposingCapability {
-			    pub let my_capability : Capability?
-			    init() {
-				    self.my_capability = nil
-			    }
-		    }
-		`,
-		lint.CapabilityFieldAnalyzer,
-	)
+	t.Run("public capability field", func(t *testing.T) {
 
-	require.Equal(
-		t,
-		[]analysis.Diagnostic{
-			{
-				Range: ast.Range{
-					StartPos: ast.Position{Offset: 48, Line: 3, Column: 7},
-					EndPos:   ast.Position{Offset: 82, Line: 3, Column: 41},
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+				pub contract ExposingCapability {
+					pub let my_capability : Capability?
+					init() {
+						self.my_capability = nil
+					}
+				}
+			`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 44, Line: 3, Column: 5},
+						EndPos:   ast.Position{Offset: 78, Line: 3, Column: 39},
+					},
+					Location:         testLocation,
+					Category:         lint.UpdateCategory,
+					Message:          "It is an anti-pattern to have public Capability fields.",
+					SecondaryMessage: "Consider restricting access.",
 				},
-				Location:         testLocation,
-				Category:         lint.UpdateCategory,
-				Message:          "It is an anti-pattern to have public Capability fields.",
-				SecondaryMessage: "Consider restricting access.",
 			},
-		},
-		diagnostics,
-	)
+			diagnostics,
+		)
+	})
+
+	t.Run("private capability field", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+				pub contract ExposingCapability {
+					priv let my_capability : Capability?
+					pub let data: Int
+					init() {
+						self.my_capability = nil
+						self.data = 42
+					}
+				}
+			`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
 }
 
 func TestPublicDictionaryFieldWithCapabilityValueType(t *testing.T) {
@@ -131,48 +161,58 @@ func TestPublicArrayFieldWithConcreteCapabilityType(t *testing.T) {
 	)
 }
 
-func TestPrivateCapabilityAndNonCapabilityTypeFieldInContract(t *testing.T) {
-
-	t.Parallel()
-
-	diagnostics := testAnalyzers(t,
-		`
-		    pub contract ExposingCapability {
-			    priv let my_capability : Capability?
-			    pub let data: Int
-			    init() {
-				    self.my_capability = nil
-				    self.data = 42
-			    }
-		    }
-		`,
-		lint.CapabilityFieldAnalyzer,
-	)
-
-	require.Equal(
-		t,
-		[]analysis.Diagnostic(nil),
-		diagnostics,
-	)
-}
 func TestImplicitCapabilityLeakViaArray(t *testing.T) {
 
 	t.Parallel()
 
-	t.Run("valid", func(t *testing.T) {
+	t.Run("public leaking capability in an array", func(t *testing.T) {
 
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t,
 			`
-			pub contract MyContract {
-				priv let myCapArray: [Capability]
-	
-				init() {
-					   self.myCapArray = []
-				}
-			}
-			`,
+			  pub contract MyContract {
+				  pub let myCapArray: [Capability]
+				  init() {
+						  self.myCapArray = []
+				  }
+			  }
+			  `,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 38, Line: 3, Column: 6},
+						EndPos:   ast.Position{Offset: 69, Line: 3, Column: 37},
+					},
+					Location:         testLocation,
+					Category:         lint.UpdateCategory,
+					Message:          "It is an anti-pattern to have public Capability fields.",
+					SecondaryMessage: "Consider restricting access.",
+				},
+			},
+			diagnostics,
+		)
+	})
+
+	t.Run("private nonleaking capability in an array", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+			  pub contract MyContract {
+				  priv let myCapArray: [Capability]
+	  
+				  init() {
+						 self.myCapArray = []
+				  }
+			  }
+			  `,
 			lint.CapabilityFieldAnalyzer,
 		)
 
@@ -184,53 +224,10 @@ func TestImplicitCapabilityLeakViaArray(t *testing.T) {
 	})
 }
 
-func TestImplicitCapabilityLeakViaStruct2(t *testing.T) {
-	t.Run("valid", func(t *testing.T) {
-
-		t.Parallel()
-
-		diagnostics := testAnalyzers(t,
-			`
- 			pub contract MyContract {
- 			   pub resource Counter {
- 				 priv var count: Int
- 			
- 				 init(count: Int) {
- 				   self.count = count
- 				 }
- 			   }
- 		
- 			   pub struct ContractData {
- 				   pub var owner: Capability
- 				   init(cap: Capability) {
- 					   self.owner = cap
- 				   }
- 			   }
- 		
-                priv var contractData: ContractData
- 		
- 			   init(){
- 				   self.contractData = ContractData(cap:
- 					   self.account.getCapability<&Counter>(/public/counter)
- 				   )
- 			   }
- 			}
- 			`,
-			lint.CapabilityFieldAnalyzer,
-		)
-
-		require.Equal(
-			t,
-			[]analysis.Diagnostic(nil),
-			diagnostics,
-		)
-	})
-}
-
-func TestImplicitCapabilityLeakViaStruct3(t *testing.T) {
-
-	t.Parallel()
+func TestImplicitCapabilityLeakViaStruct(t *testing.T) {
 	t.Run("leak via struct field", func(t *testing.T) {
+
+		t.Parallel()
 
 		diagnostics := testAnalyzers(t,
 			`
@@ -282,6 +279,46 @@ func TestImplicitCapabilityLeakViaStruct3(t *testing.T) {
 					SecondaryMessage: "Consider restricting access.",
 				},
 			},
+			diagnostics,
+		)
+	})
+	t.Run("valid", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+ 			pub contract MyContract {
+ 			   pub resource Counter {
+ 				 priv var count: Int
+ 			
+ 				 init(count: Int) {
+ 				   self.count = count
+ 				 }
+ 			   }
+ 		
+ 			   pub struct ContractData {
+ 				   pub var owner: Capability
+ 				   init(cap: Capability) {
+ 					   self.owner = cap
+ 				   }
+ 			   }
+ 		
+                priv var contractData: ContractData
+ 		
+ 			   init(){
+ 				   self.contractData = ContractData(cap:
+ 					   self.account.getCapability<&Counter>(/public/counter)
+ 				   )
+ 			   }
+ 			}
+ 			`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
 			diagnostics,
 		)
 	})
