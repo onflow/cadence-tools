@@ -48,12 +48,141 @@ type CompositeMembers map[string]MemberMeta
 
 type MemberInvocations map[string]InvocationMeta
 
+// PublicMemberResources detect all public resources with public members (both vars and functions)
+func PublicMemberResources(inspector *ast.Inspector) map[string]CompositeMembers {
+	var publicMembers = make(map[string]CompositeMembers)
+
+	inspector.Preorder(
+		[]ast.Element{(*ast.CompositeDeclaration)(nil)},
+		func(element ast.Element) {
+			switch declaration := element.(type) {
+			case *ast.CompositeDeclaration:
+				{
+					compositeID := declaration.Identifier.Identifier
+					if declaration.DeclarationKind() != common.DeclarationKindResource {
+						return
+					}
+					for _, d := range declaration.Members.Declarations() {
+						if d.DeclarationAccess() != ast.AccessPublic {
+							continue
+						}
+
+						switch dec := d.(type) {
+						case *ast.FieldDeclaration:
+							_, ok := publicMembers[compositeID]
+							if !ok {
+								publicMembers[compositeID] = make(CompositeMembers)
+							}
+							publicMembers[compositeID][dec.Identifier.Identifier] = MemberMeta{
+								Identifier:  dec.Identifier.Identifier,
+								Declaration: dec.TypeAnnotation.Type.String(),
+							}
+						case *ast.FunctionDeclaration:
+							var typeParams []string
+							if dec.TypeParameterList != nil && len(dec.TypeParameterList.TypeParameters) > 0 {
+								for _, p := range dec.TypeParameterList.TypeParameters {
+									typeParams = append(typeParams, p.Identifier.Identifier)
+								}
+							}
+
+							var args []string
+							for _, arg := range dec.ParameterList.Parameters {
+								args = append(args, arg.Label+" "+arg.Identifier.Identifier+" "+arg.TypeAnnotation.Type.String())
+							}
+
+							var returnType string
+							if dec.ReturnTypeAnnotation != nil {
+								returnType = dec.ReturnTypeAnnotation.Type.String()
+							}
+
+							_, ok := publicMembers[compositeID]
+							if !ok {
+								publicMembers[compositeID] = make(CompositeMembers)
+							}
+
+							publicMembers[compositeID][dec.Identifier.Identifier] = MemberMeta{
+								Identifier:    dec.Identifier.Identifier,
+								Declaration:   "function",
+								TypeArguments: typeParams,
+								Arguments:     args,
+								ReturnType:    &returnType,
+							}
+						}
+					}
+				}
+			}
+		},
+	)
+	return publicMembers
+}
+
+// ResourceTypeVariables find all resrouce type variables and their respective resource type name
+func ResourceTypeVariables(inspector *ast.Inspector, publicMembers map[string]CompositeMembers) map[string]string {
+	var compositeVariables = make(map[string]string)
+	inspector.Preorder(
+		[]ast.Element{
+			(*ast.VariableDeclaration)(nil),
+		},
+		func(element ast.Element) {
+			v, ok := element.(*ast.VariableDeclaration)
+			if !ok {
+				return
+			}
+			ce, ok := v.Value.(*ast.CreateExpression)
+			if !ok {
+				return
+			}
+
+			idex, ok := ce.InvocationExpression.InvokedExpression.(*ast.IdentifierExpression)
+			if !ok {
+				return
+			}
+
+			_, ok = publicMembers[idex.Identifier.Identifier]
+			if !ok {
+				return
+			}
+			compositeVariables[v.Identifier.Identifier] = idex.Identifier.Identifier
+		})
+
+	return compositeVariables
+}
+
+// ResourceVarInvocations find all the invocations of provided resource type variables
+func ResourceVarInvocations(inspector *ast.Inspector, resourceVariables map[string]string) map[string]InvocationMeta {
+	var invocations = make(map[string]InvocationMeta)
+	inspector.Preorder([]ast.Element{
+		(*ast.InvocationExpression)(nil),
+	},
+		func(element ast.Element) {
+			inv, ok := element.(*ast.InvocationExpression)
+			if !ok {
+				return
+			}
+			exp, ok := inv.InvokedExpression.(*ast.MemberExpression)
+			if !ok {
+				return
+			}
+
+			idex, ok := exp.Expression.(*ast.IdentifierExpression)
+			if !ok {
+				return
+			}
+
+			if _, ok := resourceVariables[idex.Identifier.Identifier]; !ok {
+				return
+			}
+
+			invocations[idex.Identifier.Identifier] = InvocationMeta{
+				MemberName: exp.Identifier.Identifier,
+				Position:   element,
+			}
+		},
+	)
+	return invocations
+}
+
 var SuggestRestrictedType = (func() *analysis.Analyzer {
-
-	//elementFilter := []ast.Element{
-	//	(*ast.InvocationExpression)(nil),
-	//}
-
 	return &analysis.Analyzer{
 		Description: "Detects unnecessary uses of the force operator",
 		Requires: []*analysis.Analyzer{
@@ -62,132 +191,19 @@ var SuggestRestrictedType = (func() *analysis.Analyzer {
 		Run: func(pass *analysis.Pass) interface{} {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 
-			//store all publicly exposed members
-			var publicMembers = make(map[string]CompositeMembers)
+			//save all publicly exposed members
+			var resourceTypes = PublicMemberResources(inspector)
 
-			inspector.Preorder(
-				[]ast.Element{(*ast.CompositeDeclaration)(nil)},
-				func(element ast.Element) {
-					switch declaration := element.(type) {
-					case *ast.CompositeDeclaration:
-						{
-							compositeID := declaration.Identifier.Identifier
-							if declaration.DeclarationKind() != common.DeclarationKindResource {
-								return
-							}
-							for _, d := range declaration.Members.Declarations() {
-								if d.DeclarationAccess() != ast.AccessPublic {
-									continue
-								}
+			//save all the resource type variables of resourceTypes
+			var compositeVariables = ResourceTypeVariables(inspector, resourceTypes)
 
-								switch dec := d.(type) {
-								case *ast.FieldDeclaration:
-									_, ok := publicMembers[compositeID]
-									if !ok {
-										publicMembers[compositeID] = make(CompositeMembers)
-									}
-									publicMembers[compositeID][dec.Identifier.Identifier] = MemberMeta{
-										Identifier:  dec.Identifier.Identifier,
-										Declaration: dec.TypeAnnotation.Type.String(),
-									}
-								case *ast.FunctionDeclaration:
-									var typeParams []string
-									if dec.TypeParameterList != nil && len(dec.TypeParameterList.TypeParameters) > 0 {
-										for _, p := range dec.TypeParameterList.TypeParameters {
-											typeParams = append(typeParams, p.Identifier.Identifier)
-										}
-									}
-
-									var args []string
-									for _, arg := range dec.ParameterList.Parameters {
-										args = append(args, arg.Label+" "+arg.Identifier.Identifier+" "+arg.TypeAnnotation.Type.String())
-									}
-
-									var returnType string
-									if dec.ReturnTypeAnnotation != nil {
-										returnType = dec.ReturnTypeAnnotation.Type.String()
-									}
-
-									_, ok := publicMembers[compositeID]
-									if !ok {
-										publicMembers[compositeID] = make(CompositeMembers)
-									}
-
-									publicMembers[compositeID][dec.Identifier.Identifier] = MemberMeta{
-										Identifier:    dec.Identifier.Identifier,
-										Declaration:   "function",
-										TypeArguments: typeParams,
-										Arguments:     args,
-										ReturnType:    &returnType,
-									}
-								}
-							}
-						}
-					}
-				},
-			)
-
-			var compositeVariables = make(map[string]string)
-			inspector.Preorder(
-				[]ast.Element{
-					(*ast.VariableDeclaration)(nil),
-				},
-				func(element ast.Element) {
-					v, ok := element.(*ast.VariableDeclaration)
-					if !ok {
-						return
-					}
-					ce, ok := v.Value.(*ast.CreateExpression)
-					if !ok {
-						return
-					}
-
-					idex, ok := ce.InvocationExpression.InvokedExpression.(*ast.IdentifierExpression)
-					if !ok {
-						return
-					}
-
-					_, ok = publicMembers[idex.Identifier.Identifier]
-					if !ok {
-						return
-					}
-					compositeVariables[v.Identifier.Identifier] = idex.Identifier.Identifier
-				})
-
-			invocations := make(map[string]InvocationMeta)
-			inspector.Preorder([]ast.Element{
-				(*ast.InvocationExpression)(nil),
-			},
-				func(element ast.Element) {
-					inv, ok := element.(*ast.InvocationExpression)
-					if !ok {
-						return
-					}
-					exp, ok := inv.InvokedExpression.(*ast.MemberExpression)
-					if !ok {
-						return
-					}
-
-					idex, ok := exp.Expression.(*ast.IdentifierExpression)
-					if !ok {
-						return
-					}
-
-					if _, ok := compositeVariables[idex.Identifier.Identifier]; !ok {
-						return
-					}
-
-					invocations[idex.Identifier.Identifier] = InvocationMeta{
-						MemberName: exp.Identifier.Identifier,
-						Position:   element,
-					}
-				},
-			)
+			//save all usage of resource variables members
+			invocations := ResourceVarInvocations(inspector, compositeVariables)
 
 			var usedMembers = make(map[string]map[string]UsageMeta)
 			for variable, meta := range invocations {
 				compositeType := compositeVariables[variable]
-				members := publicMembers[compositeType]
+				members := resourceTypes[compositeType]
 				mem := members[meta.MemberName]
 
 				if _, ok := usedMembers[compositeType]; !ok {
@@ -204,7 +220,7 @@ var SuggestRestrictedType = (func() *analysis.Analyzer {
 				location := pass.Program.Location
 				report := pass.Report
 
-				if len(members) < len(publicMembers[resource]) {
+				if len(members) < len(resourceTypes[resource]) {
 					var memberIDs []string
 
 					for _, meta := range members {
