@@ -71,7 +71,7 @@ func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]
 						if field.Access != ast.AccessPublic {
 							return
 						}
-						if field.Access == ast.AccessPublic && DetectCapabilityType(field.TypeAnnotation.Type, structWithPubCapabilities) {
+						if DetectCapabilityType(field.TypeAnnotation.Type, structWithPubCapabilities) {
 							fieldsInStruct[field.Identifier] = struct{}{}
 							structWithPubCapabilities[declaration.Identifier.Identifier] = struct{}{}
 						}
