@@ -85,3 +85,8 @@ tail -f ./debug.log
 ```
 
 Doing so you should see the output of all Log calls you make. 
+
+## Releasing
+
+To release a new version of Language server all you need to do is create a release and GitHub action will also publish a new version of NPM package found here https://github.com/onflow/cadence-tools/tree/master/npm-packages/cadence-language-server 
+That newly build NPM package using the WebAssembly will be published and can be found on NPM https://www.npmjs.com/package/@onflow/cadence-language-server
