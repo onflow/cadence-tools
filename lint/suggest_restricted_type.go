@@ -19,11 +19,10 @@
 package lint
 
 import (
-	"strings"
-
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/tools/analysis"
+	"strings"
 )
 
 type MemberMeta struct {
@@ -34,8 +33,10 @@ type MemberMeta struct {
 	ReturnType    *string
 }
 
+type MemberName string
+
 type InvocationMeta struct {
-	MemberName string
+	MemberName MemberName
 	Position   ast.HasPosition
 }
 
@@ -44,13 +45,28 @@ type UsageMeta struct {
 	MemberMeta MemberMeta
 }
 
-type CompositeMembers map[string]MemberMeta
+type MemberInvocations map[MemberName]InvocationMeta
+type CompositeMembers map[MemberName]MemberMeta
 
-type MemberInvocations map[string]InvocationMeta
+type CompositeTypeName string
+type CompositeType struct {
+	CompositeTypeName CompositeTypeName
+	Restrictions      []CompositeTypeName
+}
+
+type CompositeWithPublicMembers map[CompositeTypeName]CompositeMembers
+
+type CompositeVariable string
+type CompositeVariables map[CompositeVariable]CompositeType
+
+type CompositeVarInvocations map[CompositeVariable]InvocationMeta
+
+type MemberUsageMeta map[CompositeVariable]UsageMeta
+type CompositeTypeUsageMeta map[CompositeTypeName]MemberUsageMeta
 
 // PublicMemberResources detect all public resources with public members (both vars and functions)
-func PublicMemberResources(inspector *ast.Inspector) map[string]CompositeMembers {
-	var publicMembers = make(map[string]CompositeMembers)
+func PublicMemberResources(inspector *ast.Inspector) CompositeWithPublicMembers {
+	var publicMembers = make(CompositeWithPublicMembers)
 
 	inspector.Preorder(
 		[]ast.Element{(*ast.CompositeDeclaration)(nil)},
@@ -58,7 +74,7 @@ func PublicMemberResources(inspector *ast.Inspector) map[string]CompositeMembers
 			switch declaration := element.(type) {
 			case *ast.CompositeDeclaration:
 				{
-					compositeID := declaration.Identifier.Identifier
+					compositeID := CompositeTypeName(declaration.Identifier.Identifier)
 					if declaration.DeclarationKind() != common.DeclarationKindResource {
 						return
 					}
@@ -73,7 +89,7 @@ func PublicMemberResources(inspector *ast.Inspector) map[string]CompositeMembers
 							if !ok {
 								publicMembers[compositeID] = make(CompositeMembers)
 							}
-							publicMembers[compositeID][dec.Identifier.Identifier] = MemberMeta{
+							publicMembers[compositeID][MemberName(dec.Identifier.Identifier)] = MemberMeta{
 								Identifier:  dec.Identifier.Identifier,
 								Declaration: dec.TypeAnnotation.Type.String(),
 							}
@@ -100,7 +116,7 @@ func PublicMemberResources(inspector *ast.Inspector) map[string]CompositeMembers
 								publicMembers[compositeID] = make(CompositeMembers)
 							}
 
-							publicMembers[compositeID][dec.Identifier.Identifier] = MemberMeta{
+							publicMembers[compositeID][MemberName(dec.Identifier.Identifier)] = MemberMeta{
 								Identifier:    dec.Identifier.Identifier,
 								Declaration:   "function",
 								TypeArguments: typeParams,
@@ -116,9 +132,9 @@ func PublicMemberResources(inspector *ast.Inspector) map[string]CompositeMembers
 	return publicMembers
 }
 
-// ResourceTypeVariables find all resrouce type variables and their respective resource type name
-func ResourceTypeVariables(inspector *ast.Inspector, publicMembers map[string]CompositeMembers) map[string]string {
-	var compositeVariables = make(map[string]string)
+// CompositeTypeVariables find all resource type variables and their respective resource type name
+func CompositeTypeVariables(inspector *ast.Inspector, publicMembers CompositeWithPublicMembers) CompositeVariables {
+	var compositeVariables = make(CompositeVariables)
 	inspector.Preorder(
 		[]ast.Element{
 			(*ast.VariableDeclaration)(nil),
@@ -138,19 +154,34 @@ func ResourceTypeVariables(inspector *ast.Inspector, publicMembers map[string]Co
 				return
 			}
 
-			_, ok = publicMembers[idex.Identifier.Identifier]
+			_, ok = publicMembers[CompositeTypeName(idex.Identifier.Identifier)]
 			if !ok {
 				return
 			}
-			compositeVariables[v.Identifier.Identifier] = idex.Identifier.Identifier
+
+			var resTypes []CompositeTypeName
+
+			resType, ok := v.TypeAnnotation.Type.(*ast.RestrictedType)
+			if ok {
+				for _, typename := range resType.Restrictions {
+					resTypes = append(resTypes, CompositeTypeName(typename.Identifier.Identifier))
+				}
+			}
+
+			variable := CompositeVariable(v.Identifier.Identifier)
+			compositeType := CompositeTypeName(idex.Identifier.Identifier)
+			compositeVariables[variable] = CompositeType{
+				CompositeTypeName: compositeType,
+				Restrictions:      resTypes,
+			}
 		})
 
 	return compositeVariables
 }
 
-// ResourceVarInvocations find all the invocations of provided resource type variables
-func ResourceVarInvocations(inspector *ast.Inspector, resourceVariables map[string]string) map[string]InvocationMeta {
-	var invocations = make(map[string]InvocationMeta)
+// CompositeVariableInvocations find all the invocations of provided resource type variables
+func CompositeVariableInvocations(inspector *ast.Inspector, resourceVariables CompositeVariables) CompositeVarInvocations {
+	var invocations = make(CompositeVarInvocations)
 	inspector.Preorder([]ast.Element{
 		(*ast.InvocationExpression)(nil),
 	},
@@ -169,17 +200,36 @@ func ResourceVarInvocations(inspector *ast.Inspector, resourceVariables map[stri
 				return
 			}
 
-			if _, ok := resourceVariables[idex.Identifier.Identifier]; !ok {
+			variable := CompositeVariable(idex.Identifier.Identifier)
+			if _, ok := resourceVariables[variable]; !ok {
 				return
 			}
 
-			invocations[idex.Identifier.Identifier] = InvocationMeta{
-				MemberName: exp.Identifier.Identifier,
+			invocations[variable] = InvocationMeta{
+				MemberName: MemberName(exp.Identifier.Identifier),
 				Position:   element,
 			}
 		},
 	)
 	return invocations
+}
+
+func UsedMembersMeta(invocations CompositeVarInvocations, compositeVariables CompositeVariables, resourceTypes CompositeWithPublicMembers) CompositeTypeUsageMeta {
+	var usedMembers = make(CompositeTypeUsageMeta)
+	for variable, meta := range invocations {
+		compositeType := compositeVariables[variable].CompositeTypeName
+		members := resourceTypes[compositeType]
+		mem := members[meta.MemberName]
+
+		if _, ok := usedMembers[compositeType]; !ok {
+			usedMembers[compositeType] = make(MemberUsageMeta)
+		}
+		usedMembers[compositeType][variable] = UsageMeta{
+			Position:   meta.Position,
+			MemberMeta: mem,
+		}
+	}
+	return usedMembers
 }
 
 var SuggestRestrictedType = (func() *analysis.Analyzer {
@@ -192,53 +242,65 @@ var SuggestRestrictedType = (func() *analysis.Analyzer {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 
 			//save all publicly exposed members
+			// e.g "Vault" -> "balance", "init", "getBalance", "rob"
 			var resourceTypes = PublicMemberResources(inspector)
 
 			//save all the resource type variables of resourceTypes
-			var compositeVariables = ResourceTypeVariables(inspector, resourceTypes)
+			// e.g "res"-> ["Vault", ["VaultBalance"]]
+			var compositeVariables = CompositeTypeVariables(inspector, resourceTypes)
 
 			//save all usage of resource variables members
-			invocations := ResourceVarInvocations(inspector, compositeVariables)
+			// e.g "res" -> "getBalance"
+			var invocations = CompositeVariableInvocations(inspector, compositeVariables)
 
-			var usedMembers = make(map[string]map[string]UsageMeta)
-			for variable, meta := range invocations {
-				compositeType := compositeVariables[variable]
-				members := resourceTypes[compositeType]
-				mem := members[meta.MemberName]
+			//save all composite type variables members invocations
+			// e.g "Vault" -> "res" -> "getBalance"
+			var usedMembers = UsedMembersMeta(invocations, compositeVariables, resourceTypes)
 
-				if _, ok := usedMembers[compositeType]; !ok {
-					usedMembers[compositeType] = make(map[string]UsageMeta)
-				}
-				usedMembers[compositeType][variable] = UsageMeta{
-					Position:   meta.Position,
-					MemberMeta: mem,
-				}
-			}
-
-			for resource, members := range usedMembers {
-
-				location := pass.Program.Location
-				report := pass.Report
-
-				if len(members) < len(resourceTypes[resource]) {
+			for variable, types := range compositeVariables {
+				if len(types.Restrictions) == 0 {
+					location := pass.Program.Location
+					report := pass.Report
+					varmeta := usedMembers[types.CompositeTypeName][variable]
 					var memberIDs []string
-
-					for _, meta := range members {
+					for _, meta := range usedMembers[types.CompositeTypeName] {
 						memberIDs = append(memberIDs, meta.MemberMeta.Identifier)
 					}
+
 					msg := "Consider creating restricted type variable with members " + strings.Join(memberIDs, ",")
-					for k, meta := range members {
-						report(
-							analysis.Diagnostic{
-								Location:         location,
-								Range:            ast.NewRangeFromPositioned(nil, meta.Position),
-								Category:         ReplacementCategory,
-								Message:          "unsafe use of resource type for " + k,
-								SecondaryMessage: msg,
-							})
-					}
+					report(analysis.Diagnostic{
+						Location:         location,
+						Range:            ast.NewRangeFromPositioned(nil, varmeta.Position),
+						Category:         ReplacementCategory,
+						Message:          "unsafe use of resource type for " + string(variable),
+						SecondaryMessage: msg,
+					})
 				}
 			}
+			//for resource, members := range usedMembers {
+			//
+			//	location := pass.Program.Location
+			//	report := pass.Report
+			//
+			//	if len(members) < len(resourceTypes[resource]) {
+			//		var memberIDs []string
+			//
+			//		for _, meta := range members {
+			//			memberIDs = append(memberIDs, meta.MemberMeta.Identifier)
+			//		}
+			//		msg := "Consider creating restricted type variable with members " + strings.Join(memberIDs, ",")
+			//		for k, meta := range members {
+			//			report(
+			//				analysis.Diagnostic{
+			//					Location:         location,
+			//					Range:            ast.NewRangeFromPositioned(nil, meta.Position),
+			//					Category:         ReplacementCategory,
+			//					Message:          "unsafe use of resource type for " + k,
+			//					SecondaryMessage: msg,
+			//				})
+			//		}
+			//	}
+			//}
 
 			return nil
 		},

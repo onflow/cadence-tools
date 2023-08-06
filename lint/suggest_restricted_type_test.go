@@ -83,48 +83,47 @@ func TestAuthReferenceLeak(t *testing.T) {
 		)
 	})
 
-	//t.Run("valid", func(t *testing.T) {
-	//
-	//	t.Parallel()
-	//
-	//	diagnostics := testAnalyzers(t,
-	//		`
-	//		pub contract VaultContract {
-	//			//pub resource interface VaultBalance {
-	//			//   pub fun getBalance(): Int
-	//			//}
-	//
-	//			pub resource Vault: VaultBalance {
-	//				access(self) var balance : Int
-	//
-	//				init(amount: Int) {
-	//					self.balance = amount
-	//				}
-	//
-	//				pub fun getBalance(): Int{
-	//					return self.balance
-	//				}
-	//
-	//				pub fun rob() {
-	//					log("this should not be reachable")
-	//				}
-	//		   }
-	//
-	//		   pub fun createVault(){
-	//			 let res <- create Vault(amount: 10)
-	//
-	//
-	//			 self.account.save(<-res, to: /storage/vault)
-	//           }
-	//		}
-	//		`,
-	//		lint.SuggestRestrictedType,
-	//	)
-	//
-	//	require.Equal(
-	//		t,
-	//		[]analysis.Diagnostic(nil),
-	//		diagnostics,
-	//	)
-	//})
+	t.Run("valid", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+			pub contract VaultContract {
+				pub resource interface VaultBalance {
+				   pub fun getBalance(): Int
+				}
+	
+				pub resource Vault: VaultBalance {
+					access(self) var balance : Int
+	
+					init(amount: Int) {
+						self.balance = amount
+					}
+	
+					pub fun getBalance(): Int{
+						return self.balance
+					}
+	
+					pub fun rob() {
+						log("this should not be reachable")
+					}
+			   }
+	
+			   pub fun createVault(){
+				let res : @{VaultBalance} <- create Vault(amount: 10)
+				log(res.getBalance())			 
+ 	            self.account.save(<-res, to: /storage/vault)
+	          }
+			}
+			`,
+			lint.SuggestRestrictedType,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
 }
