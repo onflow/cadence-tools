@@ -8,9 +8,9 @@ require (
 	github.com/mattn/go-isatty v0.0.19
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v0.40.0
-	github.com/onflow/cadence-tools/lint v0.11.0
+	github.com/onflow/cadence-tools/lint v0.11.1
 	github.com/onflow/flow-cli/flowkit v1.3.5-0.20230808220356-6a2bfeb10552
-	github.com/onflow/flow-go-sdk v0.43.0
+	github.com/onflow/flow-go-sdk v0.41.10
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.4
 	github.com/spf13/pflag v1.0.5
@@ -102,7 +102,6 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
-	github.com/onflow/crypto v0.24.9 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3 // indirect
 	github.com/onflow/flow-emulator v0.54.0 // indirect
