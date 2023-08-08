@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 
 	linter "github.com/onflow/cadence-tools/lint"
+	cdcTests "github.com/onflow/cadence-tools/test"
 )
 
 // Document represents an open document on the client. It contains all cached
@@ -2886,6 +2887,11 @@ func (s *Server) handleImport(
 		testChecker := stdlib.GetTestContractType().Checker
 		return sema.ElaborationImport{
 			Elaboration: testChecker.Elaboration,
+		}, nil
+	case cdcTests.BlockchainHelpersLocation:
+		helpersChecker := cdcTests.BlockchainHelpersChecker()
+		return sema.ElaborationImport{
+			Elaboration: helpersChecker.Elaboration,
 		}, nil
 	default:
 		if isPathLocation(importedLocation) {
