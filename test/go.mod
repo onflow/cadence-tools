@@ -4,10 +4,10 @@ go 1.18
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v0.39.14
-	github.com/onflow/flow-emulator v0.53.0
-	github.com/onflow/flow-go v0.31.1-0.20230718164039-e3411eff1e9d
-	github.com/onflow/flow-go-sdk v0.41.9
+	github.com/onflow/cadence v0.40.0
+	github.com/onflow/flow-emulator v0.54.0
+	github.com/onflow/flow-go v0.31.1-0.20230808172820-f074502a67e3
+	github.com/onflow/flow-go-sdk v0.41.10
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.8.4
 )
@@ -90,9 +90,9 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect
-	github.com/onflow/flow-go/crypto v0.24.7 // indirect
+	github.com/onflow/flow-go/crypto v0.24.9 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230602212908-08fc6536d391 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230628215638-83439d22e0ce // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d // indirect
@@ -102,10 +102,10 @@ require (
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
+	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/psiemens/graceland v1.0.0 // indirect
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -148,6 +148,7 @@ require (
 	golang.org/x/term v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	google.golang.org/grpc v1.56.1 // indirect
