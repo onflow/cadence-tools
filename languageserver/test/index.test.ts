@@ -87,9 +87,11 @@ async function withConnection(f: (connection: ProtocolConnection) => Promise<voi
     connection.onError(e => console.log("err >", e))
   }
 
-  await f(connection)
-
-  await connection.sendNotification(ExitNotification.type)
+  try {
+    await f(connection)
+  } finally {
+    await connection.sendNotification(ExitNotification.type)
+  }
 }
 
 async function createTestDocument(connection: ProtocolConnection, code: string): Promise<string> {
@@ -281,7 +283,7 @@ describe("diagnostics", () => {
                 }
             }
           `,
-          ["function 'linkAccount' is deprecated. Use `capabilities.account.issue` instead."],
+          [],
       )
   )
 

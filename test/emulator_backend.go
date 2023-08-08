@@ -668,6 +668,10 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 // address mappings for system/common contracts.
 func baseConfiguration() *stdlib.Configuration {
 	addresses := make(map[string]common.Address, 0)
+	serviceAddress, _ := common.HexToAddress("0xf8d6e0586b0a20c7")
+	addresses["NonFungibleToken"] = serviceAddress
+	addresses["MetadataViews"] = serviceAddress
+	addresses["ViewResolver"] = serviceAddress
 	for _, addressLocation := range systemContracts {
 		contract := addressLocation.Name
 		address := common.Address(addressLocation.Address)
