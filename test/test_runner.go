@@ -61,6 +61,8 @@ const afterEachFunctionName = "afterEach"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
+const BlockchainHelpersLocation = common.IdentifierLocation("BlockchainHelpers")
+
 var quotedLog = regexp.MustCompile("\"(.*)\"")
 
 type Results []Result
@@ -639,17 +641,7 @@ func (r *TestRunner) parseAndCheckImport(
 	*sema.Elaboration,
 	error,
 ) {
-	if r.importResolver == nil {
-		return nil, nil, ImportResolverNotProvidedError{}
-	}
-
-	code, err := r.importResolver(location)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// Create a new (child) context, with new environment.
-
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	ctx := runtime.Context{
@@ -677,6 +669,25 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
+
+	if location == BlockchainHelpersLocation {
+		program, err := r.testRuntime.ParseAndCheckProgram(BlockchainHelpers, ctx)
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return program.Program, program.Elaboration, nil
+	}
+
+	if r.importResolver == nil {
+		return nil, nil, ImportResolverNotProvidedError{}
+	}
+
+	code, err := r.importResolver(location)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 

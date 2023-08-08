@@ -474,6 +474,18 @@ func (e *EmulatorBackend) DeployContract(
 }
 
 func (e *EmulatorBackend) ReadFile(path string) (string, error) {
+	// These are the scripts/transactions used by the
+	// BlockchainHelpers file.
+	if path == "mint_flow.cdc" {
+		return string(MintFlowTransaction), nil
+	} else if path == "get_flow_balance.cdc" {
+		return string(GetFlowBalance), nil
+	} else if path == "get_current_block_height.cdc" {
+		return string(GetCurrentBlockHeight), nil
+	} else if path == "burn_flow.cdc" {
+		return string(BurnFlow), nil
+	}
+
 	if e.fileResolver == nil {
 		return "", FileResolverNotProvidedError{}
 	}

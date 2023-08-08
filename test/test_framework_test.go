@@ -1799,6 +1799,7 @@ func TestErrors(t *testing.T) {
 
                 let result = blockchain.executeTransaction(tx2)!
 
+                Test.assertError(result, errorMessage: "some error")
                 if result.status == Test.ResultStatus.failed {
                     panic(result.error!.message)
                 }
@@ -2806,6 +2807,131 @@ func TestReplaceImports(t *testing.T) {
 	assert.Equal(t, expected, replacedCode)
 }
 
+func TestGetAccountFlowBalance(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+
+        pub fun testGetFlowBalance() {
+            // Arrange
+            let account = blockchain.serviceAccount()
+
+            // Act
+            let balance = getFlowBalance(for: account, blockchain: blockchain)
+
+            // Assert
+            Test.assertEqual(1000000000.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testGetFlowBalance")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestGetCurrentBlockHeight(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+
+        pub fun testGetCurrentBlockHeight() {
+            // Act
+            let height = getCurrentBlockHeight(blockchain: blockchain)
+
+            // Assert
+            Test.expect(height, Test.beGreaterThan(1 as UInt64))
+
+            // Act
+            blockchain.commitBlock()
+            let newHeight = getCurrentBlockHeight(blockchain: blockchain)
+
+            // Assert
+            Test.assertEqual(newHeight, height + 1)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testGetCurrentBlockHeight")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestMintFlow(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+
+        pub fun testMintFlow() {
+            // Arrange
+            let account = blockchain.createAccount()
+
+            // Act
+            mintFlow(to: account, amount: 1500.0, blockchain: blockchain)
+
+            // Assert
+            let balance = getFlowBalance(for: account, blockchain: blockchain)
+            Test.assertEqual(1500.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testMintFlow")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestBurnFlow(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+
+        pub fun testBurnFlow() {
+            // Arrange
+            let account = blockchain.createAccount()
+
+            // Act
+            mintFlow(to: account, amount: 1500.0, blockchain: blockchain)
+
+            // Assert
+            var balance = getFlowBalance(for: account, blockchain: blockchain)
+            Test.assertEqual(1500.0, balance)
+
+            // Act
+            burnFlow(from: account, amount: 500.0, blockchain: blockchain)
+
+            // Assert
+            balance = getFlowBalance(for: account, blockchain: blockchain)
+            Test.assertEqual(1000.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testBurnFlow")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestServiceAccount(t *testing.T) {
 	t.Parallel()
 
@@ -2855,6 +2981,7 @@ func TestServiceAccount(t *testing.T) {
 
 		const testCode = `
             import Test
+            import BlockchainHelpers
 
             pub let blockchain = Test.newEmulatorBlockchain()
 
@@ -2863,12 +2990,9 @@ func TestServiceAccount(t *testing.T) {
                 let account = blockchain.serviceAccount()
 
                 // Act
-                let script = Test.readFile("../scripts/get_account_balance.cdc")
-                let result = blockchain.executeScript(script, [account.address])
-                Test.expect(result, Test.beSucceeded())
+                let balance = getFlowBalance(for: account, blockchain: blockchain)
 
                 // Assert
-                let balance = result.returnValue! as! UFix64
                 Test.assertEqual(1000000000.0, balance)
             }
 
@@ -2889,28 +3013,9 @@ func TestServiceAccount(t *testing.T) {
                 let txResult = blockchain.executeTransaction(tx)
                 Test.expect(txResult, Test.beSucceeded())
 
-                let script = Test.readFile("../scripts/get_account_balance.cdc")
-                let scriptResult = blockchain.executeScript(script, [receiver.address])
-
-                Test.expect(scriptResult, Test.beSucceeded())
-
                 // Assert
-                let balance = scriptResult.returnValue! as! UFix64
+                let balance = getFlowBalance(for: receiver, blockchain: blockchain)
                 Test.assertEqual(1500.0, balance)
-            }
-		`
-
-		const scriptCode = `
-            import "FungibleToken"
-            import "FlowToken"
-
-            pub fun main(address: Address): UFix64 {
-                let balanceRef = getAccount(address)
-                    .getCapability(/public/flowTokenBalance)
-                    .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
-                    ?? panic("Could not borrow FungibleToken.Balance reference")
-
-                return balanceRef.balance
             }
 		`
 
@@ -2937,8 +3042,6 @@ func TestServiceAccount(t *testing.T) {
 
 		fileResolver := func(path string) (string, error) {
 			switch path {
-			case "../scripts/get_account_balance.cdc":
-				return scriptCode, nil
 			case "../transactions/transfer_flow_tokens.cdc":
 				return transactionCode, nil
 			default:
@@ -3974,100 +4077,45 @@ func TestBlockchainReset(t *testing.T) {
 
 	const testCode = `
         import Test
+        import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
 
         pub fun testBlockchainReset() {
             // Arrange
-            let serviceAccount = blockchain.serviceAccount()
-            let receiver = blockchain.createAccount()
+            let account = blockchain.createAccount()
+            var balance = getFlowBalance(for: account, blockchain: blockchain)
+            Test.assertEqual(0.0, balance)
 
-            let code = Test.readFile("../transactions/transfer_flow_tokens.cdc")
-            let tx = Test.Transaction(
-                code: code,
-                authorizers: [serviceAccount.address],
-                signers: [],
-                arguments: [receiver.address, 1500.0]
-            )
+            let height = getCurrentBlockHeight(blockchain: blockchain)
 
-            // Act
-            var result = blockchain.executeTransaction(tx)
-            Test.expect(result, Test.beSucceeded())
+            mintFlow(to: account, amount: 1500.0, blockchain: blockchain)
 
-            var script = Test.readFile("../scripts/get_account_balance.cdc")
-            var value = blockchain.executeScript(script, [serviceAccount.address])
-
-            Test.expect(result, Test.beSucceeded())
-
-            var balance = value.returnValue! as! UFix64
-
-            // Assert
-            Test.assertEqual(999998500.0, balance)
+            balance = getFlowBalance(for: account, blockchain: blockchain)
+            Test.assertEqual(1500.0, balance)
+            Test.assertEqual(getCurrentBlockHeight(blockchain: blockchain), height + 1)
 
             // Act
-            blockchain.reset()
-
-            script = Test.readFile("../scripts/get_account_balance.cdc")
-            value = blockchain.executeScript(script, [serviceAccount.address])
-
-            Test.expect(result, Test.beSucceeded())
-
-            balance = value.returnValue! as! UFix64
+            blockchain.reset(to: height)
 
             // Assert
-            Test.assertEqual(1000000000.0, balance)
+            balance = getFlowBalance(for: account, blockchain: blockchain)
+            Test.assertEqual(0.0, balance)
+            Test.assertEqual(getCurrentBlockHeight(blockchain: blockchain), height)
         }
 	`
 
-	const scriptCode = `
-        import "FungibleToken"
-        import "FlowToken"
-
-        pub fun main(address: Address): UFix64 {
-            let balanceRef = getAccount(address)
-                .getCapability(/public/flowTokenBalance)
-                .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
-                ?? panic("Could not borrow FungibleToken.Balance reference")
-
-            return balanceRef.balance
-        }
-	`
-
-	const transactionCode = `
-        import "FungibleToken"
-        import "FlowToken"
-
-        transaction(receiver: Address, amount: UFix64) {
-            prepare(account: AuthAccount) {
-                let flowVault = account.borrow<&FlowToken.Vault>(
-                    from: /storage/flowTokenVault
-                ) ?? panic("Could not borrow BlpToken.Vault reference")
-
-                let receiverRef = getAccount(receiver)
-                    .getCapability(/public/flowTokenReceiver)
-                    .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
-                    ?? panic("Could not borrow FungibleToken.Receiver reference")
-
-                let tokens <- flowVault.withdraw(amount: amount)
-                receiverRef.deposit(from: <- tokens)
-            }
-        }
-	`
-
-	fileResolver := func(path string) (string, error) {
-		switch path {
-		case "../scripts/get_account_balance.cdc":
-			return scriptCode, nil
-		case "../transactions/transfer_flow_tokens.cdc":
-			return transactionCode, nil
-		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
-		}
-	}
-
-	runner := NewTestRunner().WithFileResolver(fileResolver)
+	runner := NewTestRunner()
 
 	result, err := runner.RunTest(testCode, "testBlockchainReset")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
+}
+
+func TestBlockchainHelpersChecker(t *testing.T) {
+	t.Parallel()
+
+	checker := BlockchainHelpersChecker()
+	err := checker.Check()
+	assert.NoError(t, err)
 }
