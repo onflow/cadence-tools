@@ -157,13 +157,15 @@ type DocumentSymbolProvider func(uri protocol.DocumentURI, version int32, checke
 // InitializationOptionsHandler is a function that is used to handle initialization options sent by the client
 type InitializationOptionsHandler func(initializationOptions any) error
 
+type CodeActionResolver func() []*protocol.CodeAction
+
 type Server struct {
 	protocolServer       *protocol.Server
 	checkers             map[common.Location]*sema.Checker
 	documents            map[protocol.DocumentURI]Document
 	memberResolvers      map[protocol.DocumentURI]map[string]sema.MemberResolver
 	ranges               map[protocol.DocumentURI]map[string]sema.Range
-	codeActionsResolvers map[protocol.DocumentURI]map[uuid.UUID]func() []*protocol.CodeAction
+	codeActionsResolvers map[protocol.DocumentURI]map[uuid.UUID]CodeActionResolver
 	// commands is the registry of custom commands we support
 	commands map[string]CommandHandler
 	// resolveAddressImport is the optional function that is used to resolve address imports
@@ -287,7 +289,7 @@ func NewServer() (*Server, error) {
 		documents:            make(map[protocol.DocumentURI]Document),
 		memberResolvers:      make(map[protocol.DocumentURI]map[string]sema.MemberResolver),
 		ranges:               make(map[protocol.DocumentURI]map[string]sema.Range),
-		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]func() []*protocol.CodeAction),
+		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]CodeActionResolver),
 		commands:             make(map[string]CommandHandler),
 		accessCheckMode:      sema.AccessCheckModeStrict,
 	}
@@ -1833,7 +1835,7 @@ func (s *Server) getDiagnostics(
 	diagnosticsErr error,
 ) {
 	// Always reset the code actions for this document
-	codeActionsResolvers := map[uuid.UUID]func() []*protocol.CodeAction{}
+	codeActionsResolvers := map[uuid.UUID]CodeActionResolver{}
 	s.codeActionsResolvers[uri] = codeActionsResolvers
 
 	// NOTE: Always initialize to an empty slice, i.e DON'T use nil:
@@ -1933,7 +1935,7 @@ func (s *Server) getDiagnostics(
 func (s *Server) getDiagnosticsForParentError(
 	uri protocol.DocumentURI,
 	err errors.ParentError,
-	codeActionsResolvers map[uuid.UUID]func() []*protocol.CodeAction,
+	codeActionsResolvers map[uuid.UUID]CodeActionResolver,
 	log func(*protocol.LogMessageParams),
 ) (
 	diagnostics []protocol.Diagnostic,
@@ -2212,7 +2214,7 @@ func (s *Server) convertError(
 	uri protocol.DocumentURI,
 ) (
 	protocol.Diagnostic,
-	func() []*protocol.CodeAction,
+	CodeActionResolver,
 ) {
 	startPosition := err.StartPosition()
 	endPosition := err.EndPosition(nil)
@@ -2233,7 +2235,7 @@ func (s *Server) convertError(
 		Range:    protocolRange,
 	}
 
-	var codeActionsResolver func() []*protocol.CodeAction
+	var codeActionsResolver CodeActionResolver
 
 	switch err := err.(type) {
 	case *sema.TypeMismatchError:
@@ -2339,27 +2341,46 @@ func (s *Server) convertError(
 				},
 			)
 		}
+	}
 
-	case sema.HasSuggestedFixes:
+	if hasSuggestedFixes, ok := err.(sema.HasSuggestedFixes); ok {
 		if document, ok := s.documents[uri]; ok {
-			codeActionsResolver = func() []*protocol.CodeAction {
-				return conversion.SuggestedFixesToCodeActions(
-					err.SuggestFixes(document.Text),
-					diagnostic,
-					uri,
-				)
-			}
+			codeActionsResolver = combineCodeActionResolvers(
+				codeActionsResolver,
+				func() []*protocol.CodeAction {
+					return conversion.SuggestedFixesToCodeActions(
+						hasSuggestedFixes.SuggestFixes(document.Text),
+						diagnostic,
+						uri,
+					)
+				},
+			)
 		}
 	}
 
 	return diagnostic, codeActionsResolver
 }
 
+func combineCodeActionResolvers(
+	firstResolver CodeActionResolver,
+	secondResolver CodeActionResolver,
+) CodeActionResolver {
+	return func() (codeActions []*protocol.CodeAction) {
+		if firstResolver != nil {
+			codeActions = firstResolver()
+		}
+		if secondResolver != nil {
+			codeActions = append(codeActions, secondResolver()...)
+		}
+		return
+	}
+}
+
 func (s *Server) maybeReturnTypeChangeCodeActionsResolver(
 	diagnostic protocol.Diagnostic,
 	uri protocol.DocumentURI,
 	err *sema.TypeMismatchError,
-) func() []*protocol.CodeAction {
+) CodeActionResolver {
 
 	// The type mismatch could be in a return statement
 	// due to a missing or wrong return type.
@@ -2480,7 +2501,7 @@ func maybeAddMissingMembersCodeActionResolver(
 	diagnostic protocol.Diagnostic,
 	err *sema.ConformanceError,
 	uri protocol.DocumentURI,
-) func() []*protocol.CodeAction {
+) CodeActionResolver {
 
 	missingMemberCount := len(err.MissingMembers)
 	if missingMemberCount == 0 {
@@ -2589,7 +2610,7 @@ func (s *Server) maybeAddDeclarationActionsResolver(
 	errorPos ast.Position,
 	name string,
 	memberInsertionPosGetter func(checker *sema.Checker, isFunction bool) insertionPosition,
-) func() []*protocol.CodeAction {
+) CodeActionResolver {
 	return func() []*protocol.CodeAction {
 		document, ok := s.documents[uri]
 		if !ok {
@@ -3173,7 +3194,7 @@ func convertDiagnostic(
 	uri protocol.DocumentURI,
 ) (
 	protocol.Diagnostic,
-	func() []*protocol.CodeAction,
+	CodeActionResolver,
 ) {
 
 	protocolRange := conversion.ASTToProtocolRange(
@@ -3184,7 +3205,7 @@ func convertDiagnostic(
 	var protocolDiagnostic protocol.Diagnostic
 	var message string
 
-	var codeActionsResolver func() []*protocol.CodeAction
+	var codeActionsResolver CodeActionResolver
 	var tags []protocol.DiagnosticTag
 	severity := protocol.SeverityWarning
 
