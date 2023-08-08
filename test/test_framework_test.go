@@ -4119,3 +4119,51 @@ func TestBlockchainHelpersChecker(t *testing.T) {
 	err := checker.Check()
 	assert.NoError(t, err)
 }
+
+func TestTestFunctionValidSignature(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with argument", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+            import Test
+
+            pub fun testValidSignature() {
+                Test.assertEqual(2, 5 - 3)
+            }
+
+            pub fun testInvalidSignature(prefix: String) {
+                Test.assertEqual(2, 5 - 3)
+            }
+		`
+
+		runner := NewTestRunner()
+
+		_, err := runner.RunTests(testCode)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "test functions should have no arguments")
+	})
+
+	t.Run("with return value", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+            import Test
+
+            pub fun testValidSignature() {
+                Test.assertEqual(2, 5 - 3)
+            }
+
+            pub fun testInvalidSignature(): Bool {
+                return 2 == (5 - 3)
+            }
+		`
+
+		runner := NewTestRunner()
+
+		_, err := runner.RunTests(testCode)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "test functions should have no return values")
+	})
+}

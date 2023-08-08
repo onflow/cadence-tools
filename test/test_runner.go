@@ -398,8 +398,21 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		return nil, nil, err
 	}
 
-	// TODO: validate test function signature
-	//   e.g: no return values, no arguments, etc.
+	for _, funcDecl := range program.Program.FunctionDeclarations() {
+		funcName := funcDecl.Identifier.Identifier
+
+		if !strings.HasPrefix(funcName, testFunctionPrefix) {
+			continue
+		}
+
+		if !funcDecl.ParameterList.IsEmpty() {
+			return nil, nil, fmt.Errorf("test functions should have no arguments")
+		}
+
+		if funcDecl.ReturnTypeAnnotation != nil {
+			return nil, nil, fmt.Errorf("test functions should have no return values")
+		}
+	}
 
 	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
 	env.InterpreterConfig.Storage = runtime.NewStorage(ctx.Interface, nil)
