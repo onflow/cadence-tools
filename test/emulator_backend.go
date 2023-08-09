@@ -475,14 +475,16 @@ func (e *EmulatorBackend) DeployContract(
 
 func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 	// These are the scripts/transactions used by the
-	// BlockchainHelpers file.
-	if path == "mint_flow.cdc" {
+	// BlockchainHelpers file. The null character is
+	// used in order to prevent conflicts with user-defined
+	// scripts/transactions.
+	if path == "\x00helper/mint_flow.cdc" {
 		return string(MintFlowTransaction), nil
-	} else if path == "get_flow_balance.cdc" {
+	} else if path == "\x00helper/get_flow_balance.cdc" {
 		return string(GetFlowBalance), nil
-	} else if path == "get_current_block_height.cdc" {
+	} else if path == "\x00helper/get_current_block_height.cdc" {
 		return string(GetCurrentBlockHeight), nil
-	} else if path == "burn_flow.cdc" {
+	} else if path == "\x00helper/burn_flow.cdc" {
 		return string(BurnFlow), nil
 	}
 
