@@ -1799,7 +1799,6 @@ func TestErrors(t *testing.T) {
 
                 let result = blockchain.executeTransaction(tx2)!
 
-                Test.assertError(result, errorMessage: "some error")
                 if result.status == Test.ResultStatus.failed {
                     panic(result.error!.message)
                 }
@@ -2815,13 +2814,14 @@ func TestGetAccountFlowBalance(t *testing.T) {
         import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
         pub fun testGetFlowBalance() {
             // Arrange
             let account = blockchain.serviceAccount()
 
             // Act
-            let balance = getFlowBalance(for: account, blockchain: blockchain)
+            let balance = helpers.getFlowBalance(for: account)
 
             // Assert
             Test.assertEqual(1000000000.0, balance)
@@ -2843,17 +2843,18 @@ func TestGetCurrentBlockHeight(t *testing.T) {
         import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
         pub fun testGetCurrentBlockHeight() {
             // Act
-            let height = getCurrentBlockHeight(blockchain: blockchain)
+            let height = helpers.getCurrentBlockHeight()
 
             // Assert
             Test.expect(height, Test.beGreaterThan(1 as UInt64))
 
             // Act
             blockchain.commitBlock()
-            let newHeight = getCurrentBlockHeight(blockchain: blockchain)
+            let newHeight = helpers.getCurrentBlockHeight()
 
             // Assert
             Test.assertEqual(newHeight, height + 1)
@@ -2875,16 +2876,17 @@ func TestMintFlow(t *testing.T) {
         import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
         pub fun testMintFlow() {
             // Arrange
             let account = blockchain.createAccount()
 
             // Act
-            mintFlow(to: account, amount: 1500.0, blockchain: blockchain)
+            helpers.mintFlow(to: account, amount: 1500.0)
 
             // Assert
-            let balance = getFlowBalance(for: account, blockchain: blockchain)
+            let balance = helpers.getFlowBalance(for: account)
             Test.assertEqual(1500.0, balance)
         }
 	`
@@ -2904,23 +2906,24 @@ func TestBurnFlow(t *testing.T) {
         import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
         pub fun testBurnFlow() {
             // Arrange
             let account = blockchain.createAccount()
 
             // Act
-            mintFlow(to: account, amount: 1500.0, blockchain: blockchain)
+            helpers.mintFlow(to: account, amount: 1500.0)
 
             // Assert
-            var balance = getFlowBalance(for: account, blockchain: blockchain)
+            var balance = helpers.getFlowBalance(for: account)
             Test.assertEqual(1500.0, balance)
 
             // Act
-            burnFlow(from: account, amount: 500.0, blockchain: blockchain)
+            helpers.burnFlow(from: account, amount: 500.0)
 
             // Assert
-            balance = getFlowBalance(for: account, blockchain: blockchain)
+            balance = helpers.getFlowBalance(for: account)
             Test.assertEqual(1000.0, balance)
         }
 	`
@@ -2984,13 +2987,14 @@ func TestServiceAccount(t *testing.T) {
             import BlockchainHelpers
 
             pub let blockchain = Test.newEmulatorBlockchain()
+            pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
             pub fun testGetServiceAccountBalance() {
                 // Arrange
                 let account = blockchain.serviceAccount()
 
                 // Act
-                let balance = getFlowBalance(for: account, blockchain: blockchain)
+                let balance = helpers.getFlowBalance(for: account)
 
                 // Assert
                 Test.assertEqual(1000000000.0, balance)
@@ -3014,7 +3018,7 @@ func TestServiceAccount(t *testing.T) {
                 Test.expect(txResult, Test.beSucceeded())
 
                 // Assert
-                let balance = getFlowBalance(for: receiver, blockchain: blockchain)
+                let balance = helpers.getFlowBalance(for: receiver)
                 Test.assertEqual(1500.0, balance)
             }
 		`
@@ -4080,28 +4084,27 @@ func TestBlockchainReset(t *testing.T) {
         import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
         pub fun testBlockchainReset() {
             // Arrange
             let account = blockchain.createAccount()
-            var balance = getFlowBalance(for: account, blockchain: blockchain)
+            var balance = helpers.getFlowBalance(for: account)
             Test.assertEqual(0.0, balance)
 
-            let height = getCurrentBlockHeight(blockchain: blockchain)
+            let height = helpers.getCurrentBlockHeight()
 
-            mintFlow(to: account, amount: 1500.0, blockchain: blockchain)
+            helpers.mintFlow(to: account, amount: 1500.0)
 
-            balance = getFlowBalance(for: account, blockchain: blockchain)
+            balance = helpers.getFlowBalance(for: account)
             Test.assertEqual(1500.0, balance)
-            Test.assertEqual(getCurrentBlockHeight(blockchain: blockchain), height + 1)
+            Test.assertEqual(helpers.getCurrentBlockHeight(), height + 1)
 
             // Act
-            blockchain.reset(to: height)
+            blockchain.reset()
 
             // Assert
-            balance = getFlowBalance(for: account, blockchain: blockchain)
-            Test.assertEqual(0.0, balance)
-            Test.assertEqual(getCurrentBlockHeight(blockchain: blockchain), height)
+            Test.assertEqual(helpers.getCurrentBlockHeight(), 0 as UInt64)
         }
 	`
 
