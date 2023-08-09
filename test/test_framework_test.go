@@ -1799,6 +1799,7 @@ func TestErrors(t *testing.T) {
 
                 let result = blockchain.executeTransaction(tx2)!
 
+                Test.assertError(result, errorMessage: "some error")
                 if result.status == Test.ResultStatus.failed {
                     panic(result.error!.message)
                 }
