@@ -4101,10 +4101,12 @@ func TestBlockchainReset(t *testing.T) {
             Test.assertEqual(helpers.getCurrentBlockHeight(), height + 1)
 
             // Act
-            blockchain.reset()
+            blockchain.reset(to: height)
 
             // Assert
-            Test.assertEqual(helpers.getCurrentBlockHeight(), 0 as UInt64)
+            balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(0.0, balance)
+            Test.assertEqual(helpers.getCurrentBlockHeight(), height)
         }
 	`
 
