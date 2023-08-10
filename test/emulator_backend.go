@@ -46,6 +46,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// The "\x00helper/" prefix is used in order to prevent
+// conflicts with user-defined scripts/transactions.
+const helperFilePrefix = "\x00helper/"
+
 var _ stdlib.TestFramework = &EmulatorBackend{}
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
@@ -475,19 +479,19 @@ func (e *EmulatorBackend) DeployContract(
 
 func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 	// These are the scripts/transactions used by the
-	// BlockchainHelpers file. The "\x00helper/" prefix is
-	// used in order to prevent conflicts with user-defined
-	// scripts/transactions.
-	filename := strings.TrimPrefix(path, "\x00helper/")
-	switch filename {
-	case "mint_flow.cdc":
-		return string(MintFlowTransaction), nil
-	case "get_flow_balance.cdc":
-		return string(GetFlowBalance), nil
-	case "get_current_block_height.cdc":
-		return string(GetCurrentBlockHeight), nil
-	case "burn_flow.cdc":
-		return string(BurnFlow), nil
+	// BlockchainHelpers file.
+	if strings.HasPrefix(path, helperFilePrefix) {
+		filename := strings.TrimPrefix(path, helperFilePrefix)
+		switch filename {
+		case "mint_flow.cdc":
+			return string(MintFlowTransaction), nil
+		case "get_flow_balance.cdc":
+			return string(GetFlowBalance), nil
+		case "get_current_block_height.cdc":
+			return string(GetCurrentBlockHeight), nil
+		case "burn_flow.cdc":
+			return string(BurnFlow), nil
+		}
 	}
 
 	if e.fileResolver == nil {
