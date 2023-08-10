@@ -475,16 +475,18 @@ func (e *EmulatorBackend) DeployContract(
 
 func (e *EmulatorBackend) ReadFile(path string) (string, error) {
 	// These are the scripts/transactions used by the
-	// BlockchainHelpers file. The null character is
+	// BlockchainHelpers file. The "\x00helper/" prefix is
 	// used in order to prevent conflicts with user-defined
 	// scripts/transactions.
-	if path == "\x00helper/mint_flow.cdc" {
+	filename := strings.TrimPrefix(path, "\x00helper/")
+	switch filename {
+	case "mint_flow.cdc":
 		return string(MintFlowTransaction), nil
-	} else if path == "\x00helper/get_flow_balance.cdc" {
+	case "get_flow_balance.cdc":
 		return string(GetFlowBalance), nil
-	} else if path == "\x00helper/get_current_block_height.cdc" {
+	case "get_current_block_height.cdc":
 		return string(GetCurrentBlockHeight), nil
-	} else if path == "\x00helper/burn_flow.cdc" {
+	case "burn_flow.cdc":
 		return string(BurnFlow), nil
 	}
 

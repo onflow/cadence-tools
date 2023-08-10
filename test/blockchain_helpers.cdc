@@ -10,7 +10,7 @@ pub struct BlockchainHelpers {
     /// Returns the current block height of the blockchain.
     ///
     pub fun getCurrentBlockHeight(): UInt64 {
-        let script = Test.readFile("\u{0}helper/get_current_block_height.cdc")
+        let script = self.readFile("get_current_block_height.cdc")
         let scriptResult = self.blockchain.executeScript(script, [])
 
         if scriptResult.status == Test.ResultStatus.failed {
@@ -22,7 +22,7 @@ pub struct BlockchainHelpers {
     /// Returns the Flow token balance for the given account.
     ///
     pub fun getFlowBalance(for account: Test.Account): UFix64 {
-        let script = Test.readFile("\u{0}helper/get_flow_balance.cdc")
+        let script = self.readFile("get_flow_balance.cdc")
         let scriptResult = self.blockchain.executeScript(script, [account.address])
 
         if scriptResult.status == Test.ResultStatus.failed {
@@ -39,7 +39,7 @@ pub struct BlockchainHelpers {
         to receiver: Test.Account,
         amount: UFix64
     ): Test.TransactionResult {
-        let code = Test.readFile("\u{0}helper/mint_flow.cdc")
+        let code = self.readFile("mint_flow.cdc")
         let tx = Test.Transaction(
             code: code,
             authorizers: [self.blockchain.serviceAccount().address],
@@ -57,7 +57,7 @@ pub struct BlockchainHelpers {
         from account: Test.Account,
         amount: UFix64
     ): Test.TransactionResult {
-        let code = Test.readFile("\u{0}helper/burn_flow.cdc")
+        let code = self.readFile("burn_flow.cdc")
         let tx = Test.Transaction(
             code: code,
             authorizers: [account.address],
@@ -66,5 +66,15 @@ pub struct BlockchainHelpers {
         )
 
         return self.blockchain.executeTransaction(tx)
+    }
+
+    /// Reads the code for the script/transaction with the given
+    /// file name and returns its content as a String.
+    ///
+    access(self)
+    fun readFile(_ name: String): String {
+        // The "\u{0}helper/" prefix is used in order to prevent
+        // conflicts with user-defined scripts/transactions.
+        return Test.readFile("\u{0}helper/".concat(name))
     }
 }
