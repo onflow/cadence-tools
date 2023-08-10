@@ -446,6 +446,10 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 			testChecker := stdlib.GetTestContractType().Checker
 			elaboration = testChecker.Elaboration
 
+		case BlockchainHelpersLocation:
+			helpersChecker := BlockchainHelpersChecker()
+			elaboration = helpersChecker.Elaboration
+
 		default:
 			_, importedElaboration, err := r.parseAndCheckImport(importedLocation, ctx)
 			if err != nil {
@@ -554,6 +558,16 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 			return interpreter.InterpreterImport{
 				Interpreter: subInterpreter,
 			}
+		case BlockchainHelpersLocation:
+			helpersChecker := BlockchainHelpersChecker()
+			program := interpreter.ProgramFromChecker(helpersChecker)
+			subInterpreter, err := inter.NewSubInterpreter(program, location)
+			if err != nil {
+				panic(err)
+			}
+			return interpreter.InterpreterImport{
+				Interpreter: subInterpreter,
+			}
 
 		default:
 			addressLocation, ok := location.(common.AddressLocation)
@@ -654,7 +668,17 @@ func (r *TestRunner) parseAndCheckImport(
 	*sema.Elaboration,
 	error,
 ) {
+	if r.importResolver == nil {
+		return nil, nil, ImportResolverNotProvidedError{}
+	}
+
+	code, err := r.importResolver(location)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Create a new (child) context, with new environment.
+
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	ctx := runtime.Context{
@@ -682,25 +706,6 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
-
-	if location == BlockchainHelpersLocation {
-		program, err := r.testRuntime.ParseAndCheckProgram(BlockchainHelpers, ctx)
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return program.Program, program.Elaboration, nil
-	}
-
-	if r.importResolver == nil {
-		return nil, nil, ImportResolverNotProvidedError{}
-	}
-
-	code, err := r.importResolver(location)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
