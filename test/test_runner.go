@@ -61,6 +61,8 @@ const afterEachFunctionName = "afterEach"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
+const BlockchainHelpersLocation = common.IdentifierLocation("BlockchainHelpers")
+
 var quotedLog = regexp.MustCompile("\"(.*)\"")
 
 type Results []Result
@@ -396,8 +398,21 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		return nil, nil, err
 	}
 
-	// TODO: validate test function signature
-	//   e.g: no return values, no arguments, etc.
+	for _, funcDecl := range program.Program.FunctionDeclarations() {
+		funcName := funcDecl.Identifier.Identifier
+
+		if !strings.HasPrefix(funcName, testFunctionPrefix) {
+			continue
+		}
+
+		if !funcDecl.ParameterList.IsEmpty() {
+			return nil, nil, fmt.Errorf("test functions should have no arguments")
+		}
+
+		if funcDecl.ReturnTypeAnnotation != nil {
+			return nil, nil, fmt.Errorf("test functions should have no return values")
+		}
+	}
 
 	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
 	env.InterpreterConfig.Storage = runtime.NewStorage(ctx.Interface, nil)
@@ -430,6 +445,10 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 		case stdlib.TestContractLocation:
 			testChecker := stdlib.GetTestContractType().Checker
 			elaboration = testChecker.Elaboration
+
+		case BlockchainHelpersLocation:
+			helpersChecker := BlockchainHelpersChecker()
+			elaboration = helpersChecker.Elaboration
 
 		default:
 			_, importedElaboration, err := r.parseAndCheckImport(importedLocation, ctx)
@@ -532,6 +551,16 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 		case stdlib.TestContractLocation:
 			testChecker := stdlib.GetTestContractType().Checker
 			program := interpreter.ProgramFromChecker(testChecker)
+			subInterpreter, err := inter.NewSubInterpreter(program, location)
+			if err != nil {
+				panic(err)
+			}
+			return interpreter.InterpreterImport{
+				Interpreter: subInterpreter,
+			}
+		case BlockchainHelpersLocation:
+			helpersChecker := BlockchainHelpersChecker()
+			program := interpreter.ProgramFromChecker(helpersChecker)
 			subInterpreter, err := inter.NewSubInterpreter(program, location)
 			if err != nil {
 				panic(err)

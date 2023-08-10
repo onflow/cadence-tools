@@ -2806,6 +2806,135 @@ func TestReplaceImports(t *testing.T) {
 	assert.Equal(t, expected, replacedCode)
 }
 
+func TestGetAccountFlowBalance(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
+
+        pub fun testGetFlowBalance() {
+            // Arrange
+            let account = blockchain.serviceAccount()
+
+            // Act
+            let balance = helpers.getFlowBalance(for: account)
+
+            // Assert
+            Test.assertEqual(1000000000.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testGetFlowBalance")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestGetCurrentBlockHeight(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
+
+        pub fun testGetCurrentBlockHeight() {
+            // Act
+            let height = helpers.getCurrentBlockHeight()
+
+            // Assert
+            Test.expect(height, Test.beGreaterThan(1 as UInt64))
+
+            // Act
+            blockchain.commitBlock()
+            let newHeight = helpers.getCurrentBlockHeight()
+
+            // Assert
+            Test.assertEqual(newHeight, height + 1)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testGetCurrentBlockHeight")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestMintFlow(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
+
+        pub fun testMintFlow() {
+            // Arrange
+            let account = blockchain.createAccount()
+
+            // Act
+            helpers.mintFlow(to: account, amount: 1500.0)
+
+            // Assert
+            let balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(1500.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testMintFlow")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestBurnFlow(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
+
+        pub fun testBurnFlow() {
+            // Arrange
+            let account = blockchain.createAccount()
+
+            // Act
+            helpers.mintFlow(to: account, amount: 1500.0)
+
+            // Assert
+            var balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(1500.0, balance)
+
+            // Act
+            helpers.burnFlow(from: account, amount: 500.0)
+
+            // Assert
+            balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(1000.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testBurnFlow")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestServiceAccount(t *testing.T) {
 	t.Parallel()
 
@@ -2855,20 +2984,19 @@ func TestServiceAccount(t *testing.T) {
 
 		const testCode = `
             import Test
+            import BlockchainHelpers
 
             pub let blockchain = Test.newEmulatorBlockchain()
+            pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
             pub fun testGetServiceAccountBalance() {
                 // Arrange
                 let account = blockchain.serviceAccount()
 
                 // Act
-                let script = Test.readFile("../scripts/get_account_balance.cdc")
-                let result = blockchain.executeScript(script, [account.address])
-                Test.expect(result, Test.beSucceeded())
+                let balance = helpers.getFlowBalance(for: account)
 
                 // Assert
-                let balance = result.returnValue! as! UFix64
                 Test.assertEqual(1000000000.0, balance)
             }
 
@@ -2889,28 +3017,9 @@ func TestServiceAccount(t *testing.T) {
                 let txResult = blockchain.executeTransaction(tx)
                 Test.expect(txResult, Test.beSucceeded())
 
-                let script = Test.readFile("../scripts/get_account_balance.cdc")
-                let scriptResult = blockchain.executeScript(script, [receiver.address])
-
-                Test.expect(scriptResult, Test.beSucceeded())
-
                 // Assert
-                let balance = scriptResult.returnValue! as! UFix64
+                let balance = helpers.getFlowBalance(for: receiver)
                 Test.assertEqual(1500.0, balance)
-            }
-		`
-
-		const scriptCode = `
-            import "FungibleToken"
-            import "FlowToken"
-
-            pub fun main(address: Address): UFix64 {
-                let balanceRef = getAccount(address)
-                    .getCapability(/public/flowTokenBalance)
-                    .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
-                    ?? panic("Could not borrow FungibleToken.Balance reference")
-
-                return balanceRef.balance
             }
 		`
 
@@ -2937,8 +3046,6 @@ func TestServiceAccount(t *testing.T) {
 
 		fileResolver := func(path string) (string, error) {
 			switch path {
-			case "../scripts/get_account_balance.cdc":
-				return scriptCode, nil
 			case "../transactions/transfer_flow_tokens.cdc":
 				return transactionCode, nil
 			default:
@@ -3974,100 +4081,92 @@ func TestBlockchainReset(t *testing.T) {
 
 	const testCode = `
         import Test
+        import BlockchainHelpers
 
         pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
 
         pub fun testBlockchainReset() {
             // Arrange
-            let serviceAccount = blockchain.serviceAccount()
-            let receiver = blockchain.createAccount()
+            let account = blockchain.createAccount()
+            var balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(0.0, balance)
 
-            let code = Test.readFile("../transactions/transfer_flow_tokens.cdc")
-            let tx = Test.Transaction(
-                code: code,
-                authorizers: [serviceAccount.address],
-                signers: [],
-                arguments: [receiver.address, 1500.0]
-            )
+            let height = helpers.getCurrentBlockHeight()
 
-            // Act
-            var result = blockchain.executeTransaction(tx)
-            Test.expect(result, Test.beSucceeded())
+            helpers.mintFlow(to: account, amount: 1500.0)
 
-            var script = Test.readFile("../scripts/get_account_balance.cdc")
-            var value = blockchain.executeScript(script, [serviceAccount.address])
-
-            Test.expect(result, Test.beSucceeded())
-
-            var balance = value.returnValue! as! UFix64
-
-            // Assert
-            Test.assertEqual(999998500.0, balance)
+            balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(1500.0, balance)
+            Test.assertEqual(helpers.getCurrentBlockHeight(), height + 1)
 
             // Act
             blockchain.reset()
 
-            script = Test.readFile("../scripts/get_account_balance.cdc")
-            value = blockchain.executeScript(script, [serviceAccount.address])
-
-            Test.expect(result, Test.beSucceeded())
-
-            balance = value.returnValue! as! UFix64
-
             // Assert
-            Test.assertEqual(1000000000.0, balance)
+            Test.assertEqual(helpers.getCurrentBlockHeight(), 0 as UInt64)
         }
 	`
 
-	const scriptCode = `
-        import "FungibleToken"
-        import "FlowToken"
-
-        pub fun main(address: Address): UFix64 {
-            let balanceRef = getAccount(address)
-                .getCapability(/public/flowTokenBalance)
-                .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
-                ?? panic("Could not borrow FungibleToken.Balance reference")
-
-            return balanceRef.balance
-        }
-	`
-
-	const transactionCode = `
-        import "FungibleToken"
-        import "FlowToken"
-
-        transaction(receiver: Address, amount: UFix64) {
-            prepare(account: AuthAccount) {
-                let flowVault = account.borrow<&FlowToken.Vault>(
-                    from: /storage/flowTokenVault
-                ) ?? panic("Could not borrow BlpToken.Vault reference")
-
-                let receiverRef = getAccount(receiver)
-                    .getCapability(/public/flowTokenReceiver)
-                    .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
-                    ?? panic("Could not borrow FungibleToken.Receiver reference")
-
-                let tokens <- flowVault.withdraw(amount: amount)
-                receiverRef.deposit(from: <- tokens)
-            }
-        }
-	`
-
-	fileResolver := func(path string) (string, error) {
-		switch path {
-		case "../scripts/get_account_balance.cdc":
-			return scriptCode, nil
-		case "../transactions/transfer_flow_tokens.cdc":
-			return transactionCode, nil
-		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
-		}
-	}
-
-	runner := NewTestRunner().WithFileResolver(fileResolver)
+	runner := NewTestRunner()
 
 	result, err := runner.RunTest(testCode, "testBlockchainReset")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
+}
+
+func TestBlockchainHelpersChecker(t *testing.T) {
+	t.Parallel()
+
+	checker := BlockchainHelpersChecker()
+	err := checker.Check()
+	assert.NoError(t, err)
+}
+
+func TestTestFunctionValidSignature(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with argument", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+            import Test
+
+            pub fun testValidSignature() {
+                Test.assertEqual(2, 5 - 3)
+            }
+
+            pub fun testInvalidSignature(prefix: String) {
+                Test.assertEqual(2, 5 - 3)
+            }
+		`
+
+		runner := NewTestRunner()
+
+		_, err := runner.RunTests(testCode)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "test functions should have no arguments")
+	})
+
+	t.Run("with return value", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+            import Test
+
+            pub fun testValidSignature() {
+                Test.assertEqual(2, 5 - 3)
+            }
+
+            pub fun testInvalidSignature(): Bool {
+                return 2 == (5 - 3)
+            }
+		`
+
+		runner := NewTestRunner()
+
+		_, err := runner.RunTests(testCode)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "test functions should have no return values")
+	})
 }
