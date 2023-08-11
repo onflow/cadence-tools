@@ -1799,6 +1799,7 @@ func TestErrors(t *testing.T) {
 
                 let result = blockchain.executeTransaction(tx2)!
 
+                Test.assertError(result, errorMessage: "some error")
                 if result.status == Test.ResultStatus.failed {
                     panic(result.error!.message)
                 }
@@ -4101,10 +4102,12 @@ func TestBlockchainReset(t *testing.T) {
             Test.assertEqual(helpers.getCurrentBlockHeight(), height + 1)
 
             // Act
-            blockchain.reset()
+            blockchain.reset(to: height)
 
             // Assert
-            Test.assertEqual(helpers.getCurrentBlockHeight(), 0 as UInt64)
+            balance = helpers.getFlowBalance(for: account)
+            Test.assertEqual(0.0, balance)
+            Test.assertEqual(helpers.getCurrentBlockHeight(), height)
         }
 	`
 

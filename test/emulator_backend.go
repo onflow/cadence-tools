@@ -596,8 +596,8 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 	return e.stdlibHandler
 }
 
-func (e *EmulatorBackend) Reset() {
-	err := e.blockchain.RollbackToBlockHeight(0)
+func (e *EmulatorBackend) Reset(height uint64) {
+	err := e.blockchain.RollbackToBlockHeight(height)
 	if err != nil {
 		panic(err)
 	}
