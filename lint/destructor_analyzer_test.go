@@ -56,12 +56,10 @@ func TestCheckIdentifiesComplexDestructors(t *testing.T) {
 						StartPos: ast.Position{Offset: 96, Line: 5, Column: 5},
 						EndPos:   ast.Position{Offset: 130, Line: 7, Column: 5},
 					},
-					Location: testLocation,
-					Category: lint.UpdateCategory,
-					Message:  "complex destructor found",
-					SecondaryMessage: `destroy() {
-    Test.foo()
-}`,
+					Location:         testLocation,
+					Category:         lint.UpdateCategory,
+					Message:          "complex destructor found",
+					SecondaryMessage: "kinds: OtherComplexOperation, ",
 				},
 			},
 			diagnostics,
@@ -95,4 +93,108 @@ func TestCheckIdentifiesComplexDestructors(t *testing.T) {
 		)
 	})
 
+	t.Run("finds event emission destructor", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t, `
+			 access(all) contract Test {
+				access(all) event Foo()
+				access(all) resource R {
+					destroy() {
+						emit Test.Foo()
+					}
+				}
+			 }`,
+			lint.ComplexDestructorAnalyzer,
+		)
+
+		require.Len(t, diagnostics, 1)
+
+		require.Equal(
+			t,
+			"kinds: EventEmission, ",
+			diagnostics[0].SecondaryMessage,
+		)
+	})
+
+	t.Run("finds assert destructor", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t, `
+			 access(all) contract Test {
+				access(all) resource R {
+					destroy() {
+						assert(1 > 2, message: "")
+					}
+				}
+			 }`,
+			lint.ComplexDestructorAnalyzer,
+		)
+
+		require.Len(t, diagnostics, 1)
+
+		require.Equal(
+			t,
+			"kinds: AssertOrCondition, ",
+			diagnostics[0].SecondaryMessage,
+		)
+	})
+
+	t.Run("finds condition destructor", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t, `
+			 access(all) contract Test {
+				access(all) event Foo()
+				access(all) resource R {
+					destroy() {
+						pre {
+							1 > 2: ""
+						}
+						emit Test.Foo()
+					}
+				}
+			 }`,
+			lint.ComplexDestructorAnalyzer,
+		)
+
+		require.Len(t, diagnostics, 1)
+
+		require.Equal(
+			t,
+			"kinds: EventEmission, AssertOrCondition, ",
+			diagnostics[0].SecondaryMessage,
+		)
+	})
+
+	t.Run("finds total supply", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t, `
+			 access(all) contract Test {
+				access(all) var totalSupply: UInt
+				access(all) resource R {
+					destroy() {
+						Test.totalSupply = Test.totalSupply - 3
+					}
+				}
+				init() {
+					self.totalSupply = 0
+				}
+			 }`,
+			lint.ComplexDestructorAnalyzer,
+		)
+
+		require.Len(t, diagnostics, 1)
+
+		require.Equal(
+			t,
+			"kinds: TotalSupplyDecrement, ",
+			diagnostics[0].SecondaryMessage,
+		)
+	})
 }

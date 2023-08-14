@@ -19,45 +19,135 @@
 package lint
 
 import (
+	"strings"
+
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
+type ComplexDestructorKind uint
+
+const (
+	EventEmission ComplexDestructorKind = iota
+	TotalSupplyDecrement
+	AssertOrCondition
+	LoggingCall
+	PanicCall
+	IfStatement
+	LoopStatement
+	OtherComplexOperation
+)
+
+func stringOfKind(
+	kind ComplexDestructorKind,
+) string {
+	switch kind {
+	case EventEmission:
+		return "EventEmission"
+	case TotalSupplyDecrement:
+		return "TotalSupplyDecrement"
+	case AssertOrCondition:
+		return "AssertOrCondition"
+	case OtherComplexOperation:
+		return "OtherComplexOperation"
+	case PanicCall:
+		return "PanicCall"
+	case IfStatement:
+		return "IfStatement"
+	case LoopStatement:
+		return "LoopStatement"
+	case LoggingCall:
+		return "LoggingCall"
+	}
+	return "UnknownKind"
+}
+
 func reportComplexDestructor(
 	destructor *ast.SpecialFunctionDeclaration,
 	location common.Location,
+	kinds []ComplexDestructorKind,
 ) *analysis.Diagnostic {
+	kindString := "kinds: "
+
+	for _, kind := range kinds {
+		k := stringOfKind(kind)
+
+		if !strings.Contains(kindString, k) {
+			kindString = kindString + k + ", "
+		}
+	}
+
 	return &analysis.Diagnostic{
 		Location:         location,
 		Range:            ast.NewRangeFromPositioned(nil, destructor),
 		Category:         UpdateCategory,
 		Message:          "complex destructor found",
-		SecondaryMessage: destructor.String(),
+		SecondaryMessage: kindString,
 	}
 }
 
 func isComplexDestructor(
 	statements []ast.Statement,
-) bool {
+) (kinds []ComplexDestructorKind) {
 
 	for _, statement := range statements {
 		switch statement := statement.(type) {
 		case *ast.ReturnStatement:
 			continue
+		case *ast.EmitStatement:
+			kinds = append(kinds, EventEmission)
+		case *ast.IfStatement:
+			kinds = append(kinds, IfStatement)
+			kinds = append(kinds, isComplexDestructor(statement.Then.Statements)...)
+			if statement.Else != nil {
+				kinds = append(kinds, isComplexDestructor(statement.Else.Statements)...)
+			}
+		case *ast.ForStatement:
+			kinds = append(kinds, LoopStatement)
+			kinds = append(kinds, isComplexDestructor(statement.Block.Statements)...)
+		case *ast.WhileStatement:
+			kinds = append(kinds, LoopStatement)
+			kinds = append(kinds, isComplexDestructor(statement.Block.Statements)...)
+		case *ast.AssignmentStatement:
+			switch target := statement.Target.(type) {
+			case *ast.MemberExpression:
+				if target.Identifier.Identifier == "totalSupply" || target.Identifier.Identifier == "TotalSupply" {
+					kinds = append(kinds, TotalSupplyDecrement)
+				} else {
+					kinds = append(kinds, OtherComplexOperation)
+				}
+			default:
+				kinds = append(kinds, OtherComplexOperation)
+			}
 		case *ast.ExpressionStatement:
-			switch statement.Expression.(type) {
+			switch expr := statement.Expression.(type) {
 			case *ast.DestroyExpression:
 				continue
+			case *ast.InvocationExpression:
+				switch invoked := expr.InvokedExpression.(type) {
+				case *ast.IdentifierExpression:
+					if invoked.Identifier.Identifier == "assert" {
+						kinds = append(kinds, AssertOrCondition)
+					} else if invoked.Identifier.Identifier == "log" {
+						kinds = append(kinds, LoggingCall)
+					} else if invoked.Identifier.Identifier == "panic" {
+						kinds = append(kinds, PanicCall)
+					} else {
+						kinds = append(kinds, OtherComplexOperation)
+					}
+				default:
+					kinds = append(kinds, OtherComplexOperation)
+				}
 			default:
-				return true
+				kinds = append(kinds, OtherComplexOperation)
 			}
 		default:
-			return true
+			kinds = append(kinds, OtherComplexOperation)
 		}
 	}
 
-	return false
+	return kinds
 }
 
 var ComplexDestructorAnalyzer = (func() *analysis.Analyzer {
@@ -91,8 +181,15 @@ var ComplexDestructorAnalyzer = (func() *analysis.Analyzer {
 						}
 
 						// find any non-destroy statements
-						if isComplexDestructor(expr.FunctionDeclaration.FunctionBlock.Block.Statements) {
-							diagnostic = reportComplexDestructor(expr, location)
+						complexKinds := isComplexDestructor(expr.FunctionDeclaration.FunctionBlock.Block.Statements)
+
+						if expr.FunctionDeclaration.FunctionBlock.PostConditions != nil ||
+							expr.FunctionDeclaration.FunctionBlock.PreConditions != nil {
+							complexKinds = append(complexKinds, AssertOrCondition)
+						}
+
+						if complexKinds != nil {
+							diagnostic = reportComplexDestructor(expr, location, complexKinds)
 						}
 
 					default:
