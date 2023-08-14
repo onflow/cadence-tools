@@ -31,6 +31,58 @@ func TestAuthReferenceLeak(t *testing.T) {
 
 	t.Parallel()
 
+	t.Run("unrestricted struct usage", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+			pub contract VaultContract {
+				pub struct Vault {
+					pub var balance : Int
+			
+					init(amount: Int) {    
+						self.balance = amount
+					}
+			
+					pub fun getBalance(): Int{
+						return self.balance
+					}
+			
+					pub fun rob() {
+						log("this should not be reachable")
+					}
+			   }
+			
+			   pub fun createVault(){
+				 var res = Vault(amount: 10)
+                 
+                 log(res.getBalance())
+				 
+                 self.account.save(res, to: /storage/vault)
+			   }
+			}`,
+			lint.SuggestRestrictedType,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 417, Line: 22, Column: 21},
+						EndPos:   ast.Position{Offset: 432, Line: 22, Column: 36},
+					},
+					Location:         testLocation,
+					Category:         lint.ReplacementCategory,
+					Message:          "unsafe use of resource type for res",
+					SecondaryMessage: "Consider creating restricted type variable with members getBalance",
+				},
+			},
+			diagnostics,
+		)
+	})
+
 	t.Run("unnecessary", func(t *testing.T) {
 
 		t.Parallel()
@@ -111,9 +163,9 @@ func TestAuthReferenceLeak(t *testing.T) {
 			   }
 	
 			   pub fun createVault(){
-				let res : @{VaultBalance} <- create Vault(amount: 10)
-				log(res.getBalance())			 
- 	            self.account.save(<-res, to: /storage/vault)
+					let res : @{VaultBalance} <- create Vault(amount: 10)
+					log(res.getBalance())			 
+ 	    	        self.account.save(<-res, to: /storage/vault)
 	          }
 			}
 			`,

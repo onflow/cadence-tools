@@ -19,10 +19,11 @@
 package lint
 
 import (
+	"strings"
+
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/tools/analysis"
-	"strings"
 )
 
 type MemberMeta struct {
