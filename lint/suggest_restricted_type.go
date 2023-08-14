@@ -278,30 +278,6 @@ var SuggestRestrictedType = (func() *analysis.Analyzer {
 					})
 				}
 			}
-			//for resource, members := range usedMembers {
-			//
-			//	location := pass.Program.Location
-			//	report := pass.Report
-			//
-			//	if len(members) < len(resourceTypes[resource]) {
-			//		var memberIDs []string
-			//
-			//		for _, meta := range members {
-			//			memberIDs = append(memberIDs, meta.MemberMeta.Identifier)
-			//		}
-			//		msg := "Consider creating restricted type variable with members " + strings.Join(memberIDs, ",")
-			//		for k, meta := range members {
-			//			report(
-			//				analysis.Diagnostic{
-			//					Location:         location,
-			//					Range:            ast.NewRangeFromPositioned(nil, meta.Position),
-			//					Category:         ReplacementCategory,
-			//					Message:          "unsafe use of resource type for " + k,
-			//					SecondaryMessage: msg,
-			//				})
-			//		}
-			//	}
-			//}
 
 			return nil
 		},
