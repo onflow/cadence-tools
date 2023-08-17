@@ -745,10 +745,18 @@ func TestCreateAccount(t *testing.T) {
         pub fun test() {
             let blockchain = Test.newEmulatorBlockchain()
             let account = blockchain.createAccount()
+
+            let typ = CompositeType("flow.AccountCreated")!
+            let events = blockchain.eventsOfType(typ)
+            Test.assertEqual(1, events.length)
         }
 	`
 
-	runner := NewTestRunner()
+	importResolver := func(location common.Location) (string, error) {
+		return "", nil
+	}
+
+	runner := NewTestRunner().WithImportResolver(importResolver)
 	result, err := runner.RunTest(code, "test")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
