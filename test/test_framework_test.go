@@ -4253,11 +4253,19 @@ func TestBlockchainMoveTime(t *testing.T) {
         }
 
         pub fun testIsOpen() {
-            let timeDelta = UFix64(35 * 24 * 60 * 60)
+            let timeDelta = UFix64(20 * 24 * 60 * 60)
             blockchain.moveTime(by: timeDelta)
 
             let script = Test.readFile("../scripts/is_locker_open.cdc")
-            let result = blockchain.executeScript(script, [])
+            var result = blockchain.executeScript(script, [])
+
+            Test.expect(result, Test.beSucceeded())
+            Test.assertEqual(false, result.returnValue! as! Bool)
+
+            // We move time forward by another 20 days
+            blockchain.moveTime(by: timeDelta)
+
+            result = blockchain.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(true, result.returnValue! as! Bool)

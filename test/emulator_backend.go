@@ -690,7 +690,7 @@ func (e *EmulatorBackend) Events(
 // Moves the time of the Blockchain's clock, by the
 // given time delta, in the form of seconds.
 func (e *EmulatorBackend) MoveTime(timeDelta int64) {
-	e.clock.TimeDelta = timeDelta
+	e.clock.TimeDelta += timeDelta
 	e.blockchain.SetClock(e.clock)
 	e.CommitBlock()
 }
