@@ -4225,11 +4225,11 @@ func TestBlockchainMoveTime(t *testing.T) {
         pub var lockedAt: UFix64 = 0.0
 
         pub fun setup() {
-            let script = Test.readFile("../scripts/current_block_timestamp.cdc")
-            let result = blockchain.executeScript(script, [])
+            let currentBlockTimestamp = Test.readFile("current_block_timestamp.cdc")
+            let result = blockchain.executeScript(currentBlockTimestamp, [])
             lockedAt = result.returnValue! as! UFix64
 
-            let contractCode = Test.readFile("../contracts/TimeLocker.cdc")
+            let contractCode = Test.readFile("TimeLocker.cdc")
             let err = blockchain.deployContract(
                 name: "TimeLocker",
                 code: contractCode,
@@ -4245,19 +4245,20 @@ func TestBlockchainMoveTime(t *testing.T) {
         }
 
         pub fun testIsNotOpen() {
-            let script = Test.readFile("../scripts/is_locker_open.cdc")
-            let result = blockchain.executeScript(script, [])
+            let isLockerOpen = Test.readFile("is_locker_open.cdc")
+            let result = blockchain.executeScript(isLockerOpen, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(false, result.returnValue! as! Bool)
         }
 
         pub fun testIsOpen() {
-            let timeDelta = UFix64(20 * 24 * 60 * 60)
+            // timeDelta is the representation of 20 days, in seconds
+            let timeDelta = Fix64(20 * 24 * 60 * 60)
             blockchain.moveTime(by: timeDelta)
 
-            let script = Test.readFile("../scripts/is_locker_open.cdc")
-            var result = blockchain.executeScript(script, [])
+            let isLockerOpen = Test.readFile("is_locker_open.cdc")
+            var result = blockchain.executeScript(isLockerOpen, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(false, result.returnValue! as! Bool)
@@ -4265,20 +4266,26 @@ func TestBlockchainMoveTime(t *testing.T) {
             // We move time forward by another 20 days
             blockchain.moveTime(by: timeDelta)
 
-            result = blockchain.executeScript(script, [])
+            result = blockchain.executeScript(isLockerOpen, [])
 
-            Test.expect(result, Test.beSucceeded())
             Test.assertEqual(true, result.returnValue! as! Bool)
+
+            // We move time backward by 20 days
+            blockchain.moveTime(by: timeDelta * -1.0)
+
+            result = blockchain.executeScript(isLockerOpen, [])
+
+            Test.assertEqual(false, result.returnValue! as! Bool)
         }
 	`
 
 	fileResolver := func(path string) (string, error) {
 		switch path {
-		case "../contracts/TimeLocker.cdc":
+		case "TimeLocker.cdc":
 			return contractCode, nil
-		case "../scripts/is_locker_open.cdc":
+		case "is_locker_open.cdc":
 			return scriptCode, nil
-		case "../scripts/current_block_timestamp.cdc":
+		case "current_block_timestamp.cdc":
 			return currentBlockTimestamp, nil
 		default:
 			return "", fmt.Errorf("cannot find import location: %s", path)
