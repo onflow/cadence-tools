@@ -40,11 +40,11 @@ func TestRunningMultipleTests(t *testing.T) {
 	const code = `
         import Test
 
-        pub fun testFunc1() {
+        access(all) fun testFunc1() {
             Test.assert(false)
         }
 
-        pub fun testFunc2() {
+        access(all) fun testFunc2() {
             Test.assert(true)
         }
 	`
@@ -70,11 +70,11 @@ func TestRunningSingleTest(t *testing.T) {
 	const code = `
         import Test
 
-        pub fun testFunc1() {
+        access(all) fun testFunc1() {
             Test.assert(false)
         }
 
-        pub fun testFunc2() {
+        access(all) fun testFunc2() {
             Test.assert(true)
         }
 	`
@@ -96,19 +96,19 @@ func TestAssertFunction(t *testing.T) {
 	const code = `
         import Test
 
-        pub fun testAssertWithNoArgs() {
+        access(all) fun testAssertWithNoArgs() {
             Test.assert(true)
         }
 
-        pub fun testAssertWithNoArgsFail() {
+        access(all) fun testAssertWithNoArgsFail() {
             Test.assert(false)
         }
 
-        pub fun testAssertWithMessage() {
+        access(all) fun testAssertWithMessage() {
             Test.assert(true, message: "some reason")
         }
 
-        pub fun testAssertWithMessageFail() {
+        access(all) fun testAssertWithMessageFail() {
             Test.assert(false, message: "some reason")
         }
 	`
@@ -143,10 +143,10 @@ func TestExecuteScript(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeScript(
-                    "pub fun main(): Int {  return 2 + 3 }",
+                    "access(all) fun main(): Int {  return 2 + 3 }",
                     []
                 )
 
@@ -167,10 +167,10 @@ func TestExecuteScript(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeScript(
-                    "pub fun main(a: Int, b: Int): Int {  return a + b }",
+                    "access(all) fun main(a: Int, b: Int): Int {  return a + b }",
                     [2, 3]
                 )
 
@@ -188,12 +188,12 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("non-empty array returns", func(t *testing.T) {
 		t.Parallel()
 
-		const code = `pub fun main(): [UInt64] { return [1, 2, 3]}`
+		const code = `access(all) fun main(): [UInt64] { return [1, 2, 3]}`
 
 		testScript := fmt.Sprintf(`
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeScript("%s", [])
 
@@ -215,12 +215,12 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("empty array returns", func(t *testing.T) {
 		t.Parallel()
 
-		const code = `pub fun main(): [UInt64] { return [] }`
+		const code = `access(all) fun main(): [UInt64] { return [] }`
 
 		testScript := fmt.Sprintf(`
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeScript("%s", [])
 
@@ -242,12 +242,12 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("non-empty dictionary returns", func(t *testing.T) {
 		t.Parallel()
 
-		const code = `pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}}`
+		const code = `access(all) fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}}`
 
 		testScript := fmt.Sprintf(`
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeScript("%s", [])
 
@@ -269,12 +269,12 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("empty dictionary returns", func(t *testing.T) {
 		t.Parallel()
 
-		const code = `pub fun main(): {String: Int} { return {} }`
+		const code = `access(all) fun main(): {String: Int} { return {} }`
 
 		testScript := fmt.Sprintf(`
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeScript("%s", [])
 
@@ -304,17 +304,17 @@ func TestImportContract(t *testing.T) {
             import Test
             import FooContract from "./FooContract"
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo = FooContract()
                 Test.assertEqual("hello from Foo", foo.sayHello())
             }
 		`
 
 		const fooContract = `
-            pub contract FooContract {
+            access(all) contract FooContract {
                 init() {}
 
-                pub fun sayHello(): String {
+                access(all) fun sayHello(): String {
                     return "hello from Foo"
                 }
             }
@@ -338,22 +338,22 @@ func TestImportContract(t *testing.T) {
             import Test
             import FooContract from "./FooContract"
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo = FooContract(greeting: "hello from Foo")
                 Test.assertEqual("hello from Foo", foo.sayHello())
             }
 		`
 
 		const fooContract = `
-            pub contract FooContract {
+            access(all) contract FooContract {
 
-                pub var greeting: String
+                access(all) var greeting: String
 
                 init(greeting: String) {
                     self.greeting = greeting
                 }
 
-                pub fun sayHello(): String {
+                access(all) fun sayHello(): String {
                     return self.greeting
                 }
             }
@@ -376,7 +376,7 @@ func TestImportContract(t *testing.T) {
 		const code = `
             import FooContract from "./FooContract"
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo = FooContract()
             }
 		`
@@ -405,7 +405,7 @@ func TestImportContract(t *testing.T) {
 		const code = `
             import FooContract from "./FooContract"
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo = FooContract()
             }
 		`
@@ -434,19 +434,19 @@ func TestImportContract(t *testing.T) {
 		const code = `
             import FooContract from "./FooContract"
 
-            pub fun test() {}
+            access(all) fun test() {}
 		`
 
 		const fooContract = `
             import BarContract from 0x01
 
-            pub contract FooContract {
+            access(all) contract FooContract {
                 init() {}
             }
 		`
 
 		const barContract = `
-            pub contract BarContract {
+            access(all) contract BarContract {
                 init() {}
             }
 		`
@@ -480,16 +480,16 @@ func TestImportBuiltinContracts(t *testing.T) {
 	testCode := `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
+        access(all) let account = blockchain.createAccount()
 
-        pub fun setup() {
-            blockchain.useConfiguration(Test.Configuration({
+        access(all) fun setup() {
+            blockchain.useConfiguration(Test.Configuration(addresses: {
                 "FooContract": account.address
             }))
         }
 
-        pub fun testSetupExampleNFTCollection() {
+        access(all) fun testSetupExampleNFTCollection() {
             let code = Test.readFile("../transactions/setup_example_nft_collection.cdc")
             let tx = Test.Transaction(
                 code: code,
@@ -502,7 +502,7 @@ func TestImportBuiltinContracts(t *testing.T) {
             Test.expect(result, Test.beSucceeded())
         }
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/import_common_contracts.cdc")
             let result = blockchain.executeScript(script, [])
 
@@ -519,21 +519,25 @@ func TestImportBuiltinContracts(t *testing.T) {
         transaction {
 
             prepare(signer: AuthAccount) {
+
+                var exampleNFTCollectionStoragePath = /storage/cadenceExampleNFTCollection
+                var exampleNFTCollectionPublicPath = /public/cadenceExampleNFTCollection
+
                 // Return early if the account already has a collection
-                if signer.borrow<&ExampleNFT.Collection>(from: ExampleNFT.CollectionStoragePath) != nil {
+                if signer.borrow<&ExampleNFT.Collection>(from: exampleNFTCollectionStoragePath) != nil {
                     return
                 }
 
                 // Create a new empty collection
-                let collection <- ExampleNFT.createEmptyCollection()
+                let collection <- ExampleNFT.createEmptyCollection(collectionType: Type<@ExampleNFT.Collection>())
 
                 // save it to the account
-                signer.save(<-collection, to: ExampleNFT.CollectionStoragePath)
+                signer.save(<-collection, to: exampleNFTCollectionStoragePath)
 
                 // create a public capability for the collection
-                signer.link<&{NonFungibleToken.CollectionPublic, ExampleNFT.ExampleNFTCollectionPublic, MetadataViews.ResolverCollection}>(
-                    ExampleNFT.CollectionPublicPath,
-                    target: ExampleNFT.CollectionStoragePath
+                signer.link<&{NonFungibleToken.Collection}>(
+                    exampleNFTCollectionPublicPath,
+                    target: exampleNFTCollectionStoragePath
                 )
             }
         }
@@ -546,10 +550,12 @@ func TestImportBuiltinContracts(t *testing.T) {
         import "MetadataViews"
         import "ViewResolver"
         import "ExampleNFT"
-        import "NFTStorefrontV2"
-        import "NFTStorefront"
 
-        pub fun main(): Bool {
+        // TODO: enable
+        //import "NFTStorefrontV2"
+        //import "NFTStorefront"
+
+        access(all) fun main(): Bool {
             return true
         }
 	`
@@ -583,7 +589,7 @@ func TestUsingEnv(t *testing.T) {
 		t.Parallel()
 
 		const code = `
-            pub fun test() {
+            access(all) fun test() {
                 let publicKey = PublicKey(
                     publicKey: "1234".decodeHex(),
                     signatureAlgorithm: SignatureAlgorithm.ECDSA_secp256k1
@@ -607,7 +613,7 @@ func TestUsingEnv(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let acc = getAccount(0x01)
                 Test.assertEqual(0.0, acc.balance)
             }
@@ -627,17 +633,17 @@ func TestUsingEnv(t *testing.T) {
             import Test
             import FooContract from "./FooContract"
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo = FooContract()
                 Test.assertEqual(0.0, foo.getBalance())
             }
 		`
 
 		const fooContract = `
-            pub contract FooContract {
+            access(all) contract FooContract {
                 init() {}
 
-                pub fun getBalance(): UFix64 {
+                access(all) fun getBalance(): UFix64 {
                     let acc = getAccount(0x01)
                     return acc.balance
                 }
@@ -661,7 +667,7 @@ func TestUsingEnv(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -687,7 +693,7 @@ func TestUsingEnv(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -710,7 +716,7 @@ func TestUsingEnv(t *testing.T) {
 		`
 
 		const scriptCode = `
-            pub fun main(): PublicKey {
+            access(all) fun main(): PublicKey {
                 return PublicKey(
                     publicKey: "db04940e18ec414664ccfd31d5d2d4ece3985acb8cb17a2025b2f1673427267968e52e2bbf3599059649d4b2cce98fdb8a3048e68abf5abe3e710129e90696ca".decodeHex(),
                     signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
@@ -742,7 +748,7 @@ func TestCreateAccount(t *testing.T) {
 	const code = `
         import Test
 
-        pub fun test() {
+        access(all) fun test() {
             let blockchain = Test.newEmulatorBlockchain()
             let account = blockchain.createAccount()
         }
@@ -763,7 +769,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -790,7 +796,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -820,7 +826,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -850,7 +856,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -880,7 +886,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let result = blockchain.executeNextTransaction()
                 Test.expect(result, Test.beNil())
@@ -899,7 +905,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 blockchain.commitBlock()
             }
@@ -917,7 +923,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -948,7 +954,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -985,7 +991,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 blockchain.commitBlock()
                 blockchain.commitBlock()
@@ -1004,7 +1010,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1032,7 +1038,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1060,7 +1066,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account1 = blockchain.createAccount()
                 let account2 = blockchain.createAccount()
@@ -1089,7 +1095,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1117,7 +1123,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1172,7 +1178,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1193,7 +1199,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1232,7 +1238,7 @@ func TestExecutingTransactions(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1263,14 +1269,15 @@ func TestSetupAndTearDown(t *testing.T) {
 
 		const code = `
             import Test
-            pub(set) var setupRan = false
 
-            pub fun setup() {
+            access(all) var setupRan = false
+
+            access(all) fun setup() {
                 Test.assert(!setupRan)
                 setupRan = true
             }
 
-            pub fun testFunc() {
+            access(all) fun testFunc() {
                 Test.assert(setupRan)
             }
 		`
@@ -1291,11 +1298,11 @@ func TestSetupAndTearDown(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun setup() {
+            access(all) fun setup() {
                 panic("error occurred")
             }
 
-            pub fun testFunc() {
+            access(all) fun testFunc() {
                 Test.assert(true)
             }
 		`
@@ -1312,13 +1319,13 @@ func TestSetupAndTearDown(t *testing.T) {
 		const code = `
             import Test
 
-            pub(set) var tearDownRan = false
+            access(all) var tearDownRan = false
 
-            pub fun testFunc() {
+            access(all) fun testFunc() {
                 Test.assert(!tearDownRan)
             }
 
-            pub fun tearDown() {
+            access(all) fun tearDown() {
                 Test.assert(true)
             }
 		`
@@ -1339,13 +1346,13 @@ func TestSetupAndTearDown(t *testing.T) {
 		const code = `
 			import Test
 
-            pub(set) var tearDownRan = false
+            access(all) var tearDownRan = false
 
-            pub fun testFunc() {
+            access(all) fun testFunc() {
                 Test.assert(!tearDownRan)
             }
 
-            pub fun tearDown() {
+            access(all) fun tearDown() {
                 Test.assert(false)
             }
 		`
@@ -1373,17 +1380,17 @@ func TestBeforeAndAfterEach(t *testing.T) {
 		code := `
             import Test
 
-            pub(set) var counter = 0
+            access(all) var counter = 0
 
-            pub fun beforeEach() {
+            access(all) fun beforeEach() {
                 counter = counter + 1
             }
 
-            pub fun testFuncOne() {
+            access(all) fun testFuncOne() {
                 Test.assertEqual(1, counter)
             }
 
-            pub fun testFuncTwo() {
+            access(all) fun testFuncTwo() {
                 Test.assertEqual(2, counter)
             }
 		`
@@ -1405,11 +1412,11 @@ func TestBeforeAndAfterEach(t *testing.T) {
 		code := `
             import Test
 
-            pub fun beforeEach() {
+            access(all) fun beforeEach() {
                 panic("error occurred")
             }
 
-            pub fun testFunc() {
+            access(all) fun testFunc() {
                 Test.assert(true)
             }
 		`
@@ -1426,21 +1433,21 @@ func TestBeforeAndAfterEach(t *testing.T) {
 		code := `
             import Test
 
-            pub(set) var counter = 2
+            access(all) var counter = 2
 
-            pub fun afterEach() {
+            access(all) fun afterEach() {
                 counter = counter - 1
             }
 
-            pub fun testFuncOne() {
+            access(all) fun testFuncOne() {
                 Test.assertEqual(2, counter)
             }
 
-            pub fun testFuncTwo() {
+            access(all) fun testFuncTwo() {
                 Test.assertEqual(1, counter)
             }
 
-            pub fun tearDown() {
+            access(all) fun tearDown() {
                 Test.assertEqual(0, counter)
             }
 		`
@@ -1464,11 +1471,11 @@ func TestBeforeAndAfterEach(t *testing.T) {
 
             pub(set) var tearDownRan = false
 
-            pub fun testFunc() {
+            access(all) fun testFunc() {
                 Test.assert(!tearDownRan)
             }
 
-            pub fun afterEach() {
+            access(all) fun afterEach() {
                 Test.assert(false)
             }
 		`
@@ -1487,19 +1494,19 @@ func TestPrettyPrintTestResults(t *testing.T) {
 	const code = `
         import Test
 
-        pub fun testFunc1() {
+        access(all) fun testFunc1() {
             Test.assert(true, message: "should pass")
         }
 
-        pub fun testFunc2() {
+        access(all) fun testFunc2() {
             Test.assert(false, message: "unexpected error occurred")
         }
 
-        pub fun testFunc3() {
+        access(all) fun testFunc3() {
             Test.assert(true, message: "should pass")
         }
 
-        pub fun testFunc4() {
+        access(all) fun testFunc4() {
             panic("runtime error")
         }
 	`
@@ -1537,7 +1544,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1551,7 +1558,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 		`
 
 		const scriptCode = `
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 return 2 + 3
             }
 		`
@@ -1579,7 +1586,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1616,7 +1623,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1642,11 +1649,11 @@ func TestDeployingContracts(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
-                let contractCode = "pub contract Foo{ init(){}  pub fun sayHello(): String { return \"hello from Foo\"} }"
+                let contractCode = "access(all) contract Foo{ init(){}  access(all) fun sayHello(): String { return \"hello from Foo\"} }"
 
                 let err = blockchain.deployContract(
                     name: "Foo",
@@ -1658,7 +1665,7 @@ func TestDeployingContracts(t *testing.T) {
                 Test.expect(err, Test.beNil())
 
                 var script = "import Foo from ".concat(account.address.toString()).concat("\n")
-                script = script.concat("pub fun main(): String {  return Foo.sayHello() }")
+                script = script.concat("access(all) fun main(): String {  return Foo.sayHello() }")
 
                 let result = blockchain.executeScript(script, [])
 
@@ -1681,11 +1688,11 @@ func TestDeployingContracts(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
-                let contractCode = "pub contract Foo{ pub let msg: String;   init(_ msg: String){ self.msg = msg }   pub fun sayHello(): String { return self.msg } }" 
+                let contractCode = "access(all) contract Foo{ access(all) let msg: String;   init(_ msg: String){ self.msg = msg }   access(all) fun sayHello(): String { return self.msg } }" 
 
                 let err = blockchain.deployContract(
                     name: "Foo",
@@ -1697,7 +1704,7 @@ func TestDeployingContracts(t *testing.T) {
                 Test.expect(err, Test.beNil())
 
                 var script = "import Foo from ".concat(account.address.toString()).concat("\n")
-                script = script.concat("pub fun main(): String {  return Foo.sayHello() }")
+                script = script.concat("access(all) fun main(): String {  return Foo.sayHello() }")
 
                 let result = blockchain.executeScript(script, [])
 
@@ -1724,11 +1731,11 @@ func TestErrors(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
-                let contractCode = "pub contract Foo{ init(){}  pub fun sayHello() { return 0 } }"
+                let contractCode = "access(all) contract Foo{ init(){}  access(all) fun sayHello() { return 0 } }"
 
                 let err = blockchain.deployContract(
                     name: "Foo",
@@ -1756,11 +1763,11 @@ func TestErrors(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
-                let script = "import Foo from 0x01; pub fun main() {}"
+                let script = "import Foo from 0x01; access(all) fun main() {}"
                 let result = blockchain.executeScript(script, [])
 
                 if result.status == Test.ResultStatus.failed {
@@ -1786,7 +1793,7 @@ func TestErrors(t *testing.T) {
 		const code = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let blockchain = Test.newEmulatorBlockchain()
                 let account = blockchain.createAccount()
 
@@ -1820,7 +1827,7 @@ func TestInterpretFailFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.fail()
             }
 		`
@@ -1836,7 +1843,7 @@ func TestInterpretFailFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.fail(message: "some error")
             }
 		`
@@ -1860,7 +1867,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher(fun (_ value: AnyStruct): Bool {
                      if !value.getType().isSubtype(of: Type<Int>()) {
                         return false
@@ -1884,7 +1891,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher(fun (_ value: Int): Bool {
                     return value == 7
                 })
@@ -1905,7 +1912,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher(fun (_ value: Int): Bool {
                     return (value + 7) == 4
                 })
@@ -1928,7 +1935,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher(fun (_ value: &Foo): Bool {
                     return value.a == 4
                 })
@@ -1940,8 +1947,8 @@ func TestInterpretMatcher(t *testing.T) {
                 destroy f
             }
 
-            pub resource Foo {
-                pub let a: Int
+            access(all) resource Foo {
+                access(all) let a: Int
 
                 init(_ a: Int) {
                     self.a = a
@@ -1961,14 +1968,14 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher(fun (_ value: @Foo): Bool {
                     destroy value
                     return true
                 })
             }
 
-            pub resource Foo {}
+            access(all) resource Foo {}
 		`
 
 		runner := NewTestRunner()
@@ -1984,7 +1991,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher<Int>(fun (_ value: Int): Bool {
                     return value == 7
                 })
@@ -2005,7 +2012,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.newMatcher<String>(fun (_ value: Int): Bool {
                     return value == 7
                 })
@@ -2026,7 +2033,7 @@ func TestInterpretMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher1 = Test.newMatcher(fun (_ value: Int): Bool {
                     return (value + 5) == 10
                 })
@@ -2060,7 +2067,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.equal(1)
                 Test.expect(1, matcher)
             }
@@ -2078,13 +2085,13 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let f = Foo()
                 let matcher = Test.equal(f)
                 Test.expect(f, matcher)
             }
 
-            pub struct Foo {}
+            access(all) struct Foo {}
 		`
 
 		runner := NewTestRunner()
@@ -2099,13 +2106,13 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let f <- create Foo()
                 let matcher = Test.equal(<-f)
                 Test.expect(<- create Foo(), matcher)
             }
 
-            pub resource Foo {}
+            access(all) resource Foo {}
 		`
 
 		runner := NewTestRunner()
@@ -2123,7 +2130,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.equal<String>("hello")
             }
 		`
@@ -2140,7 +2147,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let matcher = Test.equal<String>(1)
             }
 		`
@@ -2160,7 +2167,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let one = Test.equal(1)
                 let two = Test.equal(2)
 
@@ -2183,7 +2190,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let one = Test.equal(1)
                 let two = Test.equal(2)
 
@@ -2206,7 +2213,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let one = Test.equal(1)
                 let two = Test.equal(2)
 
@@ -2229,7 +2236,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let one = Test.equal(1)
                 let two = Test.equal(2)
                 let three = Test.equal(3)
@@ -2252,7 +2259,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo <- create Foo()
                 let bar <- create Bar()
 
@@ -2265,8 +2272,8 @@ func TestInterpretEqualMatcher(t *testing.T) {
                 Test.expect(<-create Bar(), matcher)
             }
 
-            pub resource Foo {}
-            pub resource Bar {}
+            access(all) resource Foo {}
+            access(all) resource Bar {}
 		`
 
 		runner := NewTestRunner()
@@ -2286,7 +2293,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo <- create Foo()
                 let bar <- create Bar()
 
@@ -2298,8 +2305,8 @@ func TestInterpretEqualMatcher(t *testing.T) {
                 Test.expect(<-create Foo(), matcher)
             }
 
-            pub resource Foo {}
-            pub resource Bar {}
+            access(all) resource Foo {}
+            access(all) resource Bar {}
 		`
 
 		runner := NewTestRunner()
@@ -2323,7 +2330,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.expect("this string", Test.equal("this string"))
             }
 		`
@@ -2340,7 +2347,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.expect("this string", Test.equal("other string"))
             }
 		`
@@ -2358,7 +2365,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.expect("string", Test.equal(1))
             }
 		`
@@ -2367,7 +2374,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &stdlib.AssertionError{})
+		assert.ErrorAs(t, result.Error, &interpreter.TypeMismatchError{})
 	})
 
 	t.Run("with explicit types", func(t *testing.T) {
@@ -2376,7 +2383,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.expect<String>("hello", Test.equal("hello"))
             }
 		`
@@ -2393,7 +2400,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 Test.expect<Int>("string", Test.equal(1))
             }
 		`
@@ -2412,13 +2419,13 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let f1 <- create Foo()
                 let f2 <- create Foo()
                 Test.expect(<-f1, Test.equal(<-f2))
             }
 
-            pub resource Foo {}
+            access(all) resource Foo {}
 		`
 
 		runner := NewTestRunner()
@@ -2436,14 +2443,14 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo <- create Foo()
                 let bar = Bar()
                 Test.expect(<-foo, Test.equal(bar))
             }
 
-            pub resource Foo {}
-            pub struct Bar {}
+            access(all) resource Foo {}
+            access(all) struct Bar {}
 		`
 
 		runner := NewTestRunner()
@@ -2460,14 +2467,14 @@ func TestInterpretExpectFunction(t *testing.T) {
 		const script = `
             import Test
 
-            pub fun test() {
+            access(all) fun test() {
                 let foo = Foo()
                 let bar <- create Bar()
                 Test.expect(foo, Test.equal(<-bar))
             }
 
-            pub struct Foo {}
-            pub resource Bar {}
+            access(all) struct Foo {}
+            access(all) resource Bar {}
 		`
 
 		runner := NewTestRunner()
@@ -2488,10 +2495,10 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            access(all) let blockchain = Test.newEmulatorBlockchain()
+            access(all) let account = blockchain.createAccount()
 
-            pub fun setup() {
+            access(all) fun setup() {
                 // Deploy the contract
                 let contractCode = Test.readFile("./sample/contract.cdc")
 
@@ -2506,12 +2513,12 @@ func TestReplacingImports(t *testing.T) {
 
                 // Set the configurations to use the address of the deployed contract.
 
-                blockchain.useConfiguration(Test.Configuration({
+                blockchain.useConfiguration(Test.Configuration(addresses: {
                     "./FooContract": account.address
                 }))
             }
 
-            pub fun test() {
+            access(all) fun test() {
                 let script = Test.readFile("./sample/script.cdc")
                 let result = blockchain.executeScript(script, [])
 
@@ -2521,10 +2528,10 @@ func TestReplacingImports(t *testing.T) {
         `
 
 		const contractCode = `
-            pub contract Foo{ 
+            access(all) contract Foo{ 
                 init() {}
 
-                pub fun sayHello(): String {
+                access(all) fun sayHello(): String {
                     return "hello from Foo" 
                 }
             }
@@ -2533,7 +2540,7 @@ func TestReplacingImports(t *testing.T) {
 		const scriptCode = `
             import Foo from "./FooContract"
 
-            pub fun main(): String {
+            access(all) fun main(): String {
                 return Foo.sayHello()
             }
 		`
@@ -2562,10 +2569,10 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            access(all) let blockchain = Test.newEmulatorBlockchain()
+            access(all) let account = blockchain.createAccount()
 
-            pub fun setup() {
+            access(all) fun setup() {
                 let contractCode = Test.readFile("./sample/contract.cdc")
 
                 let err = blockchain.deployContract(
@@ -2579,12 +2586,12 @@ func TestReplacingImports(t *testing.T) {
 
                 // Address locations are not replaceable!
 
-                blockchain.useConfiguration(Test.Configuration({
+                blockchain.useConfiguration(Test.Configuration(addresses: {
                     "0x01": account.address
                 }))
             }
 
-            pub fun test() {
+            access(all) fun test() {
                 let script = Test.readFile("./sample/script.cdc")
                 let result = blockchain.executeScript(script, [])
 
@@ -2597,10 +2604,10 @@ func TestReplacingImports(t *testing.T) {
 		`
 
 		const contractCode = `
-            pub contract Foo{ 
+            access(all) contract Foo{ 
                 init(){}
 
-                pub fun sayHello(): String {
+                access(all) fun sayHello(): String {
                     return "hello from Foo" 
                 }
             }
@@ -2609,7 +2616,7 @@ func TestReplacingImports(t *testing.T) {
 		const scriptCode = `
             import Foo from 0x01
 
-            pub fun main(): String {
+            access(all) fun main(): String {
                 return Foo.sayHello()
             }
 		`
@@ -2643,10 +2650,10 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            access(all) let blockchain = Test.newEmulatorBlockchain()
+            access(all) let account = blockchain.createAccount()
 
-            pub fun setup() {
+            access(all) fun setup() {
                 let contractCode = Test.readFile("./sample/contract.cdc")
 
                 let err = blockchain.deployContract(
@@ -2661,7 +2668,7 @@ func TestReplacingImports(t *testing.T) {
                 // Configurations are not provided.
             }
 
-            pub fun test() {
+            access(all) fun test() {
                 let script = Test.readFile("./sample/script.cdc")
                 let result = blockchain.executeScript(script, [])
 
@@ -2674,10 +2681,10 @@ func TestReplacingImports(t *testing.T) {
 		`
 
 		const contractCode = `
-            pub contract Foo{ 
+            access(all) contract Foo{ 
                 init() {}
 
-                pub fun sayHello(): String {
+                access(all) fun sayHello(): String {
                     return "hello from Foo" 
                 }
             }
@@ -2686,7 +2693,7 @@ func TestReplacingImports(t *testing.T) {
 		const scriptCode = `
             import Foo from "./FooContract"
 
-            pub fun main(): String {
+            access(all) fun main(): String {
                 return Foo.sayHello()
             }
 		`
@@ -2720,17 +2727,17 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            access(all) let blockchain = Test.newEmulatorBlockchain()
+            access(all) let account = blockchain.createAccount()
 
-            pub fun setup() {
+            access(all) fun setup() {
                 // Configurations provided, but some imports are missing.
-                blockchain.useConfiguration(Test.Configuration({
+                blockchain.useConfiguration(Test.Configuration(addresses: {
                     "./FooContract": account.address
                 }))
             }
 
-            pub fun test() {
+            access(all) fun test() {
                 let script = Test.readFile("./sample/script.cdc")
                 let result = blockchain.executeScript(script, [])
 
@@ -2746,7 +2753,7 @@ func TestReplacingImports(t *testing.T) {
             import Foo from "./FooContract"
             import Foo from "./BarContract"  // This is missing in configs
 
-            pub fun main(): String {
+            access(all) fun main(): String {
                 return Foo.sayHello()
             }
 		`
@@ -2790,7 +2797,7 @@ func TestReplaceImports(t *testing.T) {
         import C2 from "./sample/contract2.cdc"
         import C3 from "./sample/contract3.cdc"
 
-        pub fun main() {}
+        access(all) fun main() {}
 	`
 
 	const expected = `
@@ -2798,7 +2805,7 @@ func TestReplaceImports(t *testing.T) {
         import C2 from 0x0200000000000000
         import C3 from 0x0300000000000000
 
-        pub fun main() {}
+        access(all) fun main() {}
 	`
 
 	replacedCode := emulatorBackend.replaceImports(code)
@@ -2830,9 +2837,9 @@ func TestServiceAccount(t *testing.T) {
 		const testCode = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
+            access(all) let blockchain = Test.newEmulatorBlockchain()
 
-            pub fun testGetServiceAccount() {
+            access(all) fun testGetServiceAccount() {
                 // Act
                 let account = blockchain.serviceAccount()
 
@@ -2856,9 +2863,9 @@ func TestServiceAccount(t *testing.T) {
 		const testCode = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
+            access(all) let blockchain = Test.newEmulatorBlockchain()
 
-            pub fun testGetServiceAccountBalance() {
+            access(all) fun testGetServiceAccountBalance() {
                 // Arrange
                 let account = blockchain.serviceAccount()
 
@@ -2872,7 +2879,7 @@ func TestServiceAccount(t *testing.T) {
                 Test.assertEqual(1000000000.0, balance)
             }
 
-            pub fun testTransferFlowTokens() {
+            access(all) fun testTransferFlowTokens() {
                 // Arrange
                 let account = blockchain.serviceAccount()
                 let receiver = blockchain.createAccount()
@@ -2904,11 +2911,11 @@ func TestServiceAccount(t *testing.T) {
             import "FungibleToken"
             import "FlowToken"
 
-            pub fun main(address: Address): UFix64 {
+            access(all) fun main(address: Address): UFix64 {
                 let balanceRef = getAccount(address)
                     .getCapability(/public/flowTokenBalance)
-                    .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
-                    ?? panic("Could not borrow FungibleToken.Balance reference")
+                    .borrow<&FlowToken.Vault>()
+                    ?? panic("Could not borrow FlowToken.Vault reference")
 
                 return balanceRef.balance
             }
@@ -2920,14 +2927,14 @@ func TestServiceAccount(t *testing.T) {
 
             transaction(receiver: Address, amount: UFix64) {
                 prepare(account: AuthAccount) {
-                    let flowVault = account.borrow<&FlowToken.Vault>(
+                    let flowVault = account.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(
                         from: /storage/flowTokenVault
                     ) ?? panic("Could not borrow BlpToken.Vault reference")
 
                     let receiverRef = getAccount(receiver)
                         .getCapability(/public/flowTokenReceiver)
-                        .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
-                        ?? panic("Could not borrow FungibleToken.Receiver reference")
+                        .borrow<&FlowToken.Vault>()
+                        ?? panic("Could not borrow FlowToken.Vault reference")
 
                     let tokens <- flowVault.withdraw(amount: amount)
                     receiverRef.deposit(from: <- tokens)
@@ -2962,8 +2969,8 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	t.Parallel()
 
 	const fooContract = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
             init() {
                 self.specialNumbers = {
@@ -2973,11 +2980,11 @@ func TestCoverageReportForUnitTests(t *testing.T) {
                 }
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if n < 0 {
                     return "Negative"
                 } else if n == 0 {
@@ -3003,9 +3010,9 @@ func TestCoverageReportForUnitTests(t *testing.T) {
         import Test
         import FooContract from "FooContract.cdc"
 
-        pub let foo = FooContract()
+        access(all) let foo = FooContract()
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             // Arrange
             let testInputs: {Int: String} = {
                 -1: "Negative",
@@ -3028,7 +3035,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
             }
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             // Act
             foo.addSpecialNumber(78557, "Sierpinski")
 
@@ -3098,14 +3105,16 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"I.Crypto",
 			"I.Test",
 			"A.f8d6e0586b0a20c7.ExampleNFT",
-			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
-			"A.f8d6e0586b0a20c7.NFTStorefront",
+
+			// TODO: enable
+			//"A.f8d6e0586b0a20c7.NFTStorefrontV2",
+			//"A.f8d6e0586b0a20c7.NFTStorefront",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
 	assert.Equal(
 		t,
-		"Coverage: 97.4% of statements",
+		"Coverage: 42.4% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3114,8 +3123,8 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	t.Parallel()
 
 	const contractCode = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
             init() {
                 self.specialNumbers = {
@@ -3125,11 +3134,11 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
                 }
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if n < 0 {
                     return "Negative"
                 } else if n == 0 {
@@ -3154,7 +3163,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	const scriptCode = `
         import FooContract from "../contracts/FooContract.cdc"
 
-        pub fun main(): Bool {
+        access(all) fun main(): Bool {
             // Arrange
             let testInputs: {Int: String} = {
                 -1: "Negative",
@@ -3183,10 +3192,10 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
+        access(all) let account = blockchain.createAccount()
 
-        pub fun setup() {
+        access(all) fun setup() {
             let contractCode = Test.readFile("../contracts/FooContract.cdc")
             let err = blockchain.deployContract(
                 name: "FooContract",
@@ -3197,12 +3206,12 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 
             Test.expect(err, Test.beNil())
 
-            blockchain.useConfiguration(Test.Configuration({
+            blockchain.useConfiguration(Test.Configuration(addresses: {
                 "../contracts/FooContract.cdc": account.address
             }))
         }
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
             let result = blockchain.executeScript(script, [])
 
@@ -3210,7 +3219,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
             Test.assert(result.returnValue! as! Bool)
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             let code = Test.readFile("../transactions/add_special_number.cdc")
             let tx = Test.Transaction(
                 code: code,
@@ -3317,15 +3326,17 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"I.Crypto",
 			"I.Test",
 			"A.f8d6e0586b0a20c7.ExampleNFT",
-			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
-			"A.f8d6e0586b0a20c7.NFTStorefront",
+
+			// TODO: enable
+			//"A.f8d6e0586b0a20c7.NFTStorefrontV2",
+			//"A.f8d6e0586b0a20c7.NFTStorefront",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
-	assert.Equal(t, 1, coverageReport.TotalLocations())
+	assert.Equal(t, 3, coverageReport.TotalLocations())
 	assert.Equal(
 		t,
-		"Coverage: 100.0% of statements",
+		"Coverage: 22.9% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3334,20 +3345,20 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
 	t.Parallel()
 
 	const fooContract = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
             init() {
                 self.specialNumbers = {1729: "Harshad"}
                 log("init successful")
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
                 log("specialNumbers updated")
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if self.specialNumbers.containsKey(n) {
                     return self.specialNumbers[n]!
                 }
@@ -3361,13 +3372,13 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
         import Test
         import FooContract from "FooContract.cdc"
 
-        pub let foo = FooContract()
+        access(all) let foo = FooContract()
 
-        pub fun setup() {
+        access(all) fun setup() {
             log("setup successful")
         }
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             // Act
             let result = foo.getIntegerTrait(1729)
 
@@ -3376,7 +3387,7 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
             log("getIntegerTrait works")
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             // Act
             foo.addSpecialNumber(78557, "Sierpinski")
 
@@ -3420,18 +3431,18 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
 	t.Parallel()
 
 	const fooContract = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
             init() {
                 self.specialNumbers = {1729: "Harshad"}
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if self.specialNumbers.containsKey(n) {
                     return self.specialNumbers[n]!
                 }
@@ -3445,9 +3456,9 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
         import Test
         import FooContract from "FooContract.cdc"
 
-        pub let foo = FooContract()
+        access(all) let foo = FooContract()
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
 	        // Act
             let result = foo.getIntegerTrait(1729)
 
@@ -3455,7 +3466,7 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
             Test.assertEqual("Harshad", result)
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             // Act
             foo.addSpecialNumber(78557, "Sierpinski")
 
@@ -3488,20 +3499,20 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 	t.Parallel()
 
 	const contractCode = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
             init() {
                 self.specialNumbers = {1729: "Harshad"}
                 log("init successful")
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
                 log("specialNumbers updated")
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if self.specialNumbers.containsKey(n) {
                     return self.specialNumbers[n]!
                 }
@@ -3514,7 +3525,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 	const scriptCode = `
         import FooContract from "../contracts/FooContract.cdc"
 
-        pub fun main(): Bool {
+        access(all) fun main(): Bool {
             // Act
             let trait = FooContract.getIntegerTrait(1729)
 
@@ -3529,10 +3540,10 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
+        access(all) let account = blockchain.createAccount()
 
-        pub fun setup() {
+        access(all) fun setup() {
             let contractCode = Test.readFile("../contracts/FooContract.cdc")
             let err = blockchain.deployContract(
                 name: "FooContract",
@@ -3543,12 +3554,12 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 
             Test.expect(err, Test.beNil())
 
-            blockchain.useConfiguration(Test.Configuration({
+            blockchain.useConfiguration(Test.Configuration(addresses: {
                 "../contracts/FooContract.cdc": account.address
             }))
         }
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
             let result = blockchain.executeScript(script, [])
 
@@ -3556,7 +3567,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
             Test.assert(result.returnValue! as! Bool)
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             let code = Test.readFile("../transactions/add_special_number.cdc")
             let tx = Test.Transaction(
                 code: code,
@@ -3569,7 +3580,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
             Test.expect(result, Test.beSucceeded())
         }
 
-        pub fun tearDown() {
+        access(all) fun tearDown() {
             let expectedLogs = [
                 "init successful",
                 "getIntegerTrait works",
@@ -3623,18 +3634,18 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 	t.Parallel()
 
 	const contractCode = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
             init() {
                 self.specialNumbers = {1729: "Harshad"}
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if self.specialNumbers.containsKey(n) {
                     return self.specialNumbers[n]!
                 }
@@ -3647,7 +3658,7 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 	const scriptCode = `
         import FooContract from "../contracts/FooContract.cdc"
 
-        pub fun main(): Bool {
+        access(all) fun main(): Bool {
             // Act
             let trait = FooContract.getIntegerTrait(1729)
 
@@ -3661,10 +3672,10 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
+        access(all) let account = blockchain.createAccount()
 
-        pub fun setup() {
+        access(all) fun setup() {
             let contractCode = Test.readFile("../contracts/FooContract.cdc")
             let err = blockchain.deployContract(
                 name: "FooContract",
@@ -3675,12 +3686,12 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 
             Test.expect(err, Test.beNil())
 
-            blockchain.useConfiguration(Test.Configuration({
+            blockchain.useConfiguration(Test.Configuration(addresses: {
                 "../contracts/FooContract.cdc": account.address
             }))
         }
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
             let result = blockchain.executeScript(script, [])
 
@@ -3688,7 +3699,7 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
             Test.assert(result.returnValue! as! Bool)
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             let code = Test.readFile("../transactions/add_special_number.cdc")
             let tx = Test.Transaction(
                 code: code,
@@ -3701,7 +3712,7 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
             Test.expect(result, Test.beSucceeded())
         }
 
-        pub fun tearDown() {
+        access(all) fun tearDown() {
             Test.assertEqual([] as [String], blockchain.logs() )
         }
 	`
@@ -3748,23 +3759,23 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	t.Parallel()
 
 	const contractCode = `
-        pub contract FooContract {
-            pub let specialNumbers: {Int: String}
+        access(all) contract FooContract {
+            access(all) let specialNumbers: {Int: String}
 
-            pub event ContractInitialized()
-            pub event NumberAdded(n: Int, trait: String)
+            access(all) event ContractInitialized()
+            access(all) event NumberAdded(n: Int, trait: String)
 
             init() {
                 self.specialNumbers = {1729: "Harshad"}
                 emit ContractInitialized()
             }
 
-            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+            access(all) fun addSpecialNumber(_ n: Int, _ trait: String) {
                 self.specialNumbers[n] = trait
                 emit NumberAdded(n: n, trait: trait)
             }
 
-            pub fun getIntegerTrait(_ n: Int): String {
+            access(all) fun getIntegerTrait(_ n: Int): String {
                 if self.specialNumbers.containsKey(n) {
                     return self.specialNumbers[n]!
                 }
@@ -3777,7 +3788,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	const scriptCode = `
         import FooContract from "../contracts/FooContract.cdc"
 
-        pub fun main(): Bool {
+        access(all) fun main(): Bool {
             // Act
             let trait = FooContract.getIntegerTrait(1729)
 
@@ -3790,10 +3801,10 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
+        access(all) let account = blockchain.createAccount()
 
-        pub fun setup() {
+        access(all) fun setup() {
             let contractCode = Test.readFile("../contracts/FooContract.cdc")
             let err = blockchain.deployContract(
                 name: "FooContract",
@@ -3804,12 +3815,12 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 
             Test.expect(err, Test.beNil())
 
-            blockchain.useConfiguration(Test.Configuration({
+            blockchain.useConfiguration(Test.Configuration(addresses: {
                 "../contracts/FooContract.cdc": account.address
             }))
         }
 
-        pub fun testGetIntegerTrait() {
+        access(all) fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
             let result = blockchain.executeScript(script, [])
 
@@ -3821,7 +3832,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
             Test.assertEqual(1, events.length)
         }
 
-        pub fun testAddSpecialNumber() {
+        access(all) fun testAddSpecialNumber() {
             let code = Test.readFile("../transactions/add_special_number.cdc")
             let tx = Test.Transaction(
                 code: code,
@@ -3895,7 +3906,7 @@ func TestImportingHelperFile(t *testing.T) {
 	const helpersCode = `
         import Test
 
-        pub fun createTransaction(
+        access(all) fun createTransaction(
             _ path: String,
             account: Test.Account,
             args: [AnyStruct]
@@ -3923,10 +3934,10 @@ func TestImportingHelperFile(t *testing.T) {
         import Test
         import "test_helpers.cdc"
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
+        access(all) let account = blockchain.createAccount()
 
-        pub fun testRunTransaction() {
+        access(all) fun testRunTransaction() {
             let tx = createTransaction(
                 "../transactions/add_special_number.cdc",
                 account: account,
@@ -3975,9 +3986,9 @@ func TestBlockchainReset(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
+        access(all) let blockchain = Test.newEmulatorBlockchain()
 
-        pub fun testBlockchainReset() {
+        access(all) fun testBlockchainReset() {
             // Arrange
             let serviceAccount = blockchain.serviceAccount()
             let receiver = blockchain.createAccount()
@@ -4023,10 +4034,10 @@ func TestBlockchainReset(t *testing.T) {
         import "FungibleToken"
         import "FlowToken"
 
-        pub fun main(address: Address): UFix64 {
+        access(all) fun main(address: Address): UFix64 {
             let balanceRef = getAccount(address)
                 .getCapability(/public/flowTokenBalance)
-                .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+                .borrow<&FlowToken.Vault>()
                 ?? panic("Could not borrow FungibleToken.Balance reference")
 
             return balanceRef.balance
@@ -4039,13 +4050,13 @@ func TestBlockchainReset(t *testing.T) {
 
         transaction(receiver: Address, amount: UFix64) {
             prepare(account: AuthAccount) {
-                let flowVault = account.borrow<&FlowToken.Vault>(
+                let flowVault = account.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(
                     from: /storage/flowTokenVault
                 ) ?? panic("Could not borrow BlpToken.Vault reference")
 
                 let receiverRef = getAccount(receiver)
                     .getCapability(/public/flowTokenReceiver)
-                    .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+                    .borrow<&FlowToken.Vault>()
                     ?? panic("Could not borrow FungibleToken.Receiver reference")
 
                 let tokens <- flowVault.withdraw(amount: amount)
