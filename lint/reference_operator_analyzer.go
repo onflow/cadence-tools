@@ -59,7 +59,7 @@ var ReferenceOperatorAnalyzer = (func() *analysis.Analyzer {
 					// Analyze code instead
 
 					startOffset := referenceExpression.Expression.EndPosition(nil).Offset + 1
-					endOffset := referenceExpression.Type.StartPosition().Offset - 1
+					endOffset := referenceExpression.StartPosition().Offset - 1
 
 					if !invalidOperatorRegexp.Match(code[startOffset:endOffset]) {
 						return

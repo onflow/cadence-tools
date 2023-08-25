@@ -39,8 +39,8 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			pub contract Test {
-				pub fun test() {
+			access(all) contract Test {
+				access(all) fun test() {
 					let x = 3
 					let y = x!
 				}
@@ -54,8 +54,8 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 73, Line: 5, Column: 13},
-						EndPos:   ast.Position{Offset: 74, Line: 5, Column: 14},
+						StartPos: ast.Position{Offset: 89, Line: 5, Column: 13},
+						EndPos:   ast.Position{Offset: 90, Line: 5, Column: 14},
 					},
 					Location: testLocation,
 					Category: lint.RemovalCategory,
@@ -72,8 +72,8 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			pub contract Test {
-				pub fun test() {
+			access(all) contract Test {
+				access(all) fun test() {
 					let x: Int? = 3
 					let y = x!
 				}
