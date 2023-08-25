@@ -1104,10 +1104,10 @@ github.com/onflow/atree v0.5.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/atree v0.6.0 h1:j7nQ2r8npznx4NX39zPpBYHmdy45f4xwoi+dm37Jk7c=
 github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVFi0tc=
 github.com/onflow/cadence v0.39.13-stable-cadence/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
-github.com/onflow/cadence v0.40.1-0.20230825193141-901e7b0a7aa6 h1:UVJmShXN7XFYk/h3nI8tyycrryM6FF/JH0GW7w6ZHyc=
-github.com/onflow/cadence v0.40.1-0.20230825193141-901e7b0a7aa6/go.mod h1:9t99vCrpG/Ic9y5mMfM927FlvT50LOlIbNpTfub5n+U=
-github.com/onflow/cadence-tools/lint v0.11.1-0.20230825213033-6f907d9e3aea h1:89/dHA2/DqnSy3eQIMVee5KCajH2Nbyx7/jHMnobnro=
-github.com/onflow/cadence-tools/lint v0.11.1-0.20230825213033-6f907d9e3aea/go.mod h1:jURNI8pp5W0u/07QRhg/MO2yA4q3m/FQkBRVbIVbH38=
+github.com/onflow/cadence v0.39.13-stable-cadence.0.20230815215130-fc15617946a1 h1:ELu6aFiphx4QAQE64EbYidJjc5DQSF087QfJZfamnXY=
+github.com/onflow/cadence v0.39.13-stable-cadence.0.20230815215130-fc15617946a1/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
+github.com/onflow/cadence-tools/lint v0.11.1-0.20230825223013-014ec1d170a5 h1:aKwL0jVO2klc8Z+/CWjXfOOReIVJdDOumh8ypCjQPss=
+github.com/onflow/cadence-tools/lint v0.11.1-0.20230825223013-014ec1d170a5/go.mod h1:b5LWCSnFLa+sU1Q+LnOoiM2U6KJHjtiksmE7452mNMo=
 github.com/onflow/flow-cli/flowkit v1.3.5-0.20230825221814-b6e47e54a129 h1:VJ4jZr+OwR68D+6+SrjONSoIAiqAZfS50qKnHnWWmwM=
 github.com/onflow/flow-cli/flowkit v1.3.5-0.20230825221814-b6e47e54a129/go.mod h1:j3znBZdekaO63l8KhusHW1rpWPraHnIr/M7HqWbaq08=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230822191436-8a95802475f4 h1:MyiN3RknOanPPiDpBIdJ43ZrQNppgQUZgy5njPDdF7w=

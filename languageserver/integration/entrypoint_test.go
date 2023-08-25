@@ -123,7 +123,7 @@ func Test_EntrypointUpdate(t *testing.T) {
 	t.Run("update script entrypoint information", func(t *testing.T) {
 		entrypoint := buildEntrypoint(t, `
 			/// pragma arguments (hello: "hi")
-			pub fun main(hello: String): String {
+			access(all) fun main(hello: String): String {
 				return hello.concat(" world")
 			}
 		`)
@@ -170,7 +170,7 @@ func Test_Codelensses(t *testing.T) {
 	}, {
 		code: `
 			/// pragma arguments (hello: "hi")
-			pub fun main(hello: String): String {
+			access(all) fun main(hello: String): String {
 				return hello.concat(" world")
 			}
 		`,
