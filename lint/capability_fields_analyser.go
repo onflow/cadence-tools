@@ -51,7 +51,7 @@ func DetectCapabilityType(typeToCheck ast.Type, compositesWithPubCapabilities ma
 	}
 }
 
-func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]struct{}, map[ast.Identifier]struct{}) {
+func CollectCompositesWithPublicCapabilities(inspector *ast.Inspector) (map[string]struct{}, map[ast.Identifier]struct{}) {
 	compositesWithPubCapabilities := make(map[string]struct{})
 	fieldsInStruct := make(map[ast.Identifier]struct{})
 	inspector.Preorder(
@@ -60,16 +60,16 @@ func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]
 			switch declaration := element.(type) {
 			case *ast.CompositeDeclaration:
 				{
-					if declaration.CompositeKind != common.CompositeKindStructure {
-						return
-					}
 					for _, d := range declaration.Members.Declarations() {
 						field, ok := d.(*ast.FieldDeclaration)
 						if !ok || field.Access != ast.AccessPublic {
 							return
 						}
 						if DetectCapabilityType(field.TypeAnnotation.Type, compositesWithPubCapabilities) {
-							fieldsInStruct[field.Identifier] = struct{}{}
+							if declaration.CompositeKind != common.CompositeKindContract {
+								fieldsInStruct[field.Identifier] = struct{}{}
+							}
+
 							compositesWithPubCapabilities[declaration.Identifier.Identifier] = struct{}{}
 						}
 					}
@@ -95,7 +95,7 @@ var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 			location := pass.Program.Location
 			report := pass.Report
-			structTypesPublicCapability, fieldsInStruct := CollectStructsWithPublicCapabilities(inspector)
+			structTypesPublicCapability, fieldsInStruct := CollectCompositesWithPublicCapabilities(inspector)
 
 			inspector.Preorder(
 				elementFilter,

@@ -326,3 +326,81 @@ func TestImplicitCapabilityLeakViaStruct(t *testing.T) {
 		)
 	})
 }
+
+func TestImplicitCapabilityLeakViaResource(t *testing.T) {
+	t.Parallel()
+
+	t.Run("leak via resource field", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+		pub resource MyResource {
+			pub let my_capability : Capability?
+			init() {
+				self.my_capability = nil
+			}
+		}
+		pub contract MyContract {
+
+			// Declare a public field using the MyResource resource
+			pub var myResource: @MyResource?
+
+			// Initialize the contract
+			init() {
+				self.myResource <- nil
+			}
+		}`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 209, Line: 11, Column: 3},
+						EndPos:   ast.Position{Offset: 240, Line: 11, Column: 34},
+					},
+					Location:         testLocation,
+					Category:         lint.UpdateCategory,
+					Message:          "It is an anti-pattern to have public Capability fields.",
+					SecondaryMessage: "Consider restricting access.",
+				},
+			},
+			diagnostics,
+		)
+	})
+	t.Run("valid", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+		pub resource MyResource {
+			pub let my_capability : Capability?
+			init() {
+				self.my_capability = nil
+			}
+		}
+		pub contract MyContract {
+
+			// Declare a public field using the MyResource resource
+			priv var myResource: @MyResource?
+
+			// Initialize the contract
+			init() {
+				self.myResource <- nil
+			}
+		}`,
+			lint.CapabilityFieldAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+}
