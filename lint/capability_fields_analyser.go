@@ -65,10 +65,7 @@ func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]
 					}
 					for _, d := range declaration.Members.Declarations() {
 						field, ok := d.(*ast.FieldDeclaration)
-						if !ok {
-							return
-						}
-						if field.Access != ast.AccessPublic {
+						if !ok || field.Access != ast.AccessPublic {
 							return
 						}
 						if DetectCapabilityType(field.TypeAnnotation.Type, structWithPubCapabilities) {

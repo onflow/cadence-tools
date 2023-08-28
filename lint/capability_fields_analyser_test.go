@@ -225,6 +225,8 @@ func TestImplicitCapabilityLeakViaArray(t *testing.T) {
 }
 
 func TestImplicitCapabilityLeakViaStruct(t *testing.T) {
+	t.Parallel()
+
 	t.Run("leak via struct field", func(t *testing.T) {
 
 		t.Parallel()
@@ -282,6 +284,7 @@ func TestImplicitCapabilityLeakViaStruct(t *testing.T) {
 			diagnostics,
 		)
 	})
+
 	t.Run("valid", func(t *testing.T) {
 
 		t.Parallel()
