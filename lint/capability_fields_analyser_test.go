@@ -386,10 +386,8 @@ func TestImplicitCapabilityLeakViaResource(t *testing.T) {
 		}
 		pub contract MyContract {
 
-			// Declare a public field using the MyResource resource
 			priv var myResource: @MyResource?
 
-			// Initialize the contract
 			init() {
 				self.myResource <- nil
 			}

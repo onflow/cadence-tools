@@ -53,7 +53,7 @@ func DetectCapabilityType(typeToCheck ast.Type, compositesWithPubCapabilities ma
 
 func CollectCompositesWithPublicCapabilities(inspector *ast.Inspector) (map[string]struct{}, map[ast.Identifier]struct{}) {
 	compositesWithPubCapabilities := make(map[string]struct{})
-	fieldsInStruct := make(map[ast.Identifier]struct{})
+	fieldsInComposite := make(map[ast.Identifier]struct{})
 	inspector.Preorder(
 		[]ast.Element{(*ast.CompositeDeclaration)(nil)},
 		func(element ast.Element) {
@@ -67,7 +67,10 @@ func CollectCompositesWithPublicCapabilities(inspector *ast.Inspector) (map[stri
 						}
 						if DetectCapabilityType(field.TypeAnnotation.Type, compositesWithPubCapabilities) {
 							if declaration.CompositeKind != common.CompositeKindContract {
-								fieldsInStruct[field.Identifier] = struct{}{}
+								// public capability fields in contracts are not included in this set as later
+								// on it is used to exclude false positive. And while a struct with a public capability
+								// can be a false positive a contract with a public capability is always an anti pattern.
+								fieldsInComposite[field.Identifier] = struct{}{}
 							}
 
 							compositesWithPubCapabilities[declaration.Identifier.Identifier] = struct{}{}
@@ -77,7 +80,7 @@ func CollectCompositesWithPublicCapabilities(inspector *ast.Inspector) (map[stri
 			}
 		},
 	)
-	return compositesWithPubCapabilities, fieldsInStruct
+	return compositesWithPubCapabilities, fieldsInComposite
 }
 
 var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
