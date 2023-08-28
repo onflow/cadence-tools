@@ -29,7 +29,7 @@ func DetectCapabilityType(typeToCheck ast.Type, compositesWithPubCapabilities ma
 	switch downcastedType := typeToCheck.(type) {
 	case *ast.NominalType:
 		_, found := compositesWithPubCapabilities[downcastedType.Identifier.Identifier]
-		return downcastedType.Identifier.Identifier == capabilityTypeName || found
+		return found || downcastedType.Identifier.Identifier == capabilityTypeName
 	case *ast.OptionalType:
 		return DetectCapabilityType(downcastedType.Type, compositesWithPubCapabilities)
 	case *ast.VariableSizedType:
