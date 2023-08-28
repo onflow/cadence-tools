@@ -24,35 +24,35 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
-func DetectCapabilityType(typeToCheck ast.Type, structWithPubCapabilities map[string]struct{}) bool {
+func DetectCapabilityType(typeToCheck ast.Type, compositesWithPubCapabilities map[string]struct{}) bool {
 	const capabilityTypeName = "Capability"
 	switch downcastedType := typeToCheck.(type) {
 	case *ast.NominalType:
-		_, found := structWithPubCapabilities[downcastedType.Identifier.Identifier]
+		_, found := compositesWithPubCapabilities[downcastedType.Identifier.Identifier]
 		return downcastedType.Identifier.Identifier == capabilityTypeName || found
 	case *ast.OptionalType:
-		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
+		return DetectCapabilityType(downcastedType.Type, compositesWithPubCapabilities)
 	case *ast.VariableSizedType:
-		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
+		return DetectCapabilityType(downcastedType.Type, compositesWithPubCapabilities)
 	case *ast.ConstantSizedType:
-		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
+		return DetectCapabilityType(downcastedType.Type, compositesWithPubCapabilities)
 	case *ast.DictionaryType:
-		return DetectCapabilityType(downcastedType.KeyType, structWithPubCapabilities) || DetectCapabilityType(downcastedType.ValueType, structWithPubCapabilities)
+		return DetectCapabilityType(downcastedType.KeyType, compositesWithPubCapabilities) || DetectCapabilityType(downcastedType.ValueType, compositesWithPubCapabilities)
 	case *ast.FunctionType:
 		return false
 	case *ast.ReferenceType:
-		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
+		return DetectCapabilityType(downcastedType.Type, compositesWithPubCapabilities)
 	case *ast.RestrictedType:
 		return false
 	case *ast.InstantiationType:
-		return DetectCapabilityType(downcastedType.Type, structWithPubCapabilities)
+		return DetectCapabilityType(downcastedType.Type, compositesWithPubCapabilities)
 	default:
 		panic("Unknown type")
 	}
 }
 
 func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]struct{}, map[ast.Identifier]struct{}) {
-	structWithPubCapabilities := make(map[string]struct{})
+	compositesWithPubCapabilities := make(map[string]struct{})
 	fieldsInStruct := make(map[ast.Identifier]struct{})
 	inspector.Preorder(
 		[]ast.Element{(*ast.CompositeDeclaration)(nil)},
@@ -68,16 +68,16 @@ func CollectStructsWithPublicCapabilities(inspector *ast.Inspector) (map[string]
 						if !ok || field.Access != ast.AccessPublic {
 							return
 						}
-						if DetectCapabilityType(field.TypeAnnotation.Type, structWithPubCapabilities) {
+						if DetectCapabilityType(field.TypeAnnotation.Type, compositesWithPubCapabilities) {
 							fieldsInStruct[field.Identifier] = struct{}{}
-							structWithPubCapabilities[declaration.Identifier.Identifier] = struct{}{}
+							compositesWithPubCapabilities[declaration.Identifier.Identifier] = struct{}{}
 						}
 					}
 				}
 			}
 		},
 	)
-	return structWithPubCapabilities, fieldsInStruct
+	return compositesWithPubCapabilities, fieldsInStruct
 }
 
 var CapabilityFieldAnalyzer = (func() *analysis.Analyzer {
