@@ -34,8 +34,8 @@ func TestAuthAccountParameterAnalyzerInContractFunction(t *testing.T) {
 
 	diagnostics := testAnalyzers(t,
 		`
-		    pub contract BalanceChecker {
-		        pub fun getBalance(account: AuthAccount): UFix64 {
+		    access(all) contract BalanceChecker {
+		        access(all) fun getBalance(account: AuthAccount): UFix64 {
 		            return account.balance
 		        }
 		    }
@@ -48,8 +48,8 @@ func TestAuthAccountParameterAnalyzerInContractFunction(t *testing.T) {
 		[]analysis.Diagnostic{
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 47, Line: 3, Column: 10},
-					EndPos:   ast.Position{Offset: 145, Line: 5, Column: 10},
+					StartPos: ast.Position{Offset: 55, Line: 3, Column: 10},
+					EndPos:   ast.Position{Offset: 161, Line: 5, Column: 10},
 				},
 				Location:         testLocation,
 				Category:         lint.UpdateCategory,
@@ -67,8 +67,8 @@ func TestAuthAccountParameterAnalyzerInContractInitFunction(t *testing.T) {
 
 	diagnostics := testAnalyzers(t,
 		`
-		    pub contract BalanceChecker {
-		        pub let balance: UFix64
+		    access(all) contract BalanceChecker {
+		        access(all) let balance: UFix64
 		        init(account: AuthAccount) {
 		            self.balance = account.balance
 		        }
@@ -82,8 +82,8 @@ func TestAuthAccountParameterAnalyzerInContractInitFunction(t *testing.T) {
 		[]analysis.Diagnostic{
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 81, Line: 4, Column: 10},
-					EndPos:   ast.Position{Offset: 165, Line: 6, Column: 10},
+					StartPos: ast.Position{Offset: 97, Line: 4, Column: 10},
+					EndPos:   ast.Position{Offset: 181, Line: 6, Column: 10},
 				},
 				Location:         testLocation,
 				Category:         lint.UpdateCategory,
@@ -101,8 +101,8 @@ func TestAuthAccountParameterAnalyzerInStructInitFunction(t *testing.T) {
 
 	diagnostics := testAnalyzers(t,
 		`
-		    pub struct Balance {
-		        pub let balance: UFix64
+		    access(all) struct Balance {
+		        access(all) let balance: UFix64
 		        init(account: AuthAccount) {
 		            self.balance = account.balance
 		        }
@@ -116,8 +116,8 @@ func TestAuthAccountParameterAnalyzerInStructInitFunction(t *testing.T) {
 		[]analysis.Diagnostic{
 			{
 				Range: ast.Range{
-					StartPos: ast.Position{Offset: 72, Line: 4, Column: 10},
-					EndPos:   ast.Position{Offset: 156, Line: 6, Column: 10},
+					StartPos: ast.Position{Offset: 88, Line: 4, Column: 10},
+					EndPos:   ast.Position{Offset: 172, Line: 6, Column: 10},
 				},
 				Location:         testLocation,
 				Category:         lint.UpdateCategory,
@@ -135,8 +135,8 @@ func TestAuthAccountParameterAnalyzerWithPublicAccount(t *testing.T) {
 
 	diagnostics := testAnalyzers(t,
 		`
-		    pub contract BalanceChecker {
-		        pub fun getBalance(account: PublicAccount): UFix64 {
+		    access(all) contract BalanceChecker {
+		        access(all) fun getBalance(account: PublicAccount): UFix64 {
 		            return account.balance
 		        }
 		    }

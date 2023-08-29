@@ -2522,10 +2522,22 @@ func maybeAddMissingMembersCodeActionResolver(
 
 			builder.WriteRune('\n')
 			builder.WriteString(indentation)
-			if missingMember.Access != ast.AccessNotSpecified {
-				builder.WriteString(missingMember.Access.Keyword())
+
+			var accessString string
+			switch access := missingMember.Access.(type) {
+			case sema.PrimitiveAccess:
+				if ast.PrimitiveAccess(access) != ast.AccessNotSpecified {
+					accessString = access.AccessKeyword()
+				}
+			case sema.EntitlementSetAccess, sema.EntitlementMapAccess:
+				accessString = fmt.Sprintf("access(%s)", access.AccessKeyword())
+			}
+
+			if accessString != "" {
+				builder.WriteString(accessString)
 				builder.WriteRune(' ')
 			}
+
 			builder.WriteString(newMemberSource)
 			builder.WriteRune('\n')
 		}

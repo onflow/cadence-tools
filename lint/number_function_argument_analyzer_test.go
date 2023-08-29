@@ -41,8 +41,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-			pub contract Test {
-				pub fun test() {
+			access(all) contract Test {
+				access(all) fun test() {
 					let x = Fix64(1)
 				}
 			}`,
@@ -54,8 +54,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 58, Line: 4, Column: 13},
-						EndPos:   ast.Position{Offset: 65, Line: 4, Column: 20},
+						StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
+						EndPos:   ast.Position{Offset: 81, Line: 4, Column: 20},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -71,8 +71,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 
 		t.Parallel()
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = UFix64(1)
 			}
 		}`,
@@ -84,8 +84,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 63, Line: 4, Column: 20},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 79, Line: 4, Column: 20},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -101,8 +101,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = Fix64(-1)
 			}
 		}`,
@@ -114,8 +114,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 63, Line: 4, Column: 20},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 79, Line: 4, Column: 20},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -133,8 +133,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = UFix64(1.2)
 			}
 		}`,
@@ -146,8 +146,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 65, Line: 4, Column: 22},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 81, Line: 4, Column: 22},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -163,8 +163,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = Fix64(-1.2)
 			}
 		}`,
@@ -176,8 +176,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 65, Line: 4, Column: 22},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 81, Line: 4, Column: 22},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -197,8 +197,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = UInt8(1)
 			}
 		}`,
@@ -210,8 +210,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 62, Line: 4, Column: 19},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 78, Line: 4, Column: 19},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -227,8 +227,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = Int8(1)
 			}
 		}`,
@@ -240,8 +240,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 61, Line: 4, Column: 18},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 77, Line: 4, Column: 18},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -258,8 +258,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = Int8(-1)
 			}
 		}`,
@@ -271,8 +271,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 62, Line: 4, Column: 19},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 78, Line: 4, Column: 19},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -288,8 +288,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = Int(1)
 			}
 		}`,
@@ -301,8 +301,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 60, Line: 4, Column: 17},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 76, Line: 4, Column: 17},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,
@@ -318,8 +318,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t, `
-		pub contract Test {
-			pub fun test() {
+		access(all) contract Test {
+			access(all) fun test() {
 				let x = Int(-1)
 			}
 		}`,
@@ -331,8 +331,8 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 55, Line: 4, Column: 12},
-						EndPos:   ast.Position{Offset: 61, Line: 4, Column: 18},
+						StartPos: ast.Position{Offset: 71, Line: 4, Column: 12},
+						EndPos:   ast.Position{Offset: 77, Line: 4, Column: 18},
 					},
 					Location:         testLocation,
 					Category:         lint.ReplacementCategory,

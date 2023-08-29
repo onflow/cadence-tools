@@ -13,12 +13,10 @@ on:
       - 'v**'
 
 jobs:
-  test:
-    name: Test
+  test-test:
+    name: Test (Test Framework)
     runs-on: ubuntu-20.04
     steps:
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install wabt
     - uses: actions/checkout@v2
       with:
         fetch-depth: 0
@@ -35,9 +33,79 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     - name: Test
-      run: make
+      run: make test-test
     - name: Check tidy
-      run: make check-tidy
+      run: make check-tidy-test
+
+  test-lint:
+    name: Test (Lint)
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.19.x'
+      - uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test
+        run: make test-lint
+      - name: Check tidy
+        run: make check-tidy-lint
+
+  test-languageserver:
+    name: Test (Language Server)
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install wabt
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.19.x'
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '15'
+      - uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test
+        run: make test-languageserver
+      - name: Check tidy
+        run: make check-tidy-languageserver
+
+  test-docgen:
+    name: Test (Docgen)
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install wabt
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.19.x'
+      - uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test
+        run: make test-docgen
+      - name: Check tidy
+        run: make check-tidy-docgen
 
   lint:
     name: Lint

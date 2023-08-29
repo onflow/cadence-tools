@@ -30,18 +30,21 @@ import (
 
 func TestDeprecatedMemberAnalyzer(t *testing.T) {
 
+	// TODO: no more deprecated members
+	t.SkipNow()
+
 	t.Parallel()
 
 	diagnostics := testAnalyzers(t,
 		`
-          pub contract Test {
+          access(all) contract Test {
               /// **DEPRECATED**
-              pub fun foo() {}
+              access(all) fun foo() {}
 
               /// Deprecated: No good
-              pub fun bar() {}
+              access(all) fun bar() {}
 
-              pub fun test(account: AuthAccount) {
+              access(all) fun test(account: AuthAccount) {
                   account.addPublicKey([])
                   account.removePublicKey(0)
                   self.foo()

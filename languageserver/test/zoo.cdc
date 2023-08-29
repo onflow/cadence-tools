@@ -1,7 +1,7 @@
 import "Foo"
 
-pub contract Zoo {
-     pub let x: String
+access(all) contract Zoo {
+     access(all) let x: String
      init() {
        self.x = Foo.bar
      }

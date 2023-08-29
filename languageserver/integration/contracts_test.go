@@ -37,10 +37,10 @@ func Test_ContractUpdate(t *testing.T) {
 
 	const code = `
       /// pragma signers Alice
-	  pub contract HelloWorld {
-			pub let greeting: String
+	  access(all) contract HelloWorld {
+			access(all) let greeting: String
 
-			pub fun hello(): String {
+			access(all) fun hello(): String {
 				return self.greeting
 			}
 

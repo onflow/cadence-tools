@@ -127,7 +127,7 @@ describe("getEntryPointParameters command", () => {
 
   test("script", async() =>
     testCode(
-        `pub fun main(a: Int) {}`,
+        `access(all) fun main(a: Int) {}`,
         [{name: 'a', type: 'Int'}]
     )
   )
@@ -166,7 +166,7 @@ describe("getContractInitializerParameters command", () => {
   test("one contract, no parameters", async() =>
       testCode(
           `
-          pub contract C {
+          access(all) contract C {
               init() {}
           }
           `,
@@ -177,7 +177,7 @@ describe("getContractInitializerParameters command", () => {
   test("one contract, one parameter", async() =>
       testCode(
           `
-          pub contract C {
+          access(all) contract C {
               init(a: Int) {}
           }
           `,
@@ -188,11 +188,11 @@ describe("getContractInitializerParameters command", () => {
   test("many contracts", async() =>
       testCode(
           `
-          pub contract C1 {
+          access(all) contract C1 {
               init(a: Int) {}
           }
 
-          pub contract C2 {
+          access(all) contract C2 {
               init(b: Int) {}
           }
           `,
@@ -218,7 +218,7 @@ describe("parseEntryPointArguments command", () => {
   }
 
   test("script", async() =>
-    testCode("pub fun main(a: Address) {}"))
+    testCode("access(all) fun main(a: Address) {}"))
 
   test("transaction", async() =>
     testCode("transaction(a: Address) {}"))
@@ -247,14 +247,14 @@ describe("diagnostics", () => {
 
   test("script", async() =>
     testCode(
-      `pub fun main() { X }`,
+      `access(all) fun main() { X }`,
       ["cannot find variable in this scope: `X`. not found in this scope"]
     )
   )
 
   test("script auth account", async() =>
     testCode(
-      `pub fun main() { getAuthAccount(0x01) }`,
+      `access(all) fun main() { getAuthAccount(0x01) }`,
       [],
     )
   )
@@ -290,11 +290,11 @@ describe("diagnostics", () => {
   test("attachments", async() =>
       testCode(
           `
-            pub resource R {}
+            access(all) resource R {}
 
-            pub attachment A for R {}
+            access(all) attachment A for R {}
 
-            pub fun main() {
+            access(all) fun main() {
                 let r <- create R()
                 r[A]
                 destroy r
@@ -307,7 +307,7 @@ describe("diagnostics", () => {
   test("capability controllers", async() =>
       testCode(
           `
-            pub fun main() {
+            access(all) fun main() {
                 getAccount(0x1).capabilities.get
             }
           `,
@@ -362,7 +362,7 @@ describe("diagnostics", () => {
     const scriptName = "script"
     const scriptCode = `
       import Foo from "./foo.cdc"
-      pub fun main() { log(Foo.bar) }
+      access(all) fun main() { log(Foo.bar) }
     `
 
     let docNotifications = await testImports([
@@ -380,7 +380,7 @@ describe("diagnostics", () => {
     const scriptName = "script"
     const scriptCode = `
       import "Foo"
-      pub fun main() { log(Foo.bar) }
+      access(all) fun main() { log(Foo.bar) }
     `
 
     let docNotifications = await testImports([
@@ -398,7 +398,7 @@ describe("diagnostics", () => {
     const scriptName = "script"
     const scriptCode = `
       import Foo from "./foo.cdc"
-      pub fun main() { log(Foo.zoo) }
+      access(all) fun main() { log(Foo.zoo) }
     `
 
     let docNotifications = await testImports([

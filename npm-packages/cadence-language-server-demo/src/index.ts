@@ -25,11 +25,11 @@ import {createServer} from "@onflow/monaco-languageclient-cadence";
 import ITextModel = editor.ITextModel;
 
 const code1 = `
-pub contract C {
+access(all) contract C {
 
-    pub resource R {}
+    access(all) resource R {}
 
-    pub fun createR(): @R {
+    access(all) fun createR(): @R {
         return <- create R()
     }
 }
@@ -38,7 +38,7 @@ pub contract C {
 const code2 = `
 import 0x1
 
-pub fun main() {
+access(all) fun main() {
     let r <- C.createR()
 
 }

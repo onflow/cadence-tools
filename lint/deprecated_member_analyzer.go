@@ -32,12 +32,6 @@ func memberReplacement(memberInfo sema.MemberInfo) string {
 	switch memberInfo.AccessedType {
 	case sema.AuthAccountType:
 		switch memberName {
-		case sema.AuthAccountTypeAddPublicKeyFunctionName:
-			return "keys.add"
-
-		case sema.AuthAccountTypeRemovePublicKeyFunctionName:
-			return "keys.revoke"
-
 		case sema.AuthAccountTypeGetCapabilityFunctionName:
 			return "capabilities.get"
 

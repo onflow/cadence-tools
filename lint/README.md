@@ -92,7 +92,7 @@ The CSV file must be in the following format:
        - `id`: The ID of the transaction (its hash)
      - Scripts have the format `s.<ID>`, where
        - `id`: The ID of the script (its hash)
-  - `code`: The code of the contract, e.g. `pub contract Test {}`
+  - `code`: The code of the contract, e.g. `access(all) contract Test {}`
 
 Full example:
 
@@ -108,9 +108,9 @@ transaction {
 }
 "
 A.0000000000000001.Test,"
-pub contract Test {
+access(all) contract Test {
 
-    pub fun hello() {
+    access(all) fun hello() {
       log(""Hello, world!"")
     }
 }

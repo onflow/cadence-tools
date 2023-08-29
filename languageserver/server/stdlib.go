@@ -270,3 +270,8 @@ func newScriptStandardLibrary() (result standardLibrary) {
 	}
 	return
 }
+
+func (l standardLibrary) ReadRandom(bytes []byte) error {
+	//TODO implement
+	panic(errors.NewUnreachableError())
+}
