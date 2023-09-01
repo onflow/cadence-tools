@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
@@ -52,6 +53,18 @@ const helperFilePrefix = "\x00helper/"
 
 var _ stdlib.TestFramework = &EmulatorBackend{}
 
+type SystemClock struct {
+	TimeDelta int64
+}
+
+func (sc SystemClock) Now() time.Time {
+	return time.Now().Add(time.Second * time.Duration(sc.TimeDelta)).UTC()
+}
+
+func NewSystemClock() *SystemClock {
+	return &SystemClock{}
+}
+
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
 	blockchain *emulator.Blockchain
@@ -76,6 +89,9 @@ type EmulatorBackend struct {
 	// logCollection is a hook attached in the server logger, in order
 	// to aggregate and expose log messages from the blockchain.
 	logCollection *LogCollectionHook
+
+	// clock allows manipulating the blockchain's clock.
+	clock *SystemClock
 }
 
 type keyInfo struct {
@@ -130,6 +146,8 @@ func NewEmulatorBackend(
 	} else {
 		blockchain = newBlockchain(logCollectionHook)
 	}
+	clock := NewSystemClock()
+	blockchain.SetClock(clock)
 
 	return &EmulatorBackend{
 		blockchain:    blockchain,
@@ -139,6 +157,7 @@ func NewEmulatorBackend(
 		configuration: baseConfiguration(),
 		stdlibHandler: stdlibHandler,
 		logCollection: logCollectionHook,
+		clock:         clock,
 	}
 }
 
@@ -666,6 +685,14 @@ func (e *EmulatorBackend) Events(
 		common.ZeroAddress,
 		values...,
 	)
+}
+
+// Moves the time of the Blockchain's clock, by the
+// given time delta, in the form of seconds.
+func (e *EmulatorBackend) MoveTime(timeDelta int64) {
+	e.clock.TimeDelta += timeDelta
+	e.blockchain.SetClock(e.clock)
+	e.CommitBlock()
 }
 
 // excludeCommonLocations excludes the common contracts from appearing

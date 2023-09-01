@@ -4181,3 +4181,128 @@ func TestTestFunctionValidSignature(t *testing.T) {
 		assert.ErrorContains(t, err, "test functions should have no return values")
 	})
 }
+
+func TestBlockchainMoveTime(t *testing.T) {
+	t.Parallel()
+
+	const contractCode = `
+        pub contract TimeLocker {
+            pub let lockPeriod: UFix64
+            pub let lockedAt: UFix64
+
+            init(lockedAt: UFix64) {
+                self.lockedAt = lockedAt
+                // Lock period is 30 days, in the form of seconds.
+                self.lockPeriod = UFix64(30 * 24 * 60 * 60)
+            }
+
+            pub fun isOpen(): Bool {
+                let currentTime = getCurrentBlock().timestamp
+                return currentTime > (self.lockedAt + self.lockPeriod)
+            }
+        }
+	`
+
+	const scriptCode = `
+        import "TimeLocker"
+
+        pub fun main(): Bool {
+            return TimeLocker.isOpen()
+        }
+	`
+
+	const currentBlockTimestamp = `
+        pub fun main(): UFix64 {
+            return getCurrentBlock().timestamp
+        }
+	`
+
+	const testCode = `
+        import Test
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let account = blockchain.createAccount()
+        pub var lockedAt: UFix64 = 0.0
+
+        pub fun setup() {
+            let currentBlockTimestamp = Test.readFile("current_block_timestamp.cdc")
+            let result = blockchain.executeScript(currentBlockTimestamp, [])
+            lockedAt = result.returnValue! as! UFix64
+
+            let contractCode = Test.readFile("TimeLocker.cdc")
+            let err = blockchain.deployContract(
+                name: "TimeLocker",
+                code: contractCode,
+                account: account,
+                arguments: [lockedAt]
+            )
+
+            Test.expect(err, Test.beNil())
+
+            blockchain.useConfiguration(Test.Configuration({
+                "TimeLocker": account.address
+            }))
+        }
+
+        pub fun testIsNotOpen() {
+            let isLockerOpen = Test.readFile("is_locker_open.cdc")
+            let result = blockchain.executeScript(isLockerOpen, [])
+
+            Test.expect(result, Test.beSucceeded())
+            Test.assertEqual(false, result.returnValue! as! Bool)
+        }
+
+        pub fun testIsOpen() {
+            // timeDelta is the representation of 20 days, in seconds
+            let timeDelta = Fix64(20 * 24 * 60 * 60)
+            blockchain.moveTime(by: timeDelta)
+
+            let isLockerOpen = Test.readFile("is_locker_open.cdc")
+            var result = blockchain.executeScript(isLockerOpen, [])
+
+            Test.expect(result, Test.beSucceeded())
+            Test.assertEqual(false, result.returnValue! as! Bool)
+
+            // We move time forward by another 20 days
+            blockchain.moveTime(by: timeDelta)
+
+            result = blockchain.executeScript(isLockerOpen, [])
+
+            Test.assertEqual(true, result.returnValue! as! Bool)
+
+            // We move time backward by 20 days
+            blockchain.moveTime(by: timeDelta * -1.0)
+
+            result = blockchain.executeScript(isLockerOpen, [])
+
+            Test.assertEqual(false, result.returnValue! as! Bool)
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "TimeLocker.cdc":
+			return contractCode, nil
+		case "is_locker_open.cdc":
+			return scriptCode, nil
+		case "current_block_timestamp.cdc":
+			return currentBlockTimestamp, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", nil
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+}
