@@ -3197,31 +3197,15 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	assert.ElementsMatch(
 		t,
 		[]string{
-			"A.0ae53cb6e3f42a79.FlowToken",
-			"A.ee82856bf20e2aa6.FungibleToken",
-			"A.e5a8b7f23e8b548f.FlowFees",
-			"A.f8d6e0586b0a20c7.FlowStorageFees",
-			"A.f8d6e0586b0a20c7.FlowServiceAccount",
-			"A.f8d6e0586b0a20c7.FlowClusterQC",
-			"A.f8d6e0586b0a20c7.FlowDKG",
-			"A.f8d6e0586b0a20c7.FlowEpoch",
-			"A.f8d6e0586b0a20c7.FlowIDTableStaking",
-			"A.f8d6e0586b0a20c7.FlowStakingCollection",
-			"A.f8d6e0586b0a20c7.LockedTokens",
-			"A.f8d6e0586b0a20c7.NodeVersionBeacon",
-			"A.f8d6e0586b0a20c7.StakingProxy",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
-			"A.f8d6e0586b0a20c7.ExampleNFT",
-			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
-			"A.f8d6e0586b0a20c7.NFTStorefront",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
 	assert.Equal(
 		t,
-		"Coverage: 97.4% of statements",
+		"Coverage: 100.0% of statements",
 		coverageReport.String(),
 	)
 }
@@ -3955,9 +3939,6 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 
             let evts = blockchain.events()
             Test.expect(evts.length, Test.beGreaterThan(1))
-
-            let blockchain2 = Test.newEmulatorBlockchain()
-            Test.expect(evts.length, Test.beGreaterThan(1))
         }
 	`
 
@@ -3990,13 +3971,24 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 		}
 	}
 
+	contracts := map[string][]byte{
+		"FooContract": []byte(contractCode),
+	}
+
 	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			code := contracts[location.Name]
+			return string(code), nil
+		}
+
 		return "", nil
 	}
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -4344,4 +4336,42 @@ func TestRandomizedTestExecution(t *testing.T) {
 `
 
 	assert.Equal(t, expected, resultsStr)
+}
+
+func TestNewEmulatorBlockchainCleanState(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+        import BlockchainHelpers
+
+        pub fun test() {
+            let blockchain = Test.newEmulatorBlockchain()
+            let helpers = BlockchainHelpers(blockchain: blockchain)
+            let account = blockchain.createAccount()
+
+            let typ = CompositeType("flow.AccountCreated")!
+            let events = blockchain.eventsOfType(typ)
+            Test.assertEqual(1, events.length)
+
+            let blockchain2 = Test.newEmulatorBlockchain()
+            let helpers2 = BlockchainHelpers(blockchain: blockchain2)
+
+            let events2 = blockchain2.eventsOfType(typ)
+            Test.assertEqual(0, events2.length)
+
+            Test.assert(
+                helpers.getCurrentBlockHeight() > helpers2.getCurrentBlockHeight()
+            )
+        }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", nil
+	}
+
+	runner := NewTestRunner().WithImportResolver(importResolver)
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
 }

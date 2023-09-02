@@ -51,7 +51,7 @@ import (
 // conflicts with user-defined scripts/transactions.
 const helperFilePrefix = "\x00helper/"
 
-var _ stdlib.TestFramework = &EmulatorBackend{}
+var _ stdlib.Blockchain = &EmulatorBackend{}
 
 type SystemClock struct {
 	TimeDelta int64
@@ -76,9 +76,6 @@ type EmulatorBackend struct {
 
 	// accountKeys is a mapping of account addresses with their keys.
 	accountKeys map[common.Address]map[string]keyInfo
-
-	// fileResolver is used to resolve local files.
-	fileResolver FileResolver
 
 	// A property bag to pass various configurations to the backend.
 	// Currently, supports passing address mapping for contracts.
@@ -153,7 +150,6 @@ func NewEmulatorBackend(
 		blockchain:    blockchain,
 		blockOffset:   0,
 		accountKeys:   map[common.Address]map[string]keyInfo{},
-		fileResolver:  fileResolver,
 		configuration: baseConfiguration(),
 		stdlibHandler: stdlibHandler,
 		logCollection: logCollectionHook,
@@ -494,30 +490,6 @@ func (e *EmulatorBackend) DeployContract(
 	}
 
 	return e.CommitBlock()
-}
-
-func (e *EmulatorBackend) ReadFile(path string) (string, error) {
-	// These are the scripts/transactions used by the
-	// BlockchainHelpers file.
-	if strings.HasPrefix(path, helperFilePrefix) {
-		filename := strings.TrimPrefix(path, helperFilePrefix)
-		switch filename {
-		case "mint_flow.cdc":
-			return string(MintFlowTransaction), nil
-		case "get_flow_balance.cdc":
-			return string(GetFlowBalance), nil
-		case "get_current_block_height.cdc":
-			return string(GetCurrentBlockHeight), nil
-		case "burn_flow.cdc":
-			return string(BurnFlow), nil
-		}
-	}
-
-	if e.fileResolver == nil {
-		return "", FileResolverNotProvidedError{}
-	}
-
-	return e.fileResolver(path)
 }
 
 // Logs returns all the log messages from the blockchain.

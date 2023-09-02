@@ -28,6 +28,7 @@ import (
 	"github.com/logrusorgru/aurora"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-emulator/emulator"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -145,10 +146,16 @@ type TestRunner struct {
 	// log messages from test cases and contracts.
 	logCollection *LogCollectionHook
 
-	backend *EmulatorBackend
-
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
+
+	// blockchain is mainly used to obtain system-defined
+	// contracts & their exposed types
+	blockchain *emulator.Blockchain
+
+	// contracts is a mapping of contract names to their
+	// source code.
+	contracts map[string][]byte
 }
 
 func NewTestRunner() *TestRunner {
@@ -164,10 +171,19 @@ func NewTestRunner() *TestRunner {
 		)
 	}
 	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
+	blockchain, err := emulator.New(
+		emulator.WithStorageLimitEnabled(false),
+		emulator.Contracts(emulator.CommonContracts),
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	return &TestRunner{
 		testRuntime:   runtime.NewInterpreterRuntime(runtime.Config{}),
 		logCollection: logCollectionHook,
 		logger:        logger,
+		blockchain:    blockchain,
 	}
 }
 
@@ -188,6 +204,11 @@ func (r *TestRunner) WithCoverageReport(coverageReport *runtime.CoverageReport) 
 
 func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
 	r.randomSeed = seed
+	return r
+}
+
+func (r *TestRunner) WithContracts(contracts map[string][]byte) *TestRunner {
+	r.contracts = contracts
 	return r
 }
 
@@ -530,7 +551,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			r.backend = NewEmulatorBackend(
+			testFramework := NewTestFrameworkProvider(
 				r.fileResolver,
 				stdlibHandler,
 				r.coverageReport,
@@ -538,7 +559,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
 					inter,
-					r.backend,
+					testFramework,
 					constructorGenerator(common.Address{}),
 					invocationRange,
 				)
@@ -593,10 +614,23 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 		default:
 			addressLocation, ok := location.(common.AddressLocation)
 			if ok {
-				account, _ := r.backend.blockchain.GetAccount(
-					flow.Address(addressLocation.Address),
-				)
-				programCode := account.Contracts[addressLocation.Name]
+				var programCode []byte
+				// User-defined contracts are injected to test runners
+				// via flow-cli
+				if code, ok := r.contracts[addressLocation.Name]; ok {
+					programCode = code
+				} else {
+					// System-defined contracts are obtained from
+					// the blockchain.
+					account, err := r.blockchain.GetAccount(
+						flow.Address(addressLocation.Address),
+					)
+					if err != nil {
+						panic(err)
+					}
+					programCode = account.Contracts[addressLocation.Name]
+				}
+
 				env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 				newCtx := runtime.Context{
 					Interface:   newScriptEnvironment(zerolog.Nop()),
@@ -612,10 +646,24 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 					if !ok {
 						return nil, fmt.Errorf("no address location given")
 					}
-					account, _ := r.backend.blockchain.GetAccount(
-						flow.Address(addressLoc.Address),
-					)
-					programCode := account.Contracts[addressLoc.Name]
+
+					var programCode []byte
+					// User-defined contracts are injected to test runners
+					// via flow-cli
+					if code, ok := r.contracts[addressLoc.Name]; ok {
+						programCode = code
+					} else {
+						// System-defined contracts are obtained from
+						// the blockchain.
+						account, err := r.blockchain.GetAccount(
+							flow.Address(addressLoc.Address),
+						)
+						if err != nil {
+							panic(err)
+						}
+						programCode = account.Contracts[addressLoc.Name]
+					}
+
 					program, err := env.ParseAndCheckProgram(
 						programCode, addressLoc, true,
 					)
