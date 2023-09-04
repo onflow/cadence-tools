@@ -20,6 +20,7 @@ package test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"regexp"
 	"strings"
@@ -145,6 +146,9 @@ type TestRunner struct {
 	logCollection *LogCollectionHook
 
 	backend *EmulatorBackend
+
+	// randomSeed is used for randomized test case execution.
+	randomSeed int64
 }
 
 func NewTestRunner() *TestRunner {
@@ -179,6 +183,11 @@ func (r *TestRunner) WithFileResolver(fileResolver FileResolver) *TestRunner {
 
 func (r *TestRunner) WithCoverageReport(coverageReport *runtime.CoverageReport) *TestRunner {
 	r.coverageReport = coverageReport
+	return r
+}
+
+func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
+	r.randomSeed = seed
 	return r
 }
 
@@ -245,12 +254,24 @@ func (r *TestRunner) RunTests(script string) (results Results, err error) {
 		return nil, err
 	}
 
+	testCases := make([]*ast.FunctionDeclaration, 0)
+
 	for _, funcDecl := range program.Program.FunctionDeclarations() {
 		funcName := funcDecl.Identifier.Identifier
 
-		if !strings.HasPrefix(funcName, testFunctionPrefix) {
-			continue
+		if strings.HasPrefix(funcName, testFunctionPrefix) {
+			testCases = append(testCases, funcDecl)
 		}
+	}
+	if r.randomSeed > 0 {
+		rng := rand.New(rand.NewSource(r.randomSeed))
+		rng.Shuffle(len(testCases), func(i, j int) {
+			testCases[i], testCases[j] = testCases[j], testCases[i]
+		})
+	}
+
+	for _, funcDecl := range testCases {
+		funcName := funcDecl.Identifier.Identifier
 
 		// Run `beforeEach()` before running the test function.
 		err = r.runBeforeEach(inter)

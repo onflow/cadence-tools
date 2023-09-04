@@ -4306,3 +4306,42 @@ func TestBlockchainMoveTime(t *testing.T) {
 		require.NoError(t, result.Error)
 	}
 }
+
+func TestRandomizedTestExecution(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+
+        pub fun testCase1() {
+            log("testCase1")
+        }
+
+        pub fun testCase2() {
+            log("testCase2")
+        }
+
+        pub fun testCase3() {
+            log("testCase3")
+        }
+
+        pub fun testCase4() {
+            log("testCase4")
+        }
+	`
+
+	runner := NewTestRunner().WithRandomSeed(1600)
+	results, err := runner.RunTests(code)
+	require.NoError(t, err)
+
+	resultsStr := PrettyPrintResults(results, "test_script.cdc")
+
+	const expected = `Test results: "test_script.cdc"
+- PASS: testCase4
+- PASS: testCase3
+- PASS: testCase1
+- PASS: testCase2
+`
+
+	assert.Equal(t, expected, resultsStr)
+}
