@@ -152,10 +152,6 @@ type TestRunner struct {
 	// blockchain is mainly used to obtain system-defined
 	// contracts & their exposed types
 	blockchain *emulator.Blockchain
-
-	// contracts is a mapping of contract names to their
-	// source code.
-	contracts map[string][]byte
 }
 
 func NewTestRunner() *TestRunner {
@@ -204,11 +200,6 @@ func (r *TestRunner) WithCoverageReport(coverageReport *runtime.CoverageReport) 
 
 func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
 	r.randomSeed = seed
-	return r
-}
-
-func (r *TestRunner) WithContracts(contracts map[string][]byte) *TestRunner {
-	r.contracts = contracts
 	return r
 }
 
@@ -617,8 +608,9 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 				var programCode []byte
 				// User-defined contracts are injected to test runners
 				// via flow-cli
-				if code, ok := r.contracts[addressLocation.Name]; ok {
-					programCode = code
+				code, err := r.importResolver(location)
+				if err == nil {
+					programCode = []byte(code)
 				} else {
 					// System-defined contracts are obtained from
 					// the blockchain.
@@ -650,8 +642,9 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 					var programCode []byte
 					// User-defined contracts are injected to test runners
 					// via flow-cli
-					if code, ok := r.contracts[addressLoc.Name]; ok {
-						programCode = code
+					code, err := r.importResolver(location)
+					if err == nil {
+						programCode = []byte(code)
 					} else {
 						// System-defined contracts are obtained from
 						// the blockchain.

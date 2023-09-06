@@ -3971,24 +3971,20 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 		}
 	}
 
-	contracts := map[string][]byte{
-		"FooContract": []byte(contractCode),
-	}
-
 	importResolver := func(location common.Location) (string, error) {
 		switch location := location.(type) {
 		case common.AddressLocation:
-			code := contracts[location.Name]
-			return string(code), nil
+			if location.Name == "FooContract" {
+				return contractCode, nil
+			}
 		}
 
-		return "", nil
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
 	}
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(contracts)
+		WithImportResolver(importResolver)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
