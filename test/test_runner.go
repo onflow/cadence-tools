@@ -573,6 +573,23 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		default:
+			if _, ok := compositeType.Location.(common.AddressLocation); ok {
+				constructor := constructorGenerator(common.Address{})
+
+				value, err := inter.InvokeFunctionValue(
+					constructor,
+					[]interpreter.Value{},
+					[]sema.Type{},
+					[]sema.Type{},
+					invocationRange,
+				)
+				if err != nil {
+					panic(err)
+				}
+
+				return value.(*interpreter.CompositeValue)
+			}
+
 			// During tests, imported contracts can be constructed using the constructor,
 			// similar to structs. Therefore, generate a constructor function.
 			return constructorGenerator(common.Address{})

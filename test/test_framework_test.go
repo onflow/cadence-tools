@@ -4371,3 +4371,117 @@ func TestNewEmulatorBlockchainCleanState(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
+
+func TestReferenceDeployedContractTypes(t *testing.T) {
+	t.Parallel()
+
+	const contractCode = `
+        pub contract FooContract {
+            pub let specialNumbers: {Int: String}
+
+            pub struct SpecialNumber {
+                pub let n: Int
+                pub let trait: String
+                pub let numbers: {Int: String}
+
+                init(n: Int, trait: String) {
+                    self.n = n
+                    self.trait = trait
+                    self.numbers = FooContract.specialNumbers
+                }
+
+                pub fun getAllNumbers(): {Int: String} {
+                    return FooContract.specialNumbers
+                }
+            }
+
+            init() {
+                self.specialNumbers = {1729: "Harshad"}
+            }
+
+            pub fun getSpecialNumbers(): [SpecialNumber] {
+                return [
+                    SpecialNumber(n: 1729, trait: "Harshad")
+                ]
+            }
+        }
+	`
+
+	const scriptCode = `
+        import FooContract from "../contracts/FooContract.cdc"
+
+        pub fun main(): [FooContract.SpecialNumber] {
+            return FooContract.getSpecialNumbers()
+        }
+	`
+
+	const testCode = `
+        import Test
+        import FooContract from 0x01cf0e2f2f715450
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let account = blockchain.createAccount()
+
+        pub fun setup() {
+            let contractCode = Test.readFile("../contracts/FooContract.cdc")
+            let err = blockchain.deployContract(
+                name: "FooContract",
+                code: contractCode,
+                account: account,
+                arguments: []
+            )
+            Test.expect(err, Test.beNil())
+
+            blockchain.useConfiguration(Test.Configuration({
+                "../contracts/FooContract.cdc": account.address
+            }))
+        }
+
+        pub fun testGetSpecialNumber() {
+            let script = Test.readFile("../scripts/get_special_number.cdc")
+            let result = blockchain.executeScript(script, [])
+            Test.expect(result, Test.beSucceeded())
+
+            let specialNumbers = result.returnValue! as! [FooContract.SpecialNumber]
+            let specialNumber = specialNumbers[0]
+            let expected = FooContract.SpecialNumber(n: 1729, trait: "Harshad")
+            Test.assertEqual(expected, specialNumber)
+
+            specialNumber.getAllNumbers()
+            Test.assertEqual(1729, specialNumber.n)
+            Test.assertEqual("Harshad", specialNumber.trait)
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return contractCode, nil
+		case "../scripts/get_special_number.cdc":
+			return scriptCode, nil
+		default:
+			return "", fmt.Errorf("cannot find import location: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return contractCode, nil
+			}
+		}
+
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
+}
