@@ -692,6 +692,19 @@ func (e *EmulatorBackend) MoveTime(timeDelta int64) {
 	e.CommitBlock()
 }
 
+// Creates a snapshot of the blockchain, at the
+// current ledger state, with the given name.
+func (e *EmulatorBackend) CreateSnapshot(name string) error {
+	return e.blockchain.CreateSnapshot(name)
+}
+
+// Loads a snapshot of the blockchain, with the
+// given name, and updates the current ledger
+// state.
+func (e *EmulatorBackend) LoadSnapshot(name string) error {
+	return e.blockchain.LoadSnapshot(name)
+}
+
 // excludeCommonLocations excludes the common contracts from appearing
 // in the coverage report, as they skew the coverage metrics.
 func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
