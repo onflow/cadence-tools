@@ -509,9 +509,22 @@ func contractValueHandler(
 		compositeType,
 	)
 
+	// In unit tests, contracts are imported with string locations, e.g
+	// import FooContract from "../contracts/FooContract.cdc"
+	if _, ok := compositeType.Location.(common.StringLocation); ok {
+		return stdlib.StandardLibraryValue{
+			Name:           declaration.Identifier.Identifier,
+			Type:           constructorType,
+			DocString:      declaration.DocString,
+			Kind:           declaration.DeclarationKind(),
+			Position:       &declaration.Identifier.Pos,
+			ArgumentLabels: constructorArgumentLabels,
+		}
+	}
+
 	return stdlib.StandardLibraryValue{
 		Name:           declaration.Identifier.Identifier,
-		Type:           constructorType,
+		Type:           compositeType,
 		DocString:      declaration.DocString,
 		Kind:           declaration.DeclarationKind(),
 		Position:       &declaration.Identifier.Pos,
@@ -569,136 +582,38 @@ func (r *TestRunner) interpreterContractValueHandler(
 
 func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.ImportLocationHandlerFunc {
 	return func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
+		var program *interpreter.Program
 		switch location {
 		case stdlib.CryptoCheckerLocation:
 			cryptoChecker := stdlib.CryptoChecker()
-			program := interpreter.ProgramFromChecker(cryptoChecker)
-			subInterpreter, err := inter.NewSubInterpreter(program, location)
-			if err != nil {
-				panic(err)
-			}
-			return interpreter.InterpreterImport{
-				Interpreter: subInterpreter,
-			}
+			program = interpreter.ProgramFromChecker(cryptoChecker)
 
 		case stdlib.TestContractLocation:
 			testChecker := stdlib.GetTestContractType().Checker
-			program := interpreter.ProgramFromChecker(testChecker)
-			subInterpreter, err := inter.NewSubInterpreter(program, location)
-			if err != nil {
-				panic(err)
-			}
-			return interpreter.InterpreterImport{
-				Interpreter: subInterpreter,
-			}
+			program = interpreter.ProgramFromChecker(testChecker)
+
 		case BlockchainHelpersLocation:
 			helpersChecker := BlockchainHelpersChecker()
-			program := interpreter.ProgramFromChecker(helpersChecker)
-			subInterpreter, err := inter.NewSubInterpreter(program, location)
-			if err != nil {
-				panic(err)
-			}
-			return interpreter.InterpreterImport{
-				Interpreter: subInterpreter,
-			}
+			program = interpreter.ProgramFromChecker(helpersChecker)
 
 		default:
-			addressLocation, ok := location.(common.AddressLocation)
-			if ok {
-				var programCode []byte
-				// User-defined contracts are injected to test runners
-				// via flow-cli
-				code, err := r.importResolver(location)
-				if err == nil {
-					programCode = []byte(code)
-				} else {
-					// System-defined contracts are obtained from
-					// the blockchain.
-					account, err := r.blockchain.GetAccount(
-						flow.Address(addressLocation.Address),
-					)
-					if err != nil {
-						panic(err)
-					}
-					programCode = account.Contracts[addressLocation.Name]
-				}
-
-				env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-				newCtx := runtime.Context{
-					Interface:   newScriptEnvironment(zerolog.Nop()),
-					Location:    addressLocation,
-					Environment: env,
-				}
-				env.CheckerConfig.ImportHandler = func(
-					checker *sema.Checker,
-					importedLocation common.Location,
-					importRange ast.Range,
-				) (sema.Import, error) {
-					addressLoc, ok := importedLocation.(common.AddressLocation)
-					if !ok {
-						return nil, fmt.Errorf("no address location given")
-					}
-
-					var programCode []byte
-					// User-defined contracts are injected to test runners
-					// via flow-cli
-					code, err := r.importResolver(location)
-					if err == nil {
-						programCode = []byte(code)
-					} else {
-						// System-defined contracts are obtained from
-						// the blockchain.
-						account, err := r.blockchain.GetAccount(
-							flow.Address(addressLoc.Address),
-						)
-						if err != nil {
-							panic(err)
-						}
-						programCode = account.Contracts[addressLoc.Name]
-					}
-
-					program, err := env.ParseAndCheckProgram(
-						programCode, addressLoc, true,
-					)
-					if err != nil {
-						panic(err)
-					}
-
-					return sema.ElaborationImport{
-						Elaboration: program.Elaboration,
-					}, nil
-				}
-				program, err := r.testRuntime.ParseAndCheckProgram(programCode, newCtx)
-				if err != nil {
-					panic(err)
-				}
-
-				subInterpreter, err := inter.NewSubInterpreter(program, addressLocation)
-				if err != nil {
-					panic(err)
-				}
-				return interpreter.InterpreterImport{
-					Interpreter: subInterpreter,
-				}
-			}
 			importedProgram, importedElaboration, err := r.parseAndCheckImport(location, ctx)
 			if err != nil {
 				panic(err)
 			}
 
-			program := &interpreter.Program{
+			program = &interpreter.Program{
 				Program:     importedProgram,
 				Elaboration: importedElaboration,
 			}
+		}
 
-			subInterpreter, err := inter.NewSubInterpreter(program, location)
-			if err != nil {
-				panic(err)
-			}
-
-			return interpreter.InterpreterImport{
-				Interpreter: subInterpreter,
-			}
+		subInterpreter, err := inter.NewSubInterpreter(program, location)
+		if err != nil {
+			panic(err)
+		}
+		return interpreter.InterpreterImport{
+			Interpreter: subInterpreter,
 		}
 	}
 }
@@ -736,7 +651,20 @@ func (r *TestRunner) parseAndCheckImport(
 
 	code, err := r.importResolver(location)
 	if err != nil {
-		return nil, nil, err
+		addressLocation, ok := location.(common.AddressLocation)
+		if ok {
+			// System-defined contracts are obtained from
+			// the blockchain.
+			account, err := r.blockchain.GetAccount(
+				flow.Address(addressLocation.Address),
+			)
+			if err != nil {
+				panic(err)
+			}
+			code = string(account.Contracts[addressLocation.Name])
+		} else {
+			return nil, nil, err
+		}
 	}
 
 	// Create a new (child) context, with new environment.
@@ -763,7 +691,30 @@ func (r *TestRunner) parseAndCheckImport(
 			}, nil
 
 		default:
-			return nil, fmt.Errorf("nested imports are not supported")
+			addressLoc, ok := importedLocation.(common.AddressLocation)
+			if ok {
+				// System-defined contracts are obtained from
+				// the blockchain.
+				account, err := r.blockchain.GetAccount(
+					flow.Address(addressLoc.Address),
+				)
+				if err != nil {
+					panic(err)
+				}
+				code := account.Contracts[addressLoc.Name]
+				program, err := env.ParseAndCheckProgram(
+					code, addressLoc, true,
+				)
+				if err != nil {
+					panic(err)
+				}
+
+				return sema.ElaborationImport{
+					Elaboration: program.Elaboration,
+				}, nil
+			} else {
+				return nil, fmt.Errorf("nested imports are not supported")
+			}
 		}
 	}
 

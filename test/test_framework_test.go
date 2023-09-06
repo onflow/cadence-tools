@@ -438,7 +438,7 @@ func TestImportContract(t *testing.T) {
 		`
 
 		const fooContract = `
-            import BarContract from 0x01
+            import BarContract from "./BarContract"
 
             pub contract FooContract {
                 init() {}
