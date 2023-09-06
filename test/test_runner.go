@@ -659,7 +659,7 @@ func (r *TestRunner) parseAndCheckImport(
 				flow.Address(addressLocation.Address),
 			)
 			if err != nil {
-				panic(err)
+				return nil, nil, err
 			}
 			code = string(account.Contracts[addressLocation.Name])
 		} else {
@@ -699,14 +699,14 @@ func (r *TestRunner) parseAndCheckImport(
 					flow.Address(addressLoc.Address),
 				)
 				if err != nil {
-					panic(err)
+					return nil, err
 				}
 				code := account.Contracts[addressLoc.Name]
 				program, err := env.ParseAndCheckProgram(
 					code, addressLoc, true,
 				)
 				if err != nil {
-					panic(err)
+					return nil, err
 				}
 
 				return sema.ElaborationImport{
