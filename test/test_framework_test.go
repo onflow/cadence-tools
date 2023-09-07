@@ -4517,9 +4517,18 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
                 }
 
                 pub fun getSpecialNumbers(): [SpecialNumber] {
-                    return [
-                        SpecialNumber(n: 1729, trait: "Harshad")
-                    ]
+                    let specialNumbers: [SpecialNumber] = []
+
+                    self.specialNumbers.forEachKey(fun (key: Int): Bool {
+                        let trait = self.specialNumbers[key]!
+                        specialNumbers.append(
+                            SpecialNumber(n: key, trait: trait)
+                        )
+
+                        return true
+                    })
+
+                    return specialNumbers
                 }
             }
 		`
@@ -4567,6 +4576,31 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
                 specialNumber.getAllNumbers()
                 Test.assertEqual(1729, specialNumber.n)
                 Test.assertEqual("Harshad", specialNumber.trait)
+            }
+
+            pub fun testNewDeploymentWithEmptyArgs() {
+                let contractCode = Test.readFile("../contracts/FooContract.cdc")
+                let blockchain2 = Test.newEmulatorBlockchain()
+                let account2 = blockchain2.createAccount()
+                let args: {Int: String} = {}
+                let err = blockchain2.deployContract(
+                    name: "FooContract",
+                    code: contractCode,
+                    account: account2,
+                    arguments: [args]
+                )
+                Test.expect(err, Test.beNil())
+
+                blockchain2.useConfiguration(Test.Configuration({
+                    "../contracts/FooContract.cdc": account2.address
+                }))
+
+                let script = Test.readFile("../scripts/get_special_number.cdc")
+                let result = blockchain2.executeScript(script, [])
+                Test.expect(result, Test.beSucceeded())
+
+                let specialNumbers = result.returnValue! as! [FooContract.SpecialNumber]
+                Test.expect(specialNumbers, Test.beEmpty())
             }
 		`
 
