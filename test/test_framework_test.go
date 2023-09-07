@@ -4637,3 +4637,41 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 		}
 	})
 }
+
+func TestEmulatorBlockchainSnapshotting(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+        import BlockchainHelpers
+
+        pub let blockchain = Test.newEmulatorBlockchain()
+        pub let helpers = BlockchainHelpers(blockchain: blockchain)
+
+        pub fun test() {
+            let admin = blockchain.createAccount()
+            blockchain.createSnapshot(name: "adminCreated")
+
+            helpers.mintFlow(to: admin, amount: 1000.0)
+            blockchain.createSnapshot(name: "adminFunded")
+
+            var balance = helpers.getFlowBalance(for: admin)
+            Test.assertEqual(1000.0, balance)
+
+            blockchain.loadSnapshot(name: "adminCreated")
+
+            balance = helpers.getFlowBalance(for: admin)
+            Test.assertEqual(0.0, balance)
+
+            blockchain.loadSnapshot(name: "adminFunded")
+
+            balance = helpers.getFlowBalance(for: admin)
+            Test.assertEqual(1000.0, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
