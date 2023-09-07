@@ -574,13 +574,20 @@ func (r *TestRunner) interpreterContractValueHandler(
 
 		default:
 			if _, ok := compositeType.Location.(common.AddressLocation); ok {
-				constructor := constructorGenerator(common.Address{})
+				invocation, found := ContractInvocations[compositeType.Identifier]
+				if !found {
+					panic(fmt.Errorf("contract invocation not found"))
+				}
+				parameterTypes := make([]sema.Type, len(compositeType.ConstructorParameters))
+				for i, constructorParameter := range compositeType.ConstructorParameters {
+					parameterTypes[i] = constructorParameter.TypeAnnotation.Type
+				}
 
 				value, err := inter.InvokeFunctionValue(
-					constructor,
-					[]interpreter.Value{},
-					[]sema.Type{},
-					[]sema.Type{},
+					constructorGenerator(common.Address{}),
+					invocation.ConstructorArguments,
+					invocation.ArgumentTypes,
+					parameterTypes,
 					invocationRange,
 				)
 				if err != nil {

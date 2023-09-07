@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/flow-emulator/adapters"
 	"github.com/onflow/flow-emulator/convert"
@@ -64,6 +65,16 @@ func (sc SystemClock) Now() time.Time {
 func NewSystemClock() *SystemClock {
 	return &SystemClock{}
 }
+
+type DeployedContractConstructorInvocation struct {
+	ConstructorArguments []interpreter.Value
+	ArgumentTypes        []sema.Type
+}
+
+var ContractInvocations = make(
+	map[string]DeployedContractConstructorInvocation,
+	0,
+)
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
@@ -487,6 +498,20 @@ func (e *EmulatorBackend) DeployContract(
 	result := e.ExecuteNextTransaction()
 	if result.Error != nil {
 		return result.Error
+	}
+
+	argTypes := make([]sema.Type, 0)
+	for _, arg := range args {
+		staticType := arg.StaticType(inter)
+		argType, err := inter.ConvertStaticToSemaType(staticType)
+		if err != nil {
+			panic(err)
+		}
+		argTypes = append(argTypes, argType)
+	}
+	ContractInvocations[name] = DeployedContractConstructorInvocation{
+		ConstructorArguments: args,
+		ArgumentTypes:        argTypes,
 	}
 
 	return e.CommitBlock()
