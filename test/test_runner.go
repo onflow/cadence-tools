@@ -522,6 +522,11 @@ func contractValueHandler(
 		}
 	}
 
+	// For composite types (e.g. contracts) that are deployed on
+	// EmulatorBackend's blockchain, we have to declare the
+	// define the value declaration as a composite. This is needed
+	// for nested types that are defined in the composite type,
+	// e.g events / structs / resources / enums etc.
 	return stdlib.StandardLibraryValue{
 		Name:           declaration.Identifier.Identifier,
 		Type:           compositeType,
