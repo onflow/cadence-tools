@@ -74,23 +74,23 @@ type Result struct {
 	Error    error
 }
 
-// LogCollectionHook can be attached to zerolog.Logger objects, in order
+// logCollectionHook can be attached to zerolog.Logger objects, in order
 // to aggregate the log messages in a string slice, containing only the
 // string message.
-type LogCollectionHook struct {
+type logCollectionHook struct {
 	Logs []string
 }
 
-var _ zerolog.Hook = &LogCollectionHook{}
+var _ zerolog.Hook = &logCollectionHook{}
 
-// NewLogCollectionHook initializes and returns a *LogCollectionHook
-func NewLogCollectionHook() *LogCollectionHook {
-	return &LogCollectionHook{
+// newLogCollectionHook initializes and returns a *LogCollectionHook
+func newLogCollectionHook() *logCollectionHook {
+	return &logCollectionHook{
 		Logs: make([]string, 0),
 	}
 }
 
-func (h *LogCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+func (h *logCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	if level != zerolog.NoLevel {
 		logMsg := strings.Replace(
 			msg,
@@ -144,7 +144,7 @@ type TestRunner struct {
 	// logCollection is a hook attached in the program logger of
 	// the script environment, in order to aggregate and expose
 	// log messages from test cases and contracts.
-	logCollection *LogCollectionHook
+	logCollection *logCollectionHook
 
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
@@ -155,7 +155,7 @@ type TestRunner struct {
 }
 
 func NewTestRunner() *TestRunner {
-	logCollectionHook := NewLogCollectionHook()
+	logCollectionHook := newLogCollectionHook()
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
 	output.FormatMessage = func(i interface{}) string {
 		msg := i.(string)
@@ -169,8 +169,8 @@ func NewTestRunner() *TestRunner {
 	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
 	blockchain, err := emulator.New(
 		emulator.WithStorageLimitEnabled(false),
-		emulator.Contracts(CommonContracts),
-		emulator.WithChainID(Chain.ChainID()),
+		emulator.Contracts(commonContracts),
+		emulator.WithChainID(chain.ChainID()),
 	)
 	if err != nil {
 		panic(err)
@@ -580,7 +580,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 
 		default:
 			if _, ok := compositeType.Location.(common.AddressLocation); ok {
-				invocation, found := ContractInvocations[compositeType.Identifier]
+				invocation, found := contractInvocations[compositeType.Identifier]
 				if !found {
 					panic(fmt.Errorf("contract invocation not found"))
 				}

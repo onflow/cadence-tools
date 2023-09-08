@@ -54,25 +54,25 @@ const helperFilePrefix = "\x00helper/"
 
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
-type SystemClock struct {
+type systemClock struct {
 	TimeDelta int64
 }
 
-func (sc SystemClock) Now() time.Time {
+func (sc systemClock) Now() time.Time {
 	return time.Now().Add(time.Second * time.Duration(sc.TimeDelta)).UTC()
 }
 
-func NewSystemClock() *SystemClock {
-	return &SystemClock{}
+func newSystemClock() *systemClock {
+	return &systemClock{}
 }
 
-type DeployedContractConstructorInvocation struct {
+type deployedContractConstructorInvocation struct {
 	ConstructorArguments []interpreter.Value
 	ArgumentTypes        []sema.Type
 }
 
-var ContractInvocations = make(
-	map[string]DeployedContractConstructorInvocation,
+var contractInvocations = make(
+	map[string]deployedContractConstructorInvocation,
 	0,
 )
 
@@ -96,10 +96,10 @@ type EmulatorBackend struct {
 
 	// logCollection is a hook attached in the server logger, in order
 	// to aggregate and expose log messages from the blockchain.
-	logCollection *LogCollectionHook
+	logCollection *logCollectionHook
 
 	// clock allows manipulating the blockchain's clock.
-	clock *SystemClock
+	clock *systemClock
 }
 
 type keyInfo struct {
@@ -107,17 +107,17 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
-var Chain = flow.MonotonicEmulator.Chain()
+var chain = flow.MonotonicEmulator.Chain()
 
-var CommonContracts = emulator.NewCommonContracts(Chain)
+var commonContracts = emulator.NewCommonContracts(chain)
 
 var systemContracts = func() []common.AddressLocation {
-	serviceAddress := Chain.ServiceAddress().HexWithPrefix()
+	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
 		"FlowServiceAccount":    serviceAddress,
-		"FlowToken":             fvm.FlowTokenAddress(Chain).HexWithPrefix(),
-		"FungibleToken":         fvm.FungibleTokenAddress(Chain).HexWithPrefix(),
-		"FlowFees":              environment.FlowFeesAddress(Chain).HexWithPrefix(),
+		"FlowToken":             fvm.FlowTokenAddress(chain).HexWithPrefix(),
+		"FungibleToken":         fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+		"FlowFees":              environment.FlowFeesAddress(chain).HexWithPrefix(),
 		"FlowStorageFees":       serviceAddress,
 		"FlowClusterQC":         serviceAddress,
 		"FlowDKG":               serviceAddress,
@@ -146,7 +146,7 @@ func NewEmulatorBackend(
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
-	logCollectionHook := NewLogCollectionHook()
+	logCollectionHook := newLogCollectionHook()
 	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
 		excludeCommonLocations(coverageReport)
@@ -157,7 +157,7 @@ func NewEmulatorBackend(
 	} else {
 		blockchain = newBlockchain(logCollectionHook)
 	}
-	clock := NewSystemClock()
+	clock := newSystemClock()
 	blockchain.SetClock(clock)
 
 	return &EmulatorBackend{
@@ -512,7 +512,7 @@ func (e *EmulatorBackend) DeployContract(
 		}
 		argTypes = append(argTypes, argType)
 	}
-	ContractInvocations[name] = DeployedContractConstructorInvocation{
+	contractInvocations[name] = deployedContractConstructorInvocation{
 		ConstructorArguments: args,
 		ArgumentTypes:        argTypes,
 	}
@@ -527,7 +527,7 @@ func (e *EmulatorBackend) Logs() []string {
 
 // newBlockchain returns an emulator blockchain for testing.
 func newBlockchain(
-	hook *LogCollectionHook,
+	hook *logCollectionHook,
 	opts ...emulator.Option,
 ) *emulator.Blockchain {
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
@@ -539,8 +539,8 @@ func newBlockchain(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
 				emulator.WithServerLogger(logger),
-				emulator.Contracts(CommonContracts),
-				emulator.WithChainID(Chain.ChainID()),
+				emulator.Contracts(commonContracts),
+				emulator.WithChainID(chain.ChainID()),
 			},
 			opts...,
 		)...,
@@ -715,7 +715,7 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 	for _, location := range systemContracts {
 		coverageReport.ExcludeLocation(location)
 	}
-	for _, contract := range CommonContracts {
+	for _, contract := range commonContracts {
 		address, _ := common.HexToAddress(contract.Address.String())
 		location := common.AddressLocation{
 			Address: address,
@@ -729,7 +729,7 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 // address mappings for system/common contracts.
 func baseConfiguration() *stdlib.Configuration {
 	addresses := make(map[string]common.Address, 0)
-	serviceAddress := common.Address(Chain.ServiceAddress())
+	serviceAddress := common.Address(chain.ServiceAddress())
 	addresses["NonFungibleToken"] = serviceAddress
 	addresses["MetadataViews"] = serviceAddress
 	addresses["ViewResolver"] = serviceAddress
@@ -738,7 +738,7 @@ func baseConfiguration() *stdlib.Configuration {
 		address := common.Address(addressLocation.Address)
 		addresses[contract] = address
 	}
-	for _, contractDescription := range CommonContracts {
+	for _, contractDescription := range commonContracts {
 		contract := contractDescription.Name
 		address := common.Address(contractDescription.Address)
 		addresses[contract] = address
