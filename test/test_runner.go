@@ -169,7 +169,8 @@ func NewTestRunner() *TestRunner {
 	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
 	blockchain, err := emulator.New(
 		emulator.WithStorageLimitEnabled(false),
-		emulator.Contracts(emulator.CommonContracts),
+		emulator.Contracts(CommonContracts),
+		emulator.WithChainID(Chain.ChainID()),
 	)
 	if err != nil {
 		panic(err)

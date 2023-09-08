@@ -107,14 +107,17 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
+var Chain = flow.MonotonicEmulator.Chain()
+
+var CommonContracts = emulator.NewCommonContracts(Chain)
+
 var systemContracts = func() []common.AddressLocation {
-	chain := flow.Emulator.Chain()
-	serviceAddress := chain.ServiceAddress().HexWithPrefix()
+	serviceAddress := Chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
 		"FlowServiceAccount":    serviceAddress,
-		"FlowToken":             fvm.FlowTokenAddress(chain).HexWithPrefix(),
-		"FungibleToken":         fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-		"FlowFees":              environment.FlowFeesAddress(chain).HexWithPrefix(),
+		"FlowToken":             fvm.FlowTokenAddress(Chain).HexWithPrefix(),
+		"FungibleToken":         fvm.FungibleTokenAddress(Chain).HexWithPrefix(),
+		"FlowFees":              environment.FlowFeesAddress(Chain).HexWithPrefix(),
 		"FlowStorageFees":       serviceAddress,
 		"FlowClusterQC":         serviceAddress,
 		"FlowDKG":               serviceAddress,
@@ -536,7 +539,8 @@ func newBlockchain(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
 				emulator.WithServerLogger(logger),
-				emulator.Contracts(emulator.CommonContracts),
+				emulator.Contracts(CommonContracts),
+				emulator.WithChainID(Chain.ChainID()),
 			},
 			opts...,
 		)...,
@@ -711,7 +715,7 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 	for _, location := range systemContracts {
 		coverageReport.ExcludeLocation(location)
 	}
-	for _, contract := range emulator.CommonContracts {
+	for _, contract := range CommonContracts {
 		address, _ := common.HexToAddress(contract.Address.String())
 		location := common.AddressLocation{
 			Address: address,
@@ -725,7 +729,7 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 // address mappings for system/common contracts.
 func baseConfiguration() *stdlib.Configuration {
 	addresses := make(map[string]common.Address, 0)
-	serviceAddress, _ := common.HexToAddress("0xf8d6e0586b0a20c7")
+	serviceAddress := common.Address(Chain.ServiceAddress())
 	addresses["NonFungibleToken"] = serviceAddress
 	addresses["MetadataViews"] = serviceAddress
 	addresses["ViewResolver"] = serviceAddress
@@ -734,7 +738,7 @@ func baseConfiguration() *stdlib.Configuration {
 		address := common.Address(addressLocation.Address)
 		addresses[contract] = address
 	}
-	for _, contractDescription := range emulator.CommonContracts {
+	for _, contractDescription := range CommonContracts {
 		contract := contractDescription.Name
 		address := common.Address(contractDescription.Address)
 		addresses[contract] = address

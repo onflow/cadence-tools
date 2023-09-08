@@ -2957,7 +2957,7 @@ func TestServiceAccount(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(
 			t,
-			"0xf8d6e0586b0a20c7",
+			"0x0000000000000001",
 			serviceAccount.Address.HexWithPrefix(),
 		)
 	})
@@ -2977,7 +2977,7 @@ func TestServiceAccount(t *testing.T) {
                 // Assert
                 Test.assertEqual(Type<Address>(), account.address.getType())
                 Test.assertEqual(Type<PublicKey>(), account.publicKey.getType())
-                Test.assertEqual(Address(0xf8d6e0586b0a20c7), account.address)
+                Test.assertEqual(Address(0x0000000000000001), account.address)
             }
 		`
 
@@ -3377,7 +3377,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
 	require.NoError(t, result2.Error)
 
-	address, err := common.HexToAddress("0x01cf0e2f2f715450")
+	address, err := common.HexToAddress("0x0000000000000005")
 	require.NoError(t, err)
 	location := common.AddressLocation{
 		Address: address,
@@ -3400,25 +3400,25 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	assert.ElementsMatch(
 		t,
 		[]string{
-			"A.0ae53cb6e3f42a79.FlowToken",
-			"A.ee82856bf20e2aa6.FungibleToken",
-			"A.e5a8b7f23e8b548f.FlowFees",
-			"A.f8d6e0586b0a20c7.FlowStorageFees",
-			"A.f8d6e0586b0a20c7.FlowServiceAccount",
-			"A.f8d6e0586b0a20c7.FlowClusterQC",
-			"A.f8d6e0586b0a20c7.FlowDKG",
-			"A.f8d6e0586b0a20c7.FlowEpoch",
-			"A.f8d6e0586b0a20c7.FlowIDTableStaking",
-			"A.f8d6e0586b0a20c7.FlowStakingCollection",
-			"A.f8d6e0586b0a20c7.LockedTokens",
-			"A.f8d6e0586b0a20c7.NodeVersionBeacon",
-			"A.f8d6e0586b0a20c7.StakingProxy",
+			"A.0000000000000003.FlowToken",
+			"A.0000000000000002.FungibleToken",
+			"A.0000000000000004.FlowFees",
+			"A.0000000000000001.FlowStorageFees",
+			"A.0000000000000001.FlowServiceAccount",
+			"A.0000000000000001.FlowClusterQC",
+			"A.0000000000000001.FlowDKG",
+			"A.0000000000000001.FlowEpoch",
+			"A.0000000000000001.FlowIDTableStaking",
+			"A.0000000000000001.FlowStakingCollection",
+			"A.0000000000000001.LockedTokens",
+			"A.0000000000000001.NodeVersionBeacon",
+			"A.0000000000000001.StakingProxy",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"I.Crypto",
 			"I.Test",
-			"A.f8d6e0586b0a20c7.ExampleNFT",
-			"A.f8d6e0586b0a20c7.NFTStorefrontV2",
-			"A.f8d6e0586b0a20c7.NFTStorefront",
+			"A.0000000000000001.ExampleNFT",
+			"A.0000000000000001.NFTStorefrontV2",
+			"A.0000000000000001.NFTStorefront",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -3889,6 +3889,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 
 	const testCode = `
         import Test
+        import FooContract from 0x0000000000000005
 
         pub let blockchain = Test.newEmulatorBlockchain()
         pub let account = blockchain.createAccount()
@@ -3916,7 +3917,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
             Test.expect(result, Test.beSucceeded())
             Test.assert(result.returnValue! as! Bool)
 
-            let typ = CompositeType("A.01cf0e2f2f715450.FooContract.ContractInitialized")!
+            let typ = Type<FooContract.ContractInitialized>()
             let events = blockchain.eventsOfType(typ)
             Test.assertEqual(1, events.length)
         }
@@ -3933,9 +3934,13 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
             let result = blockchain.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
 
-            let typ = CompositeType("A.01cf0e2f2f715450.FooContract.NumberAdded")!
+            let typ = Type<FooContract.NumberAdded>()
             let events = blockchain.eventsOfType(typ)
             Test.assertEqual(1, events.length)
+
+            let event = events[0] as! FooContract.NumberAdded
+            Test.assertEqual(78557, event.n)
+            Test.assertEqual("Sierpinski", event.trait)
 
             let evts = blockchain.events()
             Test.expect(evts.length, Test.beGreaterThan(1))
@@ -4420,7 +4425,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		const testCode = `
             import Test
-            import FooContract from 0x01cf0e2f2f715450
+            import FooContract from 0x0000000000000005
 
             pub let blockchain = Test.newEmulatorBlockchain()
             pub let account = blockchain.createAccount()
@@ -4543,7 +4548,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		const testCode = `
             import Test
-            import FooContract from 0x01cf0e2f2f715450
+            import FooContract from 0x0000000000000005
 
             pub let blockchain = Test.newEmulatorBlockchain()
             pub let account = blockchain.createAccount()
