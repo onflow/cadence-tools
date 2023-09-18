@@ -283,7 +283,7 @@ describe("diagnostics", () => {
                 }
             }
           `,
-          ["function 'linkAccount' is deprecated. Use `capabilities.account.issue` instead."],
+          [],
       )
   )
 

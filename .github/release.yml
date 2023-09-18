@@ -1,0 +1,24 @@
+changelog:
+  categories:
+    - title: 💥 Language Breaking Changes
+      labels:
+        - Language Breaking Change
+        - Storage Breaking Change
+    - title: 💥 Go API Breaking Chance
+      labels:
+        - Go API Breaking Change
+    - title: ⭐ Features
+      labels:
+        - Feature
+    - title: 🛠 Improvements
+      labels:
+        - Improvement
+    - title: 🐞 Bug Fixes
+      labels:
+        - Bugfix
+    - title: 📖 Documentation
+      labels:
+        - Documentation
+    - title: Other Changes
+      labels:
+        - "*"
