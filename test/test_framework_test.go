@@ -4452,7 +4452,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
                 )
                 Test.expect(err, Test.beNil())
 
-                blockchain.useConfiguration(Test.Configuration({
+                blockchain.useConfiguration(Test.Configuration(addresses: {
                     "../contracts/FooContract.cdc": account.address
                 }))
             }
@@ -4575,7 +4575,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
                 )
                 Test.expect(err, Test.beNil())
 
-                blockchain.useConfiguration(Test.Configuration({
+                blockchain.useConfiguration(Test.Configuration(addresses: {
                     "../contracts/FooContract.cdc": account.address
                 }))
             }
@@ -4608,7 +4608,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
                 )
                 Test.expect(err, Test.beNil())
 
-                blockchain2.useConfiguration(Test.Configuration({
+                blockchain2.useConfiguration(Test.Configuration(addresses: {
                     "../contracts/FooContract.cdc": account2.address
                 }))
 
