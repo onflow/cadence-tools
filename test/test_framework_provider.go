@@ -62,7 +62,6 @@ func (tf *TestFrameworkProvider) ReadFile(path string) (string, error) {
 
 func (tf *TestFrameworkProvider) NewEmulatorBackend() stdlib.Blockchain {
 	return NewEmulatorBackend(
-		tf.fileResolver,
 		tf.stdlibHandler,
 		tf.coverageReport,
 	)

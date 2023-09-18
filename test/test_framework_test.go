@@ -2796,7 +2796,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+	emulatorBackend := NewEmulatorBackend(nil, nil)
 	emulatorBackend.UseConfiguration(&stdlib.Configuration{
 		Addresses: map[string]common.Address{
 			"./sample/contract1.cdc": {0x1},
@@ -2870,7 +2870,7 @@ func TestGetCurrentBlockHeight(t *testing.T) {
             let height = helpers.getCurrentBlockHeight()
 
             // Assert
-            Test.expect(height, Test.beGreaterThan(1 as UInt64))
+            Test.assertEqual(height, 1 as UInt64)
 
             // Act
             blockchain.commitBlock()
@@ -2903,7 +2903,8 @@ func TestMintFlow(t *testing.T) {
             let account = blockchain.createAccount()
 
             // Act
-            helpers.mintFlow(to: account, amount: 1500.0)
+            let result = helpers.mintFlow(to: account, amount: 1500.0)
+            Test.expect(result, Test.beSucceeded())
 
             // Assert
             let balance = helpers.getFlowBalance(account: account)
@@ -2933,14 +2934,16 @@ func TestBurnFlow(t *testing.T) {
             let account = blockchain.createAccount()
 
             // Act
-            helpers.mintFlow(to: account, amount: 1500.0)
+            let mintResult = helpers.mintFlow(to: account, amount: 1500.0)
+            Test.expect(mintResult, Test.beSucceeded())
 
             // Assert
             var balance = helpers.getFlowBalance(account: account)
             Test.assertEqual(1500.0, balance)
 
             // Act
-            helpers.burnFlow(from: account, amount: 500.0)
+            let burnResult = helpers.burnFlow(from: account, amount: 500.0)
+            Test.expect(burnResult, Test.beSucceeded())
 
             // Assert
             balance = helpers.getFlowBalance(account: account)
@@ -2961,7 +2964,7 @@ func TestServiceAccount(t *testing.T) {
 	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
-		emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+		emulatorBackend := NewEmulatorBackend(nil, nil)
 
 		serviceAccount, err := emulatorBackend.ServiceAccount()
 
@@ -4244,7 +4247,7 @@ func TestBlockchainMoveTime(t *testing.T) {
 
             Test.expect(err, Test.beNil())
 
-            blockchain.useConfiguration(Test.Configuration({
+            blockchain.useConfiguration(Test.Configuration(addresses: {
                 "TimeLocker": account.address
             }))
         }
