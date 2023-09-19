@@ -28,7 +28,6 @@ import (
 	"github.com/logrusorgru/aurora"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-emulator/emulator"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -130,7 +129,6 @@ type TestRunner struct {
 	importResolver ImportResolver
 
 	// fileResolver is used to resolve local files.
-	//
 	fileResolver FileResolver
 
 	testRuntime runtime.Runtime
@@ -149,9 +147,9 @@ type TestRunner struct {
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
 
-	// blockchain is mainly used to obtain system-defined
-	// contracts & their exposed types
-	blockchain *emulator.Blockchain
+	contracts map[string]common.Address
+
+	backend *EmulatorBackend
 }
 
 func NewTestRunner() *TestRunner {
@@ -167,21 +165,33 @@ func NewTestRunner() *TestRunner {
 		)
 	}
 	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
-	blockchain, err := emulator.New(
-		emulator.WithStorageLimitEnabled(false),
-		emulator.Contracts(commonContracts),
-		emulator.WithChainID(chain.ChainID()),
-	)
-	if err != nil {
-		panic(err)
-	}
 
 	return &TestRunner{
 		testRuntime:   runtime.NewInterpreterRuntime(runtime.Config{}),
 		logCollection: logCollectionHook,
 		logger:        logger,
-		blockchain:    blockchain,
+		contracts:     baseContracts(),
 	}
+}
+
+func baseContracts() map[string]common.Address {
+	contracts := make(map[string]common.Address, 0)
+	serviceAddress := common.Address(chain.ServiceAddress())
+	contracts["NonFungibleToken"] = serviceAddress
+	contracts["MetadataViews"] = serviceAddress
+	contracts["ViewResolver"] = serviceAddress
+	for _, addressLocation := range systemContracts {
+		contract := addressLocation.Name
+		address := common.Address(addressLocation.Address)
+		contracts[contract] = address
+	}
+	for _, contractDescription := range commonContracts {
+		contract := contractDescription.Name
+		address := common.Address(contractDescription.Address)
+		contracts[contract] = address
+	}
+
+	return contracts
 }
 
 func (r *TestRunner) WithImportResolver(importResolver ImportResolver) *TestRunner {
@@ -201,6 +211,15 @@ func (r *TestRunner) WithCoverageReport(coverageReport *runtime.CoverageReport) 
 
 func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
 	r.randomSeed = seed
+	return r
+}
+
+func (r *TestRunner) WithContracts(contracts map[string]common.Address) *TestRunner {
+	for contract, address := range contracts {
+		// We do not want to override the base configuration,
+		// which includes the mapping for system/common contracts.
+		r.contracts[contract] = address
+	}
 	return r
 }
 
@@ -312,6 +331,54 @@ func (r *TestRunner) RunTests(script string) (results Results, err error) {
 	return results, err
 }
 
+func (r *TestRunner) replaceImports(program *ast.Program, code string) string {
+	sb := strings.Builder{}
+	importDeclEnd := 0
+
+	for _, importDeclaration := range program.ImportDeclarations() {
+		prevImportDeclEnd := importDeclEnd
+		importDeclEnd = importDeclaration.EndPos.Offset + 1
+
+		location, ok := importDeclaration.Location.(common.StringLocation)
+		if !ok {
+			// keep the import statement it as-is
+			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+			continue
+		}
+
+		var address common.Address
+		var found bool
+		if len(importDeclaration.Identifiers) > 0 {
+			address, found = r.contracts[importDeclaration.Identifiers[0].Identifier]
+		} else {
+			address, found = r.contracts[location.String()]
+		}
+		if !found {
+			// keep import statement it as-is
+			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+			continue
+		}
+
+		var importStr string
+		if strings.Contains(importDeclaration.String(), "from") {
+			importStr = fmt.Sprintf("0x%s", address)
+		} else {
+			// Imports of the form `import "FungibleToken"` should be
+			// expanded to `import FungibleToken from 0xee82856bf20e2aa6`
+			importStr = fmt.Sprintf("%s from 0x%s", location, address)
+		}
+
+		locationStart := importDeclaration.LocationPos.Offset
+
+		sb.WriteString(code[prevImportDeclEnd:locationStart])
+		sb.WriteString(importStr)
+	}
+
+	sb.WriteString(code[importDeclEnd:])
+
+	return sb.String()
+}
+
 func (r *TestRunner) runTestSetup(inter *interpreter.Interpreter) error {
 	if !hasSetup(inter) {
 		return nil
@@ -403,12 +470,6 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		Location:    testScriptLocation,
 		Environment: env,
 	}
-	if r.coverageReport != nil {
-		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
-		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
-		r.coverageReport.ExcludeLocation(testScriptLocation)
-		ctx.CoverageReport = r.coverageReport
-	}
 
 	// Checker configs
 	env.CheckerConfig.ImportHandler = r.checkerImportHandler(ctx)
@@ -451,8 +512,28 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
 	env.InterpreterConfig.Storage = runtime.NewStorage(ctx.Interface, nil)
 
+	script = r.replaceImports(program.Program, script)
+	newCtx := runtime.Context{
+		Interface:   newScriptEnvironment(r.logger),
+		Location:    testScriptLocation,
+		Environment: env,
+	}
+	if r.coverageReport != nil {
+		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
+		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
+		r.coverageReport.ExcludeLocation(testScriptLocation)
+		newCtx.CoverageReport = r.coverageReport
+	}
+	program, err = r.testRuntime.ParseAndCheckProgram([]byte(script), newCtx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
+	env.InterpreterConfig.Storage = runtime.NewStorage(newCtx.Interface, nil)
+
 	_, inter, err := env.Interpret(
-		ctx.Location,
+		newCtx.Location,
 		program,
 		nil,
 	)
@@ -504,29 +585,16 @@ func contractValueHandler(
 	declaration *ast.CompositeDeclaration,
 	compositeType *sema.CompositeType,
 ) sema.ValueDeclaration {
-	constructorType, constructorArgumentLabels := sema.CompositeLikeConstructorType(
+	_, constructorArgumentLabels := sema.CompositeLikeConstructorType(
 		checker.Elaboration,
 		declaration,
 		compositeType,
 	)
 
-	// In unit tests, contracts are imported with string locations, e.g
-	// import FooContract from "../contracts/FooContract.cdc"
-	if _, ok := compositeType.Location.(common.StringLocation); ok {
-		return stdlib.StandardLibraryValue{
-			Name:           declaration.Identifier.Identifier,
-			Type:           constructorType,
-			DocString:      declaration.DocString,
-			Kind:           declaration.DeclarationKind(),
-			Position:       &declaration.Identifier.Pos,
-			ArgumentLabels: constructorArgumentLabels,
-		}
-	}
-
 	// For composite types (e.g. contracts) that are deployed on
 	// EmulatorBackend's blockchain, we have to declare the
-	// define the value declaration as a composite. This is needed
-	// for nested types that are defined in the composite type,
+	// value declaration as a composite. This is needed to access
+	// nested types that are defined in the composite type,
 	// e.g events / structs / resources / enums etc.
 	return stdlib.StandardLibraryValue{
 		Name:           declaration.Identifier.Identifier,
@@ -566,6 +634,13 @@ func (r *TestRunner) interpreterContractValueHandler(
 				stdlibHandler,
 				r.coverageReport,
 			)
+			backend, ok := testFramework.NewEmulatorBackend().(*EmulatorBackend)
+			if !ok {
+				panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
+			}
+			backend.fileResolver = r.fileResolver
+			backend.contracts = r.contracts
+			r.backend = backend
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
 					inter,
@@ -579,33 +654,27 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		default:
-			if _, ok := compositeType.Location.(common.AddressLocation); ok {
-				invocation, found := contractInvocations[compositeType.Identifier]
-				if !found {
-					panic(fmt.Errorf("contract invocation not found"))
-				}
-				parameterTypes := make([]sema.Type, len(compositeType.ConstructorParameters))
-				for i, constructorParameter := range compositeType.ConstructorParameters {
-					parameterTypes[i] = constructorParameter.TypeAnnotation.Type
-				}
-
-				value, err := inter.InvokeFunctionValue(
-					constructorGenerator(common.Address{}),
-					invocation.ConstructorArguments,
-					invocation.ArgumentTypes,
-					parameterTypes,
-					invocationRange,
-				)
-				if err != nil {
-					panic(err)
-				}
-
-				return value.(*interpreter.CompositeValue)
+			invocation, found := contractInvocations[compositeType.Identifier]
+			if !found {
+				panic(fmt.Errorf("contract invocation not found"))
+			}
+			parameterTypes := make([]sema.Type, len(compositeType.ConstructorParameters))
+			for i, constructorParameter := range compositeType.ConstructorParameters {
+				parameterTypes[i] = constructorParameter.TypeAnnotation.Type
 			}
 
-			// During tests, imported contracts can be constructed using the constructor,
-			// similar to structs. Therefore, generate a constructor function.
-			return constructorGenerator(common.Address{})
+			value, err := inter.InvokeFunctionValue(
+				constructorGenerator(common.Address{}),
+				invocation.ConstructorArguments,
+				invocation.ArgumentTypes,
+				parameterTypes,
+				invocationRange,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			return value.(*interpreter.CompositeValue)
 		}
 	}
 }
@@ -685,7 +754,7 @@ func (r *TestRunner) parseAndCheckImport(
 		if ok {
 			// System-defined contracts are obtained from
 			// the blockchain.
-			account, err := r.blockchain.GetAccount(
+			account, err := r.backend.blockchain.GetAccount(
 				flow.Address(addressLocation.Address),
 			)
 			if err != nil {
@@ -725,7 +794,7 @@ func (r *TestRunner) parseAndCheckImport(
 			if ok {
 				// System-defined contracts are obtained from
 				// the blockchain.
-				account, err := r.blockchain.GetAccount(
+				account, err := r.backend.blockchain.GetAccount(
 					flow.Address(addressLoc.Address),
 				)
 				if err != nil {
@@ -742,9 +811,27 @@ func (r *TestRunner) parseAndCheckImport(
 				return sema.ElaborationImport{
 					Elaboration: program.Elaboration,
 				}, nil
-			} else {
-				return nil, fmt.Errorf("nested imports are not supported")
 			}
+
+			stringLocation, ok := importedLocation.(common.StringLocation)
+			if ok {
+				code, err := r.importResolver(stringLocation)
+				if err != nil {
+					return nil, err
+				}
+				program, err := env.ParseAndCheckProgram(
+					[]byte(code), stringLocation, true,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				return sema.ElaborationImport{
+					Elaboration: program.Elaboration,
+				}, nil
+			}
+
+			return nil, fmt.Errorf("unable to import location: %s", importedLocation)
 		}
 	}
 
