@@ -10,7 +10,7 @@ require (
 	github.com/onflow/cadence v0.41.0-stable-cadence.1.0.20230918153730-ec4d615b89d8
 	github.com/onflow/cadence-tools/lint v0.12.0-stable-cadence.1.0.20230918225240-b1fc85f88c80
 	github.com/onflow/cadence-tools/test v0.12.0-stable-cadence.1.0.20230918225240-b1fc85f88c80
-	github.com/onflow/flow-cli/flowkit v1.5.0-stable-cadence.1.0.20230919000152-cc680ac2086e
+	github.com/onflow/flow-cli/flowkit v1.5.0-stable-cadence.1.0.20230919210856-b34bc43b5bc4
 	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1.0.20230915213126-68e7ffb5595f
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.4
@@ -116,7 +116,7 @@ require (
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230918230627-2daea3d4f44b // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230918230627-2daea3d4f44b // indirect
-	github.com/onflow/flow-emulator v0.54.1-0.20230915232846-43e906821db9 // indirect
+	github.com/onflow/flow-emulator v0.54.1-0.20230919150501-db4da71c768b // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230913160646-09adc7d3b513 // indirect
 	github.com/onflow/flow-go v0.31.1-0.20230918230928-ba70724dc568 // indirect
 	github.com/onflow/flow-go/crypto v0.24.9 // indirect
