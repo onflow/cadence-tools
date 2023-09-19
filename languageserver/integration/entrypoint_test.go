@@ -102,7 +102,7 @@ func Test_EntrypointUpdate(t *testing.T) {
 			/// pragma signers Alice
 			/// pragma arguments (hello: 10.0)
 			transaction(hello: UFix64) {
-				prepare(signer: AuthAccount) {} 
+				prepare(signer: &Account) {} 
 			}`,
 		)
 
@@ -155,7 +155,7 @@ func Test_Codelensses(t *testing.T) {
 			/// pragma signers Alice
 			/// pragma arguments (hello: 10.0)
 			transaction(hello: UFix64) {
-				prepare(signer: AuthAccount) {} 
+				prepare(signer: &Account) {} 
 			}`,
 		title:   "💡 Send with (hello: 10.0) signed by Alice",
 		command: "cadence.server.flow.sendTransaction",
@@ -181,7 +181,7 @@ func Test_Codelensses(t *testing.T) {
 	}, {
 		code: `
 			transaction {
-				prepare(s: AuthAccount) {} 
+				prepare(s: &Account) {} 
 			}`,
 		title:   "💡 Send signed by Alice",
 		command: "cadence.server.flow.sendTransaction",
@@ -191,7 +191,7 @@ func Test_Codelensses(t *testing.T) {
 		code: `
 			/// pragma signers Alice,Bob
 			transaction {
-				prepare(s1: AuthAccount, s2: AuthAccount) {} 
+				prepare(s1: &Account, s2: &Account) {} 
 			}`,
 		title:   "💡 Send signed by Alice and Bob",
 		command: "cadence.server.flow.sendTransaction",
@@ -201,7 +201,7 @@ func Test_Codelensses(t *testing.T) {
 		code: `
 			/// pragma signers Alice
 			transaction {
-				prepare(s1: AuthAccount, s2: AuthAccount) {} 
+				prepare(s1: &Account, s2: &Account) {} 
 			}`,
 		title:   "🚫 Not enough signers. Required: 2, passed: 1",
 		command: "",
@@ -210,7 +210,7 @@ func Test_Codelensses(t *testing.T) {
 		code: `
 			/// pragma signers Invalid
 			transaction {
-				prepare(s1: AuthAccount) {} 
+				prepare(s1: &Account) {} 
 			}`,
 		title:   "🚫 Specified account Invalid does not exist",
 		command: "",

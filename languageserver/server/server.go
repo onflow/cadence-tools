@@ -319,15 +319,13 @@ func NewServer() (*Server, error) {
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
 func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
 	return &sema.Config{
-		BaseValueActivation:          lib.baseValueActivation,
-		AccessCheckMode:              s.accessCheckMode,
-		PositionInfoEnabled:          true,
-		ExtendedElaborationEnabled:   true,
-		LocationHandler:              s.handleLocation,
-		ImportHandler:                s.handleImport,
-		AttachmentsEnabled:           true,
-		AccountLinkingEnabled:        true,
-		CapabilityControllersEnabled: true,
+		BaseValueActivation:        lib.baseValueActivation,
+		AccessCheckMode:            s.accessCheckMode,
+		PositionInfoEnabled:        true,
+		ExtendedElaborationEnabled: true,
+		LocationHandler:            s.handleLocation,
+		ImportHandler:              s.handleImport,
+		AttachmentsEnabled:         true,
 	}
 }
 
@@ -2344,7 +2342,7 @@ func (s *Server) convertError(
 		}
 	}
 
-	if hasSuggestedFixes, ok := err.(sema.HasSuggestedFixes); ok {
+	if hasSuggestedFixes, ok := err.(errors.HasSuggestedFixes[ast.TextEdit]); ok {
 		if document, ok := s.documents[uri]; ok {
 			codeActionsResolver = combineCodeActionResolvers(
 				codeActionsResolver,
@@ -2524,17 +2522,8 @@ func maybeAddMissingMembersCodeActionResolver(
 			builder.WriteRune('\n')
 			builder.WriteString(indentation)
 
-			var accessString string
-			switch access := missingMember.Access.(type) {
-			case sema.PrimitiveAccess:
-				if ast.PrimitiveAccess(access) != ast.AccessNotSpecified {
-					accessString = access.AccessKeyword()
-				}
-			case sema.EntitlementSetAccess, sema.EntitlementMapAccess:
-				accessString = fmt.Sprintf("access(%s)", access.AccessKeyword())
-			}
-
-			if accessString != "" {
+			if missingMember.Access != sema.PrimitiveAccess(ast.AccessNotSpecified) {
+				accessString := missingMember.Access.QualifiedString()
 				builder.WriteString(accessString)
 				builder.WriteRune(' ')
 			}
