@@ -52,6 +52,10 @@ import (
 // conflicts with user-defined scripts/transactions.
 const helperFilePrefix = "\x00helper/"
 
+// The number of predefined accounts that are created
+// upon initialization of EmulatorBackend.
+const initialAccountsNumber = 25
+
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
 type systemClock struct {
@@ -66,11 +70,17 @@ func newSystemClock() *systemClock {
 	return &systemClock{}
 }
 
+// This type holds the necessary information for each contract deployment.
+// These are consumed in InterpreterConfig.ContractValueHandler function,
+// in order to construct the contract value for imported contracts in
+// test scripts.
 type deployedContractConstructorInvocation struct {
 	ConstructorArguments []interpreter.Value
 	ArgumentTypes        []sema.Type
+	Address              common.Address
 }
 
+// This slice records all contract deployments in test scripts.
 var contractInvocations = make(
 	map[string]deployedContractConstructorInvocation,
 	0,
@@ -88,10 +98,6 @@ type EmulatorBackend struct {
 	// accountKeys is a mapping of account addresses with their keys.
 	accountKeys map[common.Address]map[string]keyInfo
 
-	// A property bag to pass various configurations to the backend.
-	// Currently, supports passing address mapping for contracts.
-	configuration *stdlib.Configuration
-
 	stdlibHandler stdlib.StandardLibraryHandler
 
 	// logCollection is a hook attached in the server logger, in order
@@ -100,6 +106,18 @@ type EmulatorBackend struct {
 
 	// clock allows manipulating the blockchain's clock.
 	clock *systemClock
+
+	// accounts is a mapping of account addresses to the underlying
+	// stdlib.Account value.
+	accounts map[common.Address]*stdlib.Account
+
+	// fileResolver is used to retrieve the Cadence source code,
+	// given a relative path.
+	fileResolver FileResolver
+
+	// contracts is a mapping of contract identifiers to their
+	// deployed account address.
+	contracts map[string]common.Address
 }
 
 type keyInfo struct {
@@ -160,15 +178,19 @@ func NewEmulatorBackend(
 	clock := newSystemClock()
 	blockchain.SetClock(clock)
 
-	return &EmulatorBackend{
+	emulatorBackend := &EmulatorBackend{
 		blockchain:    blockchain,
 		blockOffset:   0,
 		accountKeys:   map[common.Address]map[string]keyInfo{},
-		configuration: baseConfiguration(),
 		stdlibHandler: stdlibHandler,
 		logCollection: logCollectionHook,
 		clock:         clock,
+		contracts:     map[string]common.Address{},
+		accounts:      map[common.Address]*stdlib.Account{},
 	}
+	emulatorBackend.bootstrapAccounts()
+
+	return emulatorBackend
 }
 
 func (e *EmulatorBackend) RunScript(
@@ -293,13 +315,26 @@ func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 		},
 	}
 
-	return &stdlib.Account{
+	account := &stdlib.Account{
 		Address: common.Address(address),
 		PublicKey: &stdlib.PublicKey{
 			PublicKey: publicKey,
 			SignAlgo:  fvmCrypto.CryptoToRuntimeSigningAlgorithm(accountKey.PublicKey.Algorithm()),
 		},
-	}, nil
+	}
+	e.accounts[account.Address] = account
+
+	return account, nil
+}
+
+func (e *EmulatorBackend) GetAccount(
+	address interpreter.AddressValue,
+) (*stdlib.Account, error) {
+	account, ok := e.accounts[address.ToAddress()]
+	if !ok {
+		return nil, fmt.Errorf("account with address: %s not found", address.Hex())
+	}
+	return account, nil
 }
 
 func (e *EmulatorBackend) AddTransaction(
@@ -343,58 +378,6 @@ func (e *EmulatorBackend) AddTransaction(
 	return nil
 }
 
-func (e *EmulatorBackend) newTransaction(code string, authorizers []common.Address) *sdk.Transaction {
-	serviceKey := e.blockchain.ServiceKey()
-
-	sequenceNumber := serviceKey.SequenceNumber + e.blockOffset
-
-	tx := sdk.NewTransaction().
-		SetScript([]byte(code)).
-		SetProposalKey(serviceKey.Address, serviceKey.Index, sequenceNumber).
-		SetPayer(serviceKey.Address)
-
-	for _, authorizer := range authorizers {
-		tx = tx.AddAuthorizer(sdk.Address(authorizer))
-	}
-
-	return tx
-}
-
-func (e *EmulatorBackend) signTransaction(
-	tx *sdk.Transaction,
-	signerAccounts []*stdlib.Account,
-) error {
-
-	// Sign transaction with each signer
-	// Note: Following logic is borrowed from the flow-ft.
-
-	for i := len(signerAccounts) - 1; i >= 0; i-- {
-		signerAccount := signerAccounts[i]
-
-		publicKey := signerAccount.PublicKey.PublicKey
-		accountKeys := e.accountKeys[signerAccount.Address]
-		keyInfo := accountKeys[string(publicKey)]
-
-		err := tx.SignPayload(sdk.Address(signerAccount.Address), 0, keyInfo.signer)
-		if err != nil {
-			return err
-		}
-	}
-
-	serviceKey := e.blockchain.ServiceKey()
-	serviceSigner, err := serviceKey.Signer()
-	if err != nil {
-		return err
-	}
-
-	err = tx.SignEnvelope(serviceKey.Address, 0, serviceSigner)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (e *EmulatorBackend) ExecuteNextTransaction() *stdlib.TransactionResult {
 	result, err := e.blockchain.ExecuteNextTransaction()
 
@@ -431,18 +414,23 @@ func (e *EmulatorBackend) CommitBlock() error {
 func (e *EmulatorBackend) DeployContract(
 	inter *interpreter.Interpreter,
 	name string,
-	code string,
-	account *stdlib.Account,
+	path string,
 	args []interpreter.Value,
 ) error {
 
 	const deployContractTransactionTemplate = `
-	    transaction(%s) {
-		    prepare(signer: AuthAccount) {
-			    signer.contracts.add(name: "%s", code: "%s".decodeHex()%s)
-		    }
-	    }`
+        transaction(%s) {
+            prepare(signer: AuthAccount) {
+                signer.contracts.add(name: "%s", code: "%s".decodeHex()%s)
+            }
+        }
+	`
 
+	// Retrieve the contract source code, by using the given path.
+	code, err := e.fileResolver(path)
+	if err != nil {
+		panic(err)
+	}
 	code = e.replaceImports(code)
 
 	hexEncodedCode := hex.EncodeToString([]byte(code))
@@ -475,6 +463,14 @@ func (e *EmulatorBackend) DeployContract(
 		addArgsBuilder.String(),
 	)
 
+	address, ok := e.contracts[name]
+	if !ok {
+		return fmt.Errorf("could not find the address of contract: %s", name)
+	}
+	account, ok := e.accounts[address]
+	if !ok {
+		return fmt.Errorf("could not find an account with address: %s", address)
+	}
 	tx := e.newTransaction(script, []common.Address{account.Address})
 
 	for _, arg := range cadenceArgs {
@@ -484,7 +480,7 @@ func (e *EmulatorBackend) DeployContract(
 		}
 	}
 
-	err := e.signTransaction(tx, []*stdlib.Account{account})
+	err = e.signTransaction(tx, []*stdlib.Account{account})
 	if err != nil {
 		return err
 	}
@@ -512,9 +508,13 @@ func (e *EmulatorBackend) DeployContract(
 		}
 		argTypes = append(argTypes, argType)
 	}
+	// We record the successful contract deployment, along with any
+	// supplied arguments, so that we can reconstruct a contract value
+	// in test scripts.
 	contractInvocations[name] = deployedContractConstructorInvocation{
 		ConstructorArguments: args,
 		ArgumentTypes:        argTypes,
+		Address:              account.Address,
 	}
 
 	return e.CommitBlock()
@@ -523,93 +523,6 @@ func (e *EmulatorBackend) DeployContract(
 // Logs returns all the log messages from the blockchain.
 func (e *EmulatorBackend) Logs() []string {
 	return e.logCollection.Logs
-}
-
-// newBlockchain returns an emulator blockchain for testing.
-func newBlockchain(
-	hook *logCollectionHook,
-	opts ...emulator.Option,
-) *emulator.Blockchain {
-	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	logger := zerolog.New(output).With().Timestamp().
-		Logger().Hook(hook).Level(zerolog.InfoLevel)
-
-	b, err := emulator.New(
-		append(
-			[]emulator.Option{
-				emulator.WithStorageLimitEnabled(false),
-				emulator.WithServerLogger(logger),
-				emulator.Contracts(commonContracts),
-				emulator.WithChainID(chain.ChainID()),
-			},
-			opts...,
-		)...,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	return b
-}
-
-func (e *EmulatorBackend) UseConfiguration(configuration *stdlib.Configuration) {
-	for contract, address := range configuration.Addresses {
-		// We do not want to override the base configuration,
-		// which includes the mapping for system/common contracts.
-		e.configuration.Addresses[contract] = address
-	}
-}
-
-func (e *EmulatorBackend) replaceImports(code string) string {
-	if e.configuration == nil {
-		return code
-	}
-
-	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
-	if err != nil {
-		panic(err)
-	}
-
-	sb := strings.Builder{}
-	importDeclEnd := 0
-
-	for _, importDeclaration := range program.ImportDeclarations() {
-		prevImportDeclEnd := importDeclEnd
-		importDeclEnd = importDeclaration.EndPos.Offset + 1
-
-		location, ok := importDeclaration.Location.(common.StringLocation)
-		if !ok {
-			// keep the import statement it as-is
-			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
-			continue
-		}
-
-		address, ok := e.configuration.Addresses[location.String()]
-		if !ok {
-			// keep import statement it as-is
-			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
-			continue
-		}
-
-		var addressStr string
-		if strings.Contains(importDeclaration.String(), "from") {
-			addressStr = fmt.Sprintf("0x%s", address)
-		} else {
-			// Imports of the form `import "FungibleToken"` should be
-			// expanded to `import FungibleToken from 0xee82856bf20e2aa6`
-			addressStr = fmt.Sprintf("%s from 0x%s", location, address)
-		}
-
-		locationStart := importDeclaration.LocationPos.Offset
-
-		sb.WriteString(code[prevImportDeclEnd:locationStart])
-		sb.WriteString(addressStr)
-
-	}
-
-	sb.WriteString(code[importDeclEnd:])
-
-	return sb.String()
 }
 
 func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler {
@@ -709,6 +622,147 @@ func (e *EmulatorBackend) LoadSnapshot(name string) error {
 	return e.blockchain.LoadSnapshot(name)
 }
 
+// Creates the number of predefined accounts that will be used
+// for deploying the contracts under testing.
+func (e *EmulatorBackend) bootstrapAccounts() {
+	for i := 0; i < initialAccountsNumber; i++ {
+		_, err := e.CreateAccount()
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (e *EmulatorBackend) newTransaction(code string, authorizers []common.Address) *sdk.Transaction {
+	serviceKey := e.blockchain.ServiceKey()
+
+	sequenceNumber := serviceKey.SequenceNumber + e.blockOffset
+
+	tx := sdk.NewTransaction().
+		SetScript([]byte(code)).
+		SetProposalKey(serviceKey.Address, serviceKey.Index, sequenceNumber).
+		SetPayer(serviceKey.Address)
+
+	for _, authorizer := range authorizers {
+		tx = tx.AddAuthorizer(sdk.Address(authorizer))
+	}
+
+	return tx
+}
+
+func (e *EmulatorBackend) signTransaction(
+	tx *sdk.Transaction,
+	signerAccounts []*stdlib.Account,
+) error {
+
+	// Sign transaction with each signer
+	// Note: Following logic is borrowed from the flow-ft.
+
+	for i := len(signerAccounts) - 1; i >= 0; i-- {
+		signerAccount := signerAccounts[i]
+
+		publicKey := signerAccount.PublicKey.PublicKey
+		accountKeys := e.accountKeys[signerAccount.Address]
+		keyInfo := accountKeys[string(publicKey)]
+
+		err := tx.SignPayload(sdk.Address(signerAccount.Address), 0, keyInfo.signer)
+		if err != nil {
+			return err
+		}
+	}
+
+	serviceKey := e.blockchain.ServiceKey()
+	serviceSigner, err := serviceKey.Signer()
+	if err != nil {
+		return err
+	}
+
+	err = tx.SignEnvelope(serviceKey.Address, 0, serviceSigner)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *EmulatorBackend) replaceImports(code string) string {
+	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	sb := strings.Builder{}
+	importDeclEnd := 0
+	for _, importDeclaration := range program.ImportDeclarations() {
+		prevImportDeclEnd := importDeclEnd
+		importDeclEnd = importDeclaration.EndPos.Offset + 1
+
+		location, ok := importDeclaration.Location.(common.StringLocation)
+		if !ok {
+			// keep the import statement it as-is
+			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+			continue
+		}
+
+		var address common.Address
+		if len(importDeclaration.Identifiers) > 0 {
+			address, ok = e.contracts[importDeclaration.Identifiers[0].Identifier]
+			if !ok {
+				// keep import statement it as-is
+				sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+				continue
+			}
+		} else {
+			address = e.contracts[location.String()]
+		}
+
+		var importStr string
+		if strings.Contains(importDeclaration.String(), "from") {
+			importStr = fmt.Sprintf("0x%s", address)
+		} else {
+			// Imports of the form `import "FungibleToken"` should be
+			// expanded to `import FungibleToken from 0xee82856bf20e2aa6`
+			importStr = fmt.Sprintf("%s from 0x%s", location, address)
+		}
+
+		locationStart := importDeclaration.LocationPos.Offset
+
+		sb.WriteString(code[prevImportDeclEnd:locationStart])
+		sb.WriteString(importStr)
+	}
+
+	sb.WriteString(code[importDeclEnd:])
+
+	return sb.String()
+}
+
+// newBlockchain returns an emulator blockchain for testing.
+func newBlockchain(
+	hook *logCollectionHook,
+	opts ...emulator.Option,
+) *emulator.Blockchain {
+	output := zerolog.ConsoleWriter{Out: os.Stdout}
+	logger := zerolog.New(output).With().Timestamp().
+		Logger().Hook(hook).Level(zerolog.InfoLevel)
+
+	b, err := emulator.New(
+		append(
+			[]emulator.Option{
+				emulator.WithStorageLimitEnabled(false),
+				emulator.WithServerLogger(logger),
+				emulator.Contracts(commonContracts),
+				emulator.WithChainID(chain.ChainID()),
+			},
+			opts...,
+		)...,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return b
+}
+
 // excludeCommonLocations excludes the common contracts from appearing
 // in the coverage report, as they skew the coverage metrics.
 func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
@@ -722,29 +776,5 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 			Name:    contract.Name,
 		}
 		coverageReport.ExcludeLocation(location)
-	}
-}
-
-// baseConfiguration returns an *stdlib.Configuration with contract to
-// address mappings for system/common contracts.
-func baseConfiguration() *stdlib.Configuration {
-	addresses := make(map[string]common.Address, 0)
-	serviceAddress := common.Address(chain.ServiceAddress())
-	addresses["NonFungibleToken"] = serviceAddress
-	addresses["MetadataViews"] = serviceAddress
-	addresses["ViewResolver"] = serviceAddress
-	for _, addressLocation := range systemContracts {
-		contract := addressLocation.Name
-		address := common.Address(addressLocation.Address)
-		addresses[contract] = address
-	}
-	for _, contractDescription := range commonContracts {
-		contract := contractDescription.Name
-		address := common.Address(contractDescription.Address)
-		addresses[contract] = address
-	}
-
-	return &stdlib.Configuration{
-		Addresses: addresses,
 	}
 }
