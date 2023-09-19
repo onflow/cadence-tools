@@ -254,7 +254,7 @@ describe("diagnostics", () => {
 
   test("script auth account", async() =>
     testCode(
-      `access(all) fun main() { getAuthAccount(0x01) }`,
+      `access(all) fun main() { getAuthAccount<&Account>(0x01) }`,
       [],
     )
   )
@@ -268,23 +268,9 @@ describe("diagnostics", () => {
 
   test("transaction auth account", async() =>
     testCode(
-      `transaction() { execute { getAuthAccount(0x01) } }`,
+      `transaction() { execute { getAuthAccount<&Account>(0x01) } }`,
       ["cannot find variable in this scope: `getAuthAccount`. not found in this scope"],
     )
-  )
-
-  test("account linking", async() =>
-      testCode(
-          `
-            #allowAccountLinking
-            transaction {
-                prepare(acct: AuthAccount) {
-                    acct.linkAccount(/private/foo)
-                }
-            }
-          `,
-          ["function 'linkAccount' is deprecated. Use `capabilities.account.issue` instead."],
-      )
   )
 
   test("attachments", async() =>

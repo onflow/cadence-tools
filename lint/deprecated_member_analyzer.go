@@ -27,25 +27,8 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
-func memberReplacement(memberInfo sema.MemberInfo) string {
-	memberName := memberInfo.Member.Identifier.Identifier
-	switch memberInfo.AccessedType {
-	case sema.AuthAccountType:
-		switch memberName {
-		case sema.AuthAccountTypeGetCapabilityFunctionName:
-			return "capabilities.get"
-
-		case sema.AuthAccountTypeLinkFunctionName:
-			return "capabilities.storage.issue"
-
-		case sema.AuthAccountTypeLinkAccountFunctionName:
-			return "capabilities.account.issue"
-
-		case sema.AuthAccountTypeUnlinkFunctionName:
-			return "capabilities.unpublish"
-		}
-	}
-
+func memberReplacement(_ sema.MemberAccessInfo) string {
+	// NO-OP for now
 	return ""
 }
 
@@ -81,7 +64,7 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					memberInfo, _ := elaboration.MemberExpressionMemberInfo(memberExpression)
+					memberInfo, _ := elaboration.MemberExpressionMemberAccessInfo(memberExpression)
 					member := memberInfo.Member
 					if member == nil {
 						return
