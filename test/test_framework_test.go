@@ -582,6 +582,10 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	const testCode = `
         import Test
+        import "ExampleNFT"
+        import "NonFungibleToken"
+        import "NFTStorefrontV2"
+        import "FlowToken"
 
         pub let account = Test.createAccount()
 
@@ -598,12 +602,29 @@ func TestImportBuiltinContracts(t *testing.T) {
             Test.expect(result, Test.beSucceeded())
         }
 
-        pub fun testGetIntegerTrait() {
+        pub fun testImportCommonContracts() {
             let script = Test.readFile("../scripts/import_common_contracts.cdc")
             let result = Test.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(true, result.returnValue! as! Bool)
+        }
+
+        pub fun testExampleNFT() {
+            let storagePath = ExampleNFT.MinterStoragePath
+            Test.assertEqual(/storage/exampleNFTMinter, storagePath)
+
+            Test.assertEqual(
+                "A.0000000000000001.NonFungibleToken",
+                Type<NonFungibleToken>().identifier
+            )
+
+            let publicPath = NFTStorefrontV2.StorefrontPublicPath
+            Test.assertEqual(/public/NFTStorefrontV2, publicPath)
+
+            let vault <- FlowToken.createEmptyVault()
+            Test.assertEqual(0.0, vault.balance)
+            destroy <- vault
         }
 	`
 
@@ -661,13 +682,23 @@ func TestImportBuiltinContracts(t *testing.T) {
 		}
 	}
 
-	runner := NewTestRunner().WithFileResolver(fileResolver)
+	importResolver := func(location common.Location) (string, error) {
+		return "", fmt.Errorf("cannot find import location: %s", location)
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
 
 	result, err := runner.RunTest(testCode, "testSetupExampleNFTCollection")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	result, err = runner.RunTest(testCode, "testGetIntegerTrait")
+	result, err = runner.RunTest(testCode, "testImportCommonContracts")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+
+	result, err = runner.RunTest(testCode, "testExampleNFT")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
@@ -704,7 +735,7 @@ func TestUsingEnv(t *testing.T) {
             import Test
 
             pub fun test() {
-                let acc = getAccount(0x01)
+                let acc = getAccount(0x10)
                 Test.assertEqual(0.0, acc.balance)
             }
 		`
@@ -743,7 +774,7 @@ func TestUsingEnv(t *testing.T) {
                 init() {}
 
                 pub fun getBalance(): UFix64 {
-                    let acc = getAccount(0x01)
+                    let acc = getAccount(0x10)
                     return acc.balance
                 }
             }
@@ -3021,7 +3052,8 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+	runtime := runtime.NewInterpreterRuntime(runtime.Config{})
+	emulatorBackend := NewEmulatorBackend(nil, nil, nil, runtime)
 	emulatorBackend.contracts = map[string]common.Address{
 		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
 		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
@@ -3174,7 +3206,8 @@ func TestServiceAccount(t *testing.T) {
 	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
-		emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+		testRuntime := runtime.NewInterpreterRuntime(runtime.Config{})
+		emulatorBackend := NewEmulatorBackend(nil, nil, nil, testRuntime)
 
 		serviceAccount, err := emulatorBackend.ServiceAccount()
 
@@ -3443,7 +3476,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	assert.EqualValues(
 		t,
 		map[int]int{
-			6: 2, 14: 1, 18: 10, 19: 1, 20: 9, 21: 1, 22: 8, 23: 1,
+			6: 1, 14: 1, 18: 10, 19: 1, 20: 9, 21: 1, 22: 8, 23: 1,
 			24: 7, 25: 1, 26: 6, 27: 1, 30: 5, 31: 4, 34: 1,
 		},
 		coverage.LineHits,

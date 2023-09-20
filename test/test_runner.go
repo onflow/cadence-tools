@@ -21,22 +21,19 @@ package test
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"regexp"
 	"strings"
 
-	"github.com/logrusorgru/aurora"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/testutil"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 )
@@ -135,63 +132,22 @@ type TestRunner struct {
 
 	coverageReport *runtime.CoverageReport
 
-	// logger is injected as the program logger for the script
-	// environment.
-	logger zerolog.Logger
-
-	// logCollection is a hook attached in the program logger of
-	// the script environment, in order to aggregate and expose
-	// log messages from test cases and contracts.
-	logCollection *logCollectionHook
-
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
 
 	contracts map[string]common.Address
 
+	testFramework stdlib.TestFramework
+
 	backend *EmulatorBackend
+
+	storage *runtime.Storage
 }
 
 func NewTestRunner() *TestRunner {
-	logCollectionHook := newLogCollectionHook()
-	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	output.FormatMessage = func(i interface{}) string {
-		msg := i.(string)
-		return strings.Replace(
-			msg,
-			"Cadence log:",
-			aurora.Colorize("LOG:", aurora.BlueFg|aurora.BoldFm).String(),
-			1,
-		)
-	}
-	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
-
 	return &TestRunner{
-		testRuntime:   runtime.NewInterpreterRuntime(runtime.Config{}),
-		logCollection: logCollectionHook,
-		logger:        logger,
-		contracts:     baseContracts(),
+		contracts: baseContracts(),
 	}
-}
-
-func baseContracts() map[string]common.Address {
-	contracts := make(map[string]common.Address, 0)
-	serviceAddress := common.Address(chain.ServiceAddress())
-	contracts["NonFungibleToken"] = serviceAddress
-	contracts["MetadataViews"] = serviceAddress
-	contracts["ViewResolver"] = serviceAddress
-	for _, addressLocation := range systemContracts {
-		contract := addressLocation.Name
-		address := common.Address(addressLocation.Address)
-		contracts[contract] = address
-	}
-	for _, contractDescription := range commonContracts {
-		contract := contractDescription.Name
-		address := common.Address(contractDescription.Address)
-		contracts[contract] = address
-	}
-
-	return contracts
 }
 
 func (r *TestRunner) WithImportResolver(importResolver ImportResolver) *TestRunner {
@@ -444,7 +400,7 @@ func (r *TestRunner) invokeTestFunction(inter *interpreter.Interpreter, funcName
 // logs from their respective contracts, also appear in the resulting
 // string slice.
 func (r *TestRunner) Logs() []string {
-	return r.logCollection.Logs
+	return r.backend.Logs()
 }
 
 func recoverPanics(onError func(error)) {
@@ -461,14 +417,38 @@ func recoverPanics(onError func(error)) {
 
 func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
 	config := runtime.Config{
-		CoverageReport: r.coverageReport,
+		AccountLinkingEnabled:        true,
+		AttachmentsEnabled:           true,
+		CapabilityControllersEnabled: true,
+		CoverageReport:               r.coverageReport,
 	}
 	env := runtime.NewBaseInterpreterEnvironment(config)
+	r.testRuntime = runtime.NewInterpreterRuntime(config)
+
+	r.testFramework = NewTestFrameworkProvider(
+		r.fileResolver,
+		env,
+		r.coverageReport,
+		r.testRuntime,
+	)
+	backend, ok := r.testFramework.NewEmulatorBackend().(*EmulatorBackend)
+	if !ok {
+		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
+	}
+	backend.fileResolver = r.fileResolver
+	backend.contracts = r.contracts
+	r.backend = backend
 
 	ctx := runtime.Context{
-		Interface:   newScriptEnvironment(r.logger),
+		Interface:   r.backend.blockchain.NewScriptEnvironment(),
 		Location:    testScriptLocation,
 		Environment: env,
+	}
+	if r.coverageReport != nil {
+		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
+		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
+		r.coverageReport.ExcludeLocation(testScriptLocation)
+		ctx.CoverageReport = r.coverageReport
 	}
 
 	// Checker configs
@@ -488,12 +468,13 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	//   Thus, need to properly handle them. Make this nil for now.
 	env.InterpreterConfig.InjectedCompositeFieldsHandler = nil
 
-	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
+	code, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
-		return nil, nil, err
+		panic(err)
 	}
+	script = r.replaceImports(code, script)
 
-	for _, funcDecl := range program.Program.FunctionDeclarations() {
+	for _, funcDecl := range code.FunctionDeclarations() {
 		funcName := funcDecl.Identifier.Identifier
 
 		if !strings.HasPrefix(funcName, testFunctionPrefix) {
@@ -509,31 +490,17 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		}
 	}
 
-	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
-	env.InterpreterConfig.Storage = runtime.NewStorage(ctx.Interface, nil)
-
-	script = r.replaceImports(program.Program, script)
-	newCtx := runtime.Context{
-		Interface:   newScriptEnvironment(r.logger),
-		Location:    testScriptLocation,
-		Environment: env,
-	}
-	if r.coverageReport != nil {
-		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
-		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
-		r.coverageReport.ExcludeLocation(testScriptLocation)
-		newCtx.CoverageReport = r.coverageReport
-	}
-	program, err = r.testRuntime.ParseAndCheckProgram([]byte(script), newCtx)
+	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
-	env.InterpreterConfig.Storage = runtime.NewStorage(newCtx.Interface, nil)
+	r.storage = runtime.NewStorage(ctx.Interface, nil)
+	env.InterpreterConfig.Storage = r.storage
 
 	_, inter, err := env.Interpret(
-		newCtx.Location,
+		ctx.Location,
 		program,
 		nil,
 	)
@@ -629,22 +596,10 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			testFramework := NewTestFrameworkProvider(
-				r.fileResolver,
-				stdlibHandler,
-				r.coverageReport,
-			)
-			backend, ok := testFramework.NewEmulatorBackend().(*EmulatorBackend)
-			if !ok {
-				panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
-			}
-			backend.fileResolver = r.fileResolver
-			backend.contracts = r.contracts
-			r.backend = backend
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
 					inter,
-					testFramework,
+					r.testFramework,
 					constructorGenerator(common.Address{}),
 					invocationRange,
 				)
@@ -654,27 +609,33 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		default:
-			invocation, found := contractInvocations[compositeType.Identifier]
-			if !found {
-				panic(fmt.Errorf("contract invocation not found"))
-			}
-			parameterTypes := make([]sema.Type, len(compositeType.ConstructorParameters))
-			for i, constructorParameter := range compositeType.ConstructorParameters {
-				parameterTypes[i] = constructorParameter.TypeAnnotation.Type
+			var storedValue interpreter.Value
+
+			switch location := compositeType.Location.(type) {
+			case common.AddressLocation:
+				storageMap := r.storage.GetStorageMap(
+					location.Address,
+					runtime.StorageDomainContract,
+					false,
+				)
+				if storageMap != nil {
+					storedValue = storageMap.ReadValue(
+						inter,
+						interpreter.StringStorageMapKey(location.Name),
+					)
+				}
 			}
 
-			value, err := inter.InvokeFunctionValue(
-				constructorGenerator(common.Address{}),
-				invocation.ConstructorArguments,
-				invocation.ArgumentTypes,
-				parameterTypes,
-				invocationRange,
-			)
-			if err != nil {
-				panic(err)
+			if storedValue == nil {
+				panic(
+					errors.NewDefaultUserError(
+						"failed to load contract: %s",
+						compositeType.Location,
+					),
+				)
 			}
 
-			return value.(*interpreter.CompositeValue)
+			return storedValue.(*interpreter.CompositeValue)
 		}
 	}
 }
@@ -715,25 +676,6 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 			Interpreter: subInterpreter,
 		}
 	}
-}
-
-// newScriptEnvironment creates an environment for test scripts to run.
-// Leverages the functionality of FVM.
-func newScriptEnvironment(logger zerolog.Logger) environment.Environment {
-	vm := fvm.NewVirtualMachine()
-	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
-	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
-	environmentParams := environment.DefaultEnvironmentParams()
-	environmentParams.ProgramLoggerParams = environment.ProgramLoggerParams{
-		Logger:                logger,
-		CadenceLoggingEnabled: true,
-		MetricsReporter:       environment.NoopMetricsReporter{},
-	}
-
-	return environment.NewScriptEnvironmentFromStorageSnapshot(
-		environmentParams,
-		snapshotTree,
-	)
 }
 
 func (r *TestRunner) parseAndCheckImport(
@@ -844,6 +786,26 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	return program.Program, program.Elaboration, nil
+}
+
+func baseContracts() map[string]common.Address {
+	contracts := make(map[string]common.Address, 0)
+	serviceAddress := common.Address(chain.ServiceAddress())
+	contracts["NonFungibleToken"] = serviceAddress
+	contracts["MetadataViews"] = serviceAddress
+	contracts["ViewResolver"] = serviceAddress
+	for _, addressLocation := range systemContracts {
+		contract := addressLocation.Name
+		address := common.Address(addressLocation.Address)
+		contracts[contract] = address
+	}
+	for _, contractDescription := range commonContracts {
+		contract := contractDescription.Name
+		address := common.Address(contractDescription.Address)
+		contracts[contract] = address
+	}
+
+	return contracts
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.
