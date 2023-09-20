@@ -163,3 +163,5 @@ require (
 )
 
 replace github.com/onflow/cadence => ../../cadence
+
+replace github.com/onflow/flow-emulator => ../../flow-emulator
