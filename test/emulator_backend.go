@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/flow-emulator/adapters"
 	"github.com/onflow/flow-emulator/convert"
@@ -69,22 +68,6 @@ func (sc systemClock) Now() time.Time {
 func newSystemClock() *systemClock {
 	return &systemClock{}
 }
-
-// This type holds the necessary information for each contract deployment.
-// These are consumed in InterpreterConfig.ContractValueHandler function,
-// in order to construct the contract value for imported contracts in
-// test scripts.
-type deployedContractConstructorInvocation struct {
-	ConstructorArguments []interpreter.Value
-	ArgumentTypes        []sema.Type
-	Address              common.Address
-}
-
-// This slice records all contract deployments in test scripts.
-var contractInvocations = make(
-	map[string]deployedContractConstructorInvocation,
-	0,
-)
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
@@ -163,6 +146,7 @@ func NewEmulatorBackend(
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
+	testRuntime runtime.Runtime,
 ) *EmulatorBackend {
 	logCollectionHook := newLogCollectionHook()
 	var blockchain *emulator.Blockchain
@@ -171,9 +155,13 @@ func NewEmulatorBackend(
 		blockchain = newBlockchain(
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
+			emulator.WithRuntime(testRuntime),
 		)
 	} else {
-		blockchain = newBlockchain(logCollectionHook)
+		blockchain = newBlockchain(
+			logCollectionHook,
+			emulator.WithRuntime(testRuntime),
+		)
 	}
 	clock := newSystemClock()
 	blockchain.SetClock(clock)
@@ -497,24 +485,6 @@ func (e *EmulatorBackend) DeployContract(
 	result := e.ExecuteNextTransaction()
 	if result.Error != nil {
 		return result.Error
-	}
-
-	argTypes := make([]sema.Type, 0)
-	for _, arg := range args {
-		staticType := arg.StaticType(inter)
-		argType, err := inter.ConvertStaticToSemaType(staticType)
-		if err != nil {
-			panic(err)
-		}
-		argTypes = append(argTypes, argType)
-	}
-	// We record the successful contract deployment, along with any
-	// supplied arguments, so that we can reconstruct a contract value
-	// in test scripts.
-	contractInvocations[name] = deployedContractConstructorInvocation{
-		ConstructorArguments: args,
-		ArgumentTypes:        argTypes,
-		Address:              account.Address,
 	}
 
 	return e.CommitBlock()

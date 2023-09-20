@@ -70,6 +70,7 @@ func NewTestFrameworkProvider(
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
+	testRuntime runtime.Runtime,
 ) stdlib.TestFramework {
 	provider := &TestFrameworkProvider{
 		fileResolver:   fileResolver,
@@ -80,6 +81,7 @@ func NewTestFrameworkProvider(
 		fileResolver,
 		stdlibHandler,
 		coverageReport,
+		testRuntime,
 	)
 
 	return provider
