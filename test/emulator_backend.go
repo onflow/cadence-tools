@@ -24,13 +24,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/flow-emulator/adapters"
 	"github.com/onflow/flow-emulator/convert"
@@ -46,7 +49,33 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var _ stdlib.TestFramework = &EmulatorBackend{}
+// The "\x00helper/" prefix is used in order to prevent
+// conflicts with user-defined scripts/transactions.
+const helperFilePrefix = "\x00helper/"
+
+var _ stdlib.Blockchain = &EmulatorBackend{}
+
+type systemClock struct {
+	TimeDelta int64
+}
+
+func (sc systemClock) Now() time.Time {
+	return time.Now().Add(time.Second * time.Duration(sc.TimeDelta)).UTC()
+}
+
+func newSystemClock() *systemClock {
+	return &systemClock{}
+}
+
+type deployedContractConstructorInvocation struct {
+	ConstructorArguments []interpreter.Value
+	ArgumentTypes        []sema.Type
+}
+
+var contractInvocations = make(
+	map[string]deployedContractConstructorInvocation,
+	0,
+)
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
 type EmulatorBackend struct {
@@ -60,9 +89,6 @@ type EmulatorBackend struct {
 	// accountKeys is a mapping of account addresses with their keys.
 	accountKeys map[common.Address]map[string]keyInfo
 
-	// fileResolver is used to resolve local files.
-	fileResolver FileResolver
-
 	// A property bag to pass various configurations to the backend.
 	// Currently, supports passing address mapping for contracts.
 	configuration *stdlib.Configuration
@@ -71,7 +97,10 @@ type EmulatorBackend struct {
 
 	// logCollection is a hook attached in the server logger, in order
 	// to aggregate and expose log messages from the blockchain.
-	logCollection *LogCollectionHook
+	logCollection *logCollectionHook
+
+	// clock allows manipulating the blockchain's clock.
+	clock *systemClock
 }
 
 type keyInfo struct {
@@ -79,8 +108,11 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
+var chain = flow.MonotonicEmulator.Chain()
+
+var commonContracts = emulator.NewCommonContracts(chain)
+
 var systemContracts = func() []common.AddressLocation {
-	chain := flow.Emulator.Chain()
 	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
 		"FlowServiceAccount":    serviceAddress,
@@ -111,11 +143,10 @@ var systemContracts = func() []common.AddressLocation {
 }()
 
 func NewEmulatorBackend(
-	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
-	logCollectionHook := NewLogCollectionHook()
+	logCollectionHook := newLogCollectionHook()
 	var blockchain *emulator.Blockchain
 	if coverageReport != nil {
 		excludeCommonLocations(coverageReport)
@@ -126,15 +157,17 @@ func NewEmulatorBackend(
 	} else {
 		blockchain = newBlockchain(logCollectionHook)
 	}
+	clock := newSystemClock()
+	blockchain.SetClock(clock)
 
 	return &EmulatorBackend{
 		blockchain:    blockchain,
 		blockOffset:   0,
 		accountKeys:   map[common.Address]map[string]keyInfo{},
-		fileResolver:  fileResolver,
 		configuration: baseConfiguration(),
 		stdlibHandler: stdlibHandler,
 		logCollection: logCollectionHook,
+		clock:         clock,
 	}
 }
 
@@ -405,7 +438,7 @@ func (e *EmulatorBackend) DeployContract(
 
 	const deployContractTransactionTemplate = `
 	    transaction(%s) {
-		    prepare(signer: AuthAccount) {
+		    prepare(signer: auth(AddContract) &Account) {
 			    signer.contracts.add(name: "%s", code: "%s".decodeHex()%s)
 		    }
 	    }`
@@ -470,15 +503,21 @@ func (e *EmulatorBackend) DeployContract(
 		return result.Error
 	}
 
-	return e.CommitBlock()
-}
-
-func (e *EmulatorBackend) ReadFile(path string) (string, error) {
-	if e.fileResolver == nil {
-		return "", FileResolverNotProvidedError{}
+	argTypes := make([]sema.Type, 0)
+	for _, arg := range args {
+		staticType := arg.StaticType(inter)
+		argType, err := inter.ConvertStaticToSemaType(staticType)
+		if err != nil {
+			panic(err)
+		}
+		argTypes = append(argTypes, argType)
+	}
+	contractInvocations[name] = deployedContractConstructorInvocation{
+		ConstructorArguments: args,
+		ArgumentTypes:        argTypes,
 	}
 
-	return e.fileResolver(path)
+	return e.CommitBlock()
 }
 
 // Logs returns all the log messages from the blockchain.
@@ -488,7 +527,7 @@ func (e *EmulatorBackend) Logs() []string {
 
 // newBlockchain returns an emulator blockchain for testing.
 func newBlockchain(
-	hook *LogCollectionHook,
+	hook *logCollectionHook,
 	opts ...emulator.Option,
 ) *emulator.Blockchain {
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
@@ -500,7 +539,8 @@ func newBlockchain(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
 				emulator.WithServerLogger(logger),
-				emulator.Contracts(emulator.CommonContracts),
+				emulator.Contracts(commonContracts),
+				emulator.WithChainID(chain.ChainID()),
 			},
 			opts...,
 		)...,
@@ -576,8 +616,8 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 	return e.stdlibHandler
 }
 
-func (e *EmulatorBackend) Reset() {
-	err := e.blockchain.RollbackToBlockHeight(0)
+func (e *EmulatorBackend) Reset(height uint64) {
+	err := e.blockchain.RollbackToBlockHeight(height)
 	if err != nil {
 		panic(err)
 	}
@@ -600,20 +640,28 @@ func (e *EmulatorBackend) Events(
 	latestBlockHeight := latestBlock.Header.Height
 	height := uint64(0)
 	values := make([]interpreter.Value, 0)
-	evtType, _ := eventType.(interpreter.CompositeStaticType)
+
+	var eventTypeString string
+	switch eventType := eventType.(type) {
+	case nil:
+		eventTypeString = ""
+	case *interpreter.CompositeStaticType:
+		eventTypeString = eventType.String()
+	default:
+		panic(errors.NewUnreachableError())
+	}
 
 	for height <= latestBlockHeight {
-		events, err := e.blockchain.GetEventsByHeight(
-			height,
-			evtType.String(),
-		)
+		events, err := e.blockchain.GetEventsByHeight(height, eventTypeString)
 		if err != nil {
 			panic(err)
 		}
+
 		sdkEvents, err := convert.FlowEventsToSDK(events)
 		if err != nil {
 			panic(err)
 		}
+
 		for _, event := range sdkEvents {
 			value, err := runtime.ImportValue(
 				inter,
@@ -648,13 +696,38 @@ func (e *EmulatorBackend) Events(
 	)
 }
 
+// MoveTime Moves the time of the Blockchain's clock, by the
+// given time delta, in the form of seconds.
+func (e *EmulatorBackend) MoveTime(timeDelta int64) {
+	e.clock.TimeDelta += timeDelta
+	e.blockchain.SetClock(e.clock)
+
+	err := e.CommitBlock()
+	if err != nil {
+		panic(err)
+	}
+}
+
+// CreateSnapshot Creates a snapshot of the blockchain, at the
+// current ledger state, with the given name.
+func (e *EmulatorBackend) CreateSnapshot(name string) error {
+	return e.blockchain.CreateSnapshot(name)
+}
+
+// LoadSnapshot Loads a snapshot of the blockchain, with the
+// given name, and updates the current ledger
+// state.
+func (e *EmulatorBackend) LoadSnapshot(name string) error {
+	return e.blockchain.LoadSnapshot(name)
+}
+
 // excludeCommonLocations excludes the common contracts from appearing
 // in the coverage report, as they skew the coverage metrics.
 func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 	for _, location := range systemContracts {
 		coverageReport.ExcludeLocation(location)
 	}
-	for _, contract := range emulator.CommonContracts {
+	for _, contract := range commonContracts {
 		address, _ := common.HexToAddress(contract.Address.String())
 		location := common.AddressLocation{
 			Address: address,
@@ -668,16 +741,17 @@ func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
 // address mappings for system/common contracts.
 func baseConfiguration() *stdlib.Configuration {
 	addresses := make(map[string]common.Address, 0)
-	serviceAddress, _ := common.HexToAddress("0xf8d6e0586b0a20c7")
+	serviceAddress := common.Address(chain.ServiceAddress())
 	addresses["NonFungibleToken"] = serviceAddress
 	addresses["MetadataViews"] = serviceAddress
 	addresses["ViewResolver"] = serviceAddress
+
 	for _, addressLocation := range systemContracts {
 		contract := addressLocation.Name
-		address := common.Address(addressLocation.Address)
-		addresses[contract] = address
+		addresses[contract] = addressLocation.Address
 	}
-	for _, contractDescription := range emulator.CommonContracts {
+
+	for _, contractDescription := range commonContracts {
 		contract := contractDescription.Name
 		address := common.Address(contractDescription.Address)
 		addresses[contract] = address

@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 
 	linter "github.com/onflow/cadence-tools/lint"
+	cdcTests "github.com/onflow/cadence-tools/test"
 )
 
 // Document represents an open document on the client. It contains all cached
@@ -157,13 +158,15 @@ type DocumentSymbolProvider func(uri protocol.DocumentURI, version int32, checke
 // InitializationOptionsHandler is a function that is used to handle initialization options sent by the client
 type InitializationOptionsHandler func(initializationOptions any) error
 
+type CodeActionResolver func() []*protocol.CodeAction
+
 type Server struct {
 	protocolServer       *protocol.Server
 	checkers             map[common.Location]*sema.Checker
 	documents            map[protocol.DocumentURI]Document
 	memberResolvers      map[protocol.DocumentURI]map[string]sema.MemberResolver
 	ranges               map[protocol.DocumentURI]map[string]sema.Range
-	codeActionsResolvers map[protocol.DocumentURI]map[uuid.UUID]func() []*protocol.CodeAction
+	codeActionsResolvers map[protocol.DocumentURI]map[uuid.UUID]CodeActionResolver
 	// commands is the registry of custom commands we support
 	commands map[string]CommandHandler
 	// resolveAddressImport is the optional function that is used to resolve address imports
@@ -287,7 +290,7 @@ func NewServer() (*Server, error) {
 		documents:            make(map[protocol.DocumentURI]Document),
 		memberResolvers:      make(map[protocol.DocumentURI]map[string]sema.MemberResolver),
 		ranges:               make(map[protocol.DocumentURI]map[string]sema.Range),
-		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]func() []*protocol.CodeAction),
+		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]CodeActionResolver),
 		commands:             make(map[string]CommandHandler),
 		accessCheckMode:      sema.AccessCheckModeStrict,
 	}
@@ -316,15 +319,13 @@ func NewServer() (*Server, error) {
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
 func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
 	return &sema.Config{
-		BaseValueActivation:          lib.baseValueActivation,
-		AccessCheckMode:              s.accessCheckMode,
-		PositionInfoEnabled:          true,
-		ExtendedElaborationEnabled:   true,
-		LocationHandler:              s.handleLocation,
-		ImportHandler:                s.handleImport,
-		AttachmentsEnabled:           true,
-		AccountLinkingEnabled:        true,
-		CapabilityControllersEnabled: true,
+		BaseValueActivation:        lib.baseValueActivation,
+		AccessCheckMode:            s.accessCheckMode,
+		PositionInfoEnabled:        true,
+		ExtendedElaborationEnabled: true,
+		LocationHandler:            s.handleLocation,
+		ImportHandler:              s.handleImport,
+		AttachmentsEnabled:         true,
 	}
 }
 
@@ -1313,7 +1314,7 @@ func (s *Server) memberCompletions(
 	s.memberResolvers[uri] = memberResolvers
 
 	for name, resolver := range memberResolvers {
-		kind := convertDeclarationKindToCompletionItemType(resolver.Kind)
+		kind := conversion.DeclarationKindToCompletionItemType(resolver.Kind)
 		commitCharacters := declarationKindCommitCharacters(resolver.Kind)
 
 		item := &protocol.CompletionItem{
@@ -1363,7 +1364,7 @@ func (s *Server) rangeCompletions(
 
 	for index, r := range ranges {
 		id := strconv.Itoa(index)
-		kind := convertDeclarationKindToCompletionItemType(r.DeclarationKind)
+		kind := conversion.DeclarationKindToCompletionItemType(r.DeclarationKind)
 		item := &protocol.CompletionItem{
 			Label: r.Identifier,
 			Kind:  kind,
@@ -1468,38 +1469,6 @@ func (s *Server) prepareParametersCompletionItem(
 
 	builder.WriteRune(')')
 	item.InsertText = builder.String()
-}
-
-func convertDeclarationKindToCompletionItemType(kind common.DeclarationKind) protocol.CompletionItemKind {
-	switch kind {
-	case common.DeclarationKindFunction:
-		return protocol.FunctionCompletion
-
-	case common.DeclarationKindField:
-		return protocol.FieldCompletion
-
-	case common.DeclarationKindStructure,
-		common.DeclarationKindResource,
-		common.DeclarationKindEvent,
-		common.DeclarationKindContract,
-		common.DeclarationKindType:
-		return protocol.ClassCompletion
-
-	case common.DeclarationKindStructureInterface,
-		common.DeclarationKindResourceInterface,
-		common.DeclarationKindContractInterface:
-		return protocol.InterfaceCompletion
-
-	case common.DeclarationKindVariable:
-		return protocol.VariableCompletion
-
-	case common.DeclarationKindConstant,
-		common.DeclarationKindParameter:
-		return protocol.ConstantCompletion
-
-	default:
-		return protocol.TextCompletion
-	}
 }
 
 func declarationKindCommitCharacters(kind common.DeclarationKind) []string {
@@ -1681,7 +1650,7 @@ func (s *Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteComm
 }
 
 // DidChangeConfiguration is called to propagate new values set in the client configuration.
-func (s *Server) DidChangeConfiguration(conn protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
+func (s *Server) DidChangeConfiguration(_ protocol.Conn, params *protocol.DidChangeConfigurationParams) (any, error) {
 	optsMap, ok := params.Settings.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("invalid configuration parameters")
@@ -1865,7 +1834,7 @@ func (s *Server) getDiagnostics(
 	diagnosticsErr error,
 ) {
 	// Always reset the code actions for this document
-	codeActionsResolvers := map[uuid.UUID]func() []*protocol.CodeAction{}
+	codeActionsResolvers := map[uuid.UUID]CodeActionResolver{}
 	s.codeActionsResolvers[uri] = codeActionsResolvers
 
 	// NOTE: Always initialize to an empty slice, i.e DON'T use nil:
@@ -1965,7 +1934,7 @@ func (s *Server) getDiagnostics(
 func (s *Server) getDiagnosticsForParentError(
 	uri protocol.DocumentURI,
 	err errors.ParentError,
-	codeActionsResolvers map[uuid.UUID]func() []*protocol.CodeAction,
+	codeActionsResolvers map[uuid.UUID]CodeActionResolver,
 	log func(*protocol.LogMessageParams),
 ) (
 	diagnostics []protocol.Diagnostic,
@@ -2244,7 +2213,7 @@ func (s *Server) convertError(
 	uri protocol.DocumentURI,
 ) (
 	protocol.Diagnostic,
-	func() []*protocol.CodeAction,
+	CodeActionResolver,
 ) {
 	startPosition := err.StartPosition()
 	endPosition := err.EndPosition(nil)
@@ -2265,7 +2234,7 @@ func (s *Server) convertError(
 		Range:    protocolRange,
 	}
 
-	var codeActionsResolver func() []*protocol.CodeAction
+	var codeActionsResolver CodeActionResolver
 
 	switch err := err.(type) {
 	case *sema.TypeMismatchError:
@@ -2373,14 +2342,44 @@ func (s *Server) convertError(
 		}
 	}
 
+	if hasSuggestedFixes, ok := err.(errors.HasSuggestedFixes[ast.TextEdit]); ok {
+		if document, ok := s.documents[uri]; ok {
+			codeActionsResolver = combineCodeActionResolvers(
+				codeActionsResolver,
+				func() []*protocol.CodeAction {
+					return conversion.SuggestedFixesToCodeActions(
+						hasSuggestedFixes.SuggestFixes(document.Text),
+						diagnostic,
+						uri,
+					)
+				},
+			)
+		}
+	}
+
 	return diagnostic, codeActionsResolver
+}
+
+func combineCodeActionResolvers(
+	firstResolver CodeActionResolver,
+	secondResolver CodeActionResolver,
+) CodeActionResolver {
+	return func() (codeActions []*protocol.CodeAction) {
+		if firstResolver != nil {
+			codeActions = firstResolver()
+		}
+		if secondResolver != nil {
+			codeActions = append(codeActions, secondResolver()...)
+		}
+		return
+	}
 }
 
 func (s *Server) maybeReturnTypeChangeCodeActionsResolver(
 	diagnostic protocol.Diagnostic,
 	uri protocol.DocumentURI,
 	err *sema.TypeMismatchError,
-) func() []*protocol.CodeAction {
+) CodeActionResolver {
 
 	// The type mismatch could be in a return statement
 	// due to a missing or wrong return type.
@@ -2501,7 +2500,7 @@ func maybeAddMissingMembersCodeActionResolver(
 	diagnostic protocol.Diagnostic,
 	err *sema.ConformanceError,
 	uri protocol.DocumentURI,
-) func() []*protocol.CodeAction {
+) CodeActionResolver {
 
 	missingMemberCount := len(err.MissingMembers)
 	if missingMemberCount == 0 {
@@ -2523,17 +2522,8 @@ func maybeAddMissingMembersCodeActionResolver(
 			builder.WriteRune('\n')
 			builder.WriteString(indentation)
 
-			var accessString string
-			switch access := missingMember.Access.(type) {
-			case sema.PrimitiveAccess:
-				if ast.PrimitiveAccess(access) != ast.AccessNotSpecified {
-					accessString = access.AccessKeyword()
-				}
-			case sema.EntitlementSetAccess, sema.EntitlementMapAccess:
-				accessString = fmt.Sprintf("access(%s)", access.AccessKeyword())
-			}
-
-			if accessString != "" {
+			if missingMember.Access != sema.PrimitiveAccess(ast.AccessNotSpecified) {
+				accessString := missingMember.Access.QualifiedString()
 				builder.WriteString(accessString)
 				builder.WriteRune(' ')
 			}
@@ -2622,7 +2612,7 @@ func (s *Server) maybeAddDeclarationActionsResolver(
 	errorPos ast.Position,
 	name string,
 	memberInsertionPosGetter func(checker *sema.Checker, isFunction bool) insertionPosition,
-) func() []*protocol.CodeAction {
+) CodeActionResolver {
 	return func() []*protocol.CodeAction {
 		document, ok := s.documents[uri]
 		if !ok {
@@ -2898,6 +2888,11 @@ func (s *Server) handleImport(
 		testChecker := stdlib.GetTestContractType().Checker
 		return sema.ElaborationImport{
 			Elaboration: testChecker.Elaboration,
+		}, nil
+	case cdcTests.BlockchainHelpersLocation:
+		helpersChecker := cdcTests.BlockchainHelpersChecker()
+		return sema.ElaborationImport{
+			Elaboration: helpersChecker.Elaboration,
 		}, nil
 	default:
 		if isPathLocation(importedLocation) {
@@ -3206,15 +3201,18 @@ func convertDiagnostic(
 	uri protocol.DocumentURI,
 ) (
 	protocol.Diagnostic,
-	func() []*protocol.CodeAction,
+	CodeActionResolver,
 ) {
 
-	protocolRange := conversion.ASTToProtocolRange(linterDiagnostic.StartPos, linterDiagnostic.EndPos)
+	protocolRange := conversion.ASTToProtocolRange(
+		linterDiagnostic.StartPos,
+		linterDiagnostic.EndPos,
+	)
 
 	var protocolDiagnostic protocol.Diagnostic
 	var message string
 
-	var codeActionsResolver func() []*protocol.CodeAction
+	var codeActionsResolver CodeActionResolver
 	var tags []protocol.DiagnosticTag
 	severity := protocol.SeverityWarning
 
@@ -3280,35 +3278,11 @@ func convertDiagnostic(
 		tags = append(tags, protocol.Deprecated)
 
 		codeActionsResolver = func() []*protocol.CodeAction {
-			var codeActions []*protocol.CodeAction
-			for _, suggestedFix := range linterDiagnostic.SuggestedFixes {
-
-				codeActionTextEdits := make([]protocol.TextEdit, 0, len(suggestedFix.TextEdits))
-
-				for _, suggestedFixTextEdit := range suggestedFix.TextEdits {
-					codeActionTextEdit := protocol.TextEdit{
-						Range: conversion.ASTToProtocolRange(
-							suggestedFixTextEdit.StartPos,
-							suggestedFixTextEdit.EndPos,
-						),
-						NewText: suggestedFixTextEdit.Replacement,
-					}
-					codeActionTextEdits = append(codeActionTextEdits, codeActionTextEdit)
-				}
-
-				codeAction := &protocol.CodeAction{
-					Title:       suggestedFix.Message,
-					Kind:        protocol.QuickFix,
-					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-					Edit: &protocol.WorkspaceEdit{
-						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-							uri: codeActionTextEdits,
-						},
-					},
-				}
-				codeActions = append(codeActions, codeAction)
-			}
-			return codeActions
+			return conversion.SuggestedFixesToCodeActions(
+				linterDiagnostic.SuggestedFixes,
+				protocolDiagnostic,
+				uri,
+			)
 		}
 	}
 
