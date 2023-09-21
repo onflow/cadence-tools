@@ -463,10 +463,46 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	// returned from blockchain to the test script)
 	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
 
-	// TODO: The default injected fields handler only supports 'address' locations.
-	//   However, during tests, it is possible to get non-address locations. e.g: file paths.
-	//   Thus, need to properly handle them. Make this nil for now.
-	env.InterpreterConfig.InjectedCompositeFieldsHandler = nil
+	env.InterpreterConfig.InjectedCompositeFieldsHandler = func(
+		inter *interpreter.Interpreter,
+		location common.Location,
+		qualifiedIdentifier string,
+		compositeKind common.CompositeKind,
+	) map[string]interpreter.Value {
+
+		switch location {
+		case stdlib.CryptoCheckerLocation:
+			return nil
+
+		default:
+			switch compositeKind {
+			case common.CompositeKindContract:
+				var address common.Address
+
+				switch location := location.(type) {
+				case common.AddressLocation:
+					address = location.Address
+				default:
+					return nil
+				}
+
+				addressValue := interpreter.NewAddressValue(
+					inter,
+					address,
+				)
+
+				return map[string]interpreter.Value{
+					sema.ContractAccountFieldName: stdlib.NewAuthAccountValue(
+						inter,
+						env,
+						addressValue,
+					),
+				}
+			}
+		}
+
+		return nil
+	}
 
 	code, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
