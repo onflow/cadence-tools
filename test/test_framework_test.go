@@ -4985,3 +4985,125 @@ func TestEmulatorBlockchainSnapshotting(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
+
+func TestEnvironmentForUnitTests(t *testing.T) {
+	t.Parallel()
+
+	const fooContract = `
+        pub contract FooContract {
+            pub let specialNumbers: {Int: String}
+
+            init() {
+                self.specialNumbers = {
+                    1729: "Harshad",
+                    8128: "Harmonic",
+                    41041: "Carmichael"
+                }
+                self.account.save(self.specialNumbers, to: /storage/specialNumbers)
+            }
+
+            pub fun getSpecialNumbers(): {Int: String} {
+                return self.account.load<{Int: String}>(from: /storage/specialNumbers)!
+            }
+
+            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+                self.specialNumbers[n] = trait
+                self.account.load<{Int: String}>(from: /storage/specialNumbers)!
+                self.account.save(self.specialNumbers, to: /storage/specialNumbers)
+            }
+
+            pub fun getIntegerTrait(_ n: Int): String {
+                if self.specialNumbers.containsKey(n) {
+                    return self.specialNumbers[n]!
+                }
+
+                return "Enormous"
+            }
+
+            pub fun getBlockHeight(): UInt64 {
+                return getCurrentBlock().height
+            }
+        }
+	`
+
+	const code = `
+        import Test
+        import BlockchainHelpers
+        import FooContract from "../contracts/FooContract.cdc"
+
+        pub fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "../contracts/FooContract.cdc",
+                arguments: []
+            )
+
+            Test.expect(err, Test.beNil())
+        }
+
+        pub fun testAddSpecialNumber() {
+            // Act
+            FooContract.addSpecialNumber(78557, "Sierpinski")
+
+            // Assert
+            Test.assertEqual("Sierpinski", FooContract.getIntegerTrait(78557))
+
+            let specialNumbers = FooContract.getSpecialNumbers()
+            let expected: {Int: String} = {
+                8128: "Harmonic",
+                1729: "Harshad",
+                41041: "Carmichael",
+                78557: "Sierpinski"
+            }
+            Test.assertEqual(expected, specialNumbers)
+        }
+
+        pub fun testGetCurrentBlockHeight() {
+            // Act
+            let height = FooContract.getBlockHeight()
+
+            // Assert
+            Test.expect(height, Test.beGreaterThan(UInt64(1)))
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "../contracts/FooContract.cdc" {
+				return fooContract, nil
+			}
+		}
+
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver).
+		WithContracts(contracts)
+
+	results, err := runner.RunTests(code)
+
+	require.NoError(t, err)
+	for _, result := range results {
+		assert.NoError(t, result.Error)
+	}
+}
