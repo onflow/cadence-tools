@@ -10,7 +10,7 @@ require (
 	github.com/onflow/cadence v1.0.0-preview.1
 	github.com/onflow/cadence-tools/lint v0.12.0-stable-cadence.2
 	github.com/onflow/cadence-tools/test v0.12.0-stable-cadence.2
-	github.com/onflow/flow-cli/flowkit v1.5.0-stable-cadence.2
+	github.com/onflow/flow-cli/flowkit v1.5.0-stable-cadence.3
 	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.4
