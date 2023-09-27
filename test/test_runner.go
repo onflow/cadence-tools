@@ -463,47 +463,6 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	// returned from blockchain to the test script)
 	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
 
-	env.InterpreterConfig.InjectedCompositeFieldsHandler = func(
-		inter *interpreter.Interpreter,
-		location common.Location,
-		qualifiedIdentifier string,
-		compositeKind common.CompositeKind,
-	) map[string]interpreter.Value {
-
-		switch location {
-		case stdlib.CryptoCheckerLocation:
-			return nil
-
-		default:
-			switch compositeKind {
-			case common.CompositeKindContract:
-				var address common.Address
-
-				switch location := location.(type) {
-				case common.AddressLocation:
-					address = location.Address
-				default:
-					return nil
-				}
-
-				addressValue := interpreter.NewAddressValue(
-					inter,
-					address,
-				)
-
-				return map[string]interpreter.Value{
-					sema.ContractAccountFieldName: stdlib.NewAuthAccountValue(
-						inter,
-						env,
-						addressValue,
-					),
-				}
-			}
-		}
-
-		return nil
-	}
-
 	code, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
 		panic(err)
