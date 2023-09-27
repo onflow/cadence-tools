@@ -385,7 +385,6 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		r.fileResolver,
 		env,
 		r.coverageReport,
-		r.testRuntime,
 	)
 	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
 	if !ok {

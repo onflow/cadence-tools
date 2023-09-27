@@ -146,7 +146,6 @@ func NewEmulatorBackend(
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
-	testRuntime runtime.Runtime,
 ) *EmulatorBackend {
 	logCollectionHook := newLogCollectionHook()
 	var blockchain *emulator.Blockchain
@@ -155,12 +154,10 @@ func NewEmulatorBackend(
 		blockchain = newBlockchain(
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
-			emulator.WithRuntime(testRuntime),
 		)
 	} else {
 		blockchain = newBlockchain(
 			logCollectionHook,
-			emulator.WithRuntime(testRuntime),
 		)
 	}
 	clock := newSystemClock()
