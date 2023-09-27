@@ -144,8 +144,7 @@ func TestExecuteScript(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeScript(
+                let result = Test.executeScript(
                     "pub fun main(): Int {  return 2 + 3 }",
                     []
                 )
@@ -168,8 +167,7 @@ func TestExecuteScript(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeScript(
+                let result = Test.executeScript(
                     "pub fun main(a: Int, b: Int): Int {  return a + b }",
                     [2, 3]
                 )
@@ -188,14 +186,13 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("non-empty array returns", func(t *testing.T) {
 		t.Parallel()
 
-		const code = `pub fun main(): [UInt64] { return [1, 2, 3]}`
+		const code = `pub fun main(): [UInt64] { return [1, 2, 3] }`
 
 		testScript := fmt.Sprintf(`
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeScript("%s", [])
+                let result = Test.executeScript("%s", [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -203,8 +200,7 @@ func TestExecuteScript(t *testing.T) {
                 let resultArray = result.returnValue! as! [UInt64]
                 Test.assertEqual(expected, resultArray)
             }
-		`, code,
-		)
+		`, code)
 
 		runner := NewTestRunner()
 		result, err := runner.RunTest(testScript, "test")
@@ -221,8 +217,7 @@ func TestExecuteScript(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeScript("%s", [])
+                let result = Test.executeScript("%s", [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -230,8 +225,7 @@ func TestExecuteScript(t *testing.T) {
                 let resultArray = result.returnValue! as! [UInt64]
                 Test.assertEqual(expected, resultArray)
             }
-		`, code,
-		)
+		`, code)
 
 		runner := NewTestRunner()
 		result, err := runner.RunTest(testScript, "test")
@@ -242,14 +236,13 @@ func TestExecuteScript(t *testing.T) {
 	t.Run("non-empty dictionary returns", func(t *testing.T) {
 		t.Parallel()
 
-		const code = `pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10}}`
+		const code = `pub fun main(): {String: Int} { return {\"foo\": 5, \"bar\": 10} }`
 
 		testScript := fmt.Sprintf(`
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeScript("%s", [])
+                let result = Test.executeScript("%s", [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -257,8 +250,7 @@ func TestExecuteScript(t *testing.T) {
                 let resultDict = result.returnValue! as! {String: Int}
                 Test.assertEqual(expected, resultDict)
             }
-		`, code,
-		)
+		`, code)
 
 		runner := NewTestRunner()
 		result, err := runner.RunTest(testScript, "test")
@@ -275,8 +267,7 @@ func TestExecuteScript(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeScript("%s", [])
+                let result = Test.executeScript("%s", [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -284,8 +275,7 @@ func TestExecuteScript(t *testing.T) {
                 let resultDict = result.returnValue! as! {String: Int}
                 Test.assertEqual(expected, resultDict)
             }
-		`, code,
-		)
+		`, code)
 
 		runner := NewTestRunner()
 		result, err := runner.RunTest(testScript, "test")
@@ -297,16 +287,25 @@ func TestExecuteScript(t *testing.T) {
 func TestImportContract(t *testing.T) {
 	t.Parallel()
 
-	t.Run("init no params", func(t *testing.T) {
+	t.Run("contract with no init params", func(t *testing.T) {
 		t.Parallel()
 
 		const code = `
             import Test
-            import FooContract from "./FooContract"
+            import "FooContract"
+
+            pub fun setup() {
+                let err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: []
+                )
+
+                Test.expect(err, Test.beNil())
+            }
 
             pub fun test() {
-                let foo = FooContract()
-                Test.assertEqual("hello from Foo", foo.sayHello())
+                Test.assertEqual("hello from Foo", FooContract.sayHello())
             }
 		`
 
@@ -320,27 +319,63 @@ func TestImportContract(t *testing.T) {
             }
 		`
 
-		importResolver := func(location common.Location) (string, error) {
-			return fooContract, nil
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
 		}
 
-		runner := NewTestRunner().WithImportResolver(importResolver)
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("cannot find import location: %s", location.ID())
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
 	})
 
-	t.Run("init with params", func(t *testing.T) {
+	t.Run("contract with init params", func(t *testing.T) {
 		t.Parallel()
 
 		const code = `
             import Test
             import FooContract from "./FooContract"
 
+            pub fun setup() {
+                let err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: ["hello from Foo"]
+                )
+
+                Test.expect(err, Test.beNil())
+            }
+
             pub fun test() {
-                let foo = FooContract(greeting: "hello from Foo")
-                Test.assertEqual("hello from Foo", foo.sayHello())
+                Test.assertEqual("hello from Foo", FooContract.sayHello())
             }
 		`
 
@@ -359,11 +394,38 @@ func TestImportContract(t *testing.T) {
             }
 		`
 
-		importResolver := func(location common.Location) (string, error) {
-			return fooContract, nil
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
 		}
 
-		runner := NewTestRunner().WithImportResolver(importResolver)
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "./FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("cannot find import location: %s", location.ID())
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -377,12 +439,12 @@ func TestImportContract(t *testing.T) {
             import FooContract from "./FooContract"
 
             pub fun test() {
-                let foo = FooContract()
+                let message = FooContract.sayHello()
             }
 		`
 
 		importResolver := func(location common.Location) (string, error) {
-			return "", errors.New("cannot load file")
+			return "", errors.New("cannot import location")
 		}
 
 		runner := NewTestRunner().WithImportResolver(importResolver)
@@ -394,7 +456,7 @@ func TestImportContract(t *testing.T) {
 
 		importedProgramError := &sema.ImportedProgramError{}
 		assert.ErrorAs(t, errs[0], &importedProgramError)
-		assert.Contains(t, importedProgramError.Err.Error(), "cannot load file")
+		assert.Contains(t, importedProgramError.Err.Error(), "cannot import location")
 
 		assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
 	})
@@ -406,7 +468,7 @@ func TestImportContract(t *testing.T) {
             import FooContract from "./FooContract"
 
             pub fun test() {
-                let foo = FooContract()
+                let message = FooContract.sayHello()
             }
 		`
 
@@ -426,15 +488,32 @@ func TestImportContract(t *testing.T) {
 	t.Run("nested imports", func(t *testing.T) {
 		t.Parallel()
 
-		testLocation := common.AddressLocation{
-			Address: common.MustBytesToAddress([]byte{0x1}),
-			Name:    "BarContract",
-		}
-
 		const code = `
+            import Test
+            import BarContract from "./BarContract"
             import FooContract from "./FooContract"
 
-            pub fun test() {}
+            pub let account = Test.getAccount(0x0000000000000005)
+
+            pub fun setup() {
+                var err = Test.deployContract(
+                    name: "BarContract",
+                    path: "./BarContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
+
+                err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
+            }
+
+            pub fun test() {
+                Test.assertEqual(1, 1)
+            }
 		`
 
 		const fooContract = `
@@ -453,12 +532,18 @@ func TestImportContract(t *testing.T) {
 
 		importResolver := func(location common.Location) (string, error) {
 			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+				if location.Name == "BarContract" {
+					return barContract, nil
+				}
 			case common.StringLocation:
 				if location == "./FooContract" {
 					return fooContract, nil
 				}
-			case common.AddressLocation:
-				if location == testLocation {
+				if location == "./BarContract" {
 					return barContract, nil
 				}
 			}
@@ -466,28 +551,107 @@ func TestImportContract(t *testing.T) {
 			return "", fmt.Errorf("unsupported import %s", location)
 		}
 
-		runner := NewTestRunner().WithImportResolver(importResolver)
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			case "./BarContract":
+				return barContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"BarContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithContracts(contracts).
+			WithFileResolver(fileResolver)
 
 		_, err := runner.RunTest(code, "test")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "nested imports are not supported")
+		require.NoError(t, err)
+	})
+
+	t.Run("undeployed contract", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+            import Test
+            import FooContract from "./FooContract"
+
+            pub fun test() {
+                Test.assertEqual("Hello", FooContract.sayHello())
+            }
+		`
+
+		const fooContract = `
+            pub contract FooContract {
+                init() {}
+
+                pub fun sayHello(): String {
+                    return "Hello"
+                }
+            }
+		`
+
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "./FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("unsupported import %s", location)
+		}
+
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithContracts(contracts).
+			WithFileResolver(fileResolver)
+
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		assert.ErrorContains(
+			t,
+			result.Error,
+			"failed to load contract: 0000000000000005.FooContract",
+		)
 	})
 }
 
 func TestImportBuiltinContracts(t *testing.T) {
 	t.Parallel()
 
-	testCode := `
+	const testCode = `
         import Test
+        import "ExampleNFT"
+        import "NonFungibleToken"
+        import "NFTStorefrontV2"
+        import "FlowToken"
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
-
-        pub fun setup() {
-            blockchain.useConfiguration(Test.Configuration({
-                "FooContract": account.address
-            }))
-        }
+        pub let account = Test.createAccount()
 
         pub fun testSetupExampleNFTCollection() {
             let code = Test.readFile("../transactions/setup_example_nft_collection.cdc")
@@ -498,20 +662,37 @@ func TestImportBuiltinContracts(t *testing.T) {
                 arguments: []
             )
 
-            let result = blockchain.executeTransaction(tx)
+            let result = Test.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
         }
 
-        pub fun testGetIntegerTrait() {
+        pub fun testImportCommonContracts() {
             let script = Test.readFile("../scripts/import_common_contracts.cdc")
-            let result = blockchain.executeScript(script, [])
+            let result = Test.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(true, result.returnValue! as! Bool)
         }
+
+        pub fun testExampleNFT() {
+            let storagePath = ExampleNFT.MinterStoragePath
+            Test.assertEqual(/storage/exampleNFTMinter, storagePath)
+
+            Test.assertEqual(
+                "A.0000000000000001.NonFungibleToken",
+                Type<NonFungibleToken>().identifier
+            )
+
+            let publicPath = NFTStorefrontV2.StorefrontPublicPath
+            Test.assertEqual(/public/NFTStorefrontV2, publicPath)
+
+            let vault <- FlowToken.createEmptyVault()
+            Test.assertEqual(0.0, vault.balance)
+            destroy <- vault
+        }
 	`
 
-	transactionCode := `
+	const transactionCode = `
         import "NonFungibleToken"
         import "ExampleNFT"
         import "MetadataViews"
@@ -539,7 +720,7 @@ func TestImportBuiltinContracts(t *testing.T) {
         }
 	`
 
-	scriptCode := `
+	const scriptCode = `
         import "FungibleToken"
         import "FlowToken"
         import "NonFungibleToken"
@@ -561,17 +742,27 @@ func TestImportBuiltinContracts(t *testing.T) {
 		case "../scripts/import_common_contracts.cdc":
 			return scriptCode, nil
 		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
 	}
 
-	runner := NewTestRunner().WithFileResolver(fileResolver)
+	importResolver := func(location common.Location) (string, error) {
+		return "", fmt.Errorf("cannot find import location: %s", location)
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver)
 
 	result, err := runner.RunTest(testCode, "testSetupExampleNFTCollection")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	result, err = runner.RunTest(testCode, "testGetIntegerTrait")
+	result, err = runner.RunTest(testCode, "testImportCommonContracts")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+
+	result, err = runner.RunTest(testCode, "testExampleNFT")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
@@ -608,7 +799,7 @@ func TestUsingEnv(t *testing.T) {
             import Test
 
             pub fun test() {
-                let acc = getAccount(0x01)
+                let acc = getAccount(0x10)
                 Test.assertEqual(0.0, acc.balance)
             }
 		`
@@ -625,11 +816,20 @@ func TestUsingEnv(t *testing.T) {
 
 		const code = `
             import Test
-            import FooContract from "./FooContract"
+            import "FooContract"
+
+            pub fun setup() {
+                let err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: []
+                )
+
+                Test.expect(err, Test.beNil())
+            }
 
             pub fun test() {
-                let foo = FooContract()
-                Test.assertEqual(0.0, foo.getBalance())
+                Test.assertEqual(0.0, FooContract.getBalance())
             }
 		`
 
@@ -638,17 +838,44 @@ func TestUsingEnv(t *testing.T) {
                 init() {}
 
                 pub fun getBalance(): UFix64 {
-                    let acc = getAccount(0x01)
+                    let acc = getAccount(0x10)
                     return acc.balance
                 }
             }
 		`
 
-		importResolver := func(location common.Location) (string, error) {
-			return fooContract, nil
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
 		}
 
-		runner := NewTestRunner().WithImportResolver(importResolver)
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("cannot find import location: %s", location.ID())
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -662,8 +889,7 @@ func TestUsingEnv(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 // just checking the invocation of verify function
                 Test.assert(!account.publicKey.verify(
@@ -688,12 +914,11 @@ func TestUsingEnv(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let script = Test.readFile("./sample/script.cdc")
 
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -743,12 +968,11 @@ func TestCreateAccount(t *testing.T) {
         import Test
 
         pub fun test() {
-            let blockchain = Test.newEmulatorBlockchain()
-            let account = blockchain.createAccount()
+            let account = Test.createAccount()
 
             let typ = CompositeType("flow.AccountCreated")!
-            let events = blockchain.eventsOfType(typ)
-            Test.assertEqual(1, events.length)
+            let events = Test.eventsOfType(typ)
+            Test.expect(events.length, Test.beGreaterThan(1))
         }
 	`
 
@@ -762,6 +986,45 @@ func TestCreateAccount(t *testing.T) {
 	require.NoError(t, result.Error)
 }
 
+func TestGetAccount(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+
+        pub fun testMissingAccount() {
+            let account = Test.getAccount(0x0000000000000095)
+
+            Test.assertEqual(0x0000000000000005 as Address, account.address)
+        }
+
+        pub fun testExistingAccount() {
+            let admin = Test.createAccount()
+            let account = Test.getAccount(admin.address)
+
+            Test.assertEqual(account.address, admin.address)
+            Test.assertEqual(account.publicKey.publicKey, admin.publicKey.publicKey)
+        }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", nil
+	}
+
+	runner := NewTestRunner().WithImportResolver(importResolver)
+	result, err := runner.RunTest(code, "testMissingAccount")
+	require.NoError(t, err)
+	require.ErrorContains(
+		t,
+		result.Error,
+		"account with address: 0x0000000000000095 was not found",
+	)
+
+	result, err = runner.RunTest(code, "testExistingAccount")
+	require.NoError(t, err)
+	assert.NoError(t, result.Error)
+}
+
 func TestExecutingTransactions(t *testing.T) {
 	t.Parallel()
 
@@ -772,8 +1035,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(false) } }",
@@ -782,7 +1044,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                blockchain.addTransaction(tx)
+                Test.addTransaction(tx)
             }
 		`
 
@@ -799,8 +1061,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(true) } }",
@@ -809,9 +1070,9 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                blockchain.addTransaction(tx)
+                Test.addTransaction(tx)
 
-                let result = blockchain.executeNextTransaction()!
+                let result = Test.executeNextTransaction()!
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -829,8 +1090,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { prepare(acct: AuthAccount) {} execute{ assert(true) } }",
@@ -839,9 +1099,9 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                blockchain.addTransaction(tx)
+                Test.addTransaction(tx)
 
-                let result = blockchain.executeNextTransaction()!
+                let result = Test.executeNextTransaction()!
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -859,8 +1119,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(false) } }",
@@ -869,9 +1128,9 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                blockchain.addTransaction(tx)
+                Test.addTransaction(tx)
 
-                let result = blockchain.executeNextTransaction()!
+                let result = Test.executeNextTransaction()!
                 Test.expect(result, Test.beFailed())
             }
 		`
@@ -889,8 +1148,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let result = blockchain.executeNextTransaction()
+                let result = Test.executeNextTransaction()
                 Test.expect(result, Test.beNil())
             }
 		`
@@ -908,8 +1166,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                blockchain.commitBlock()
+                Test.commitBlock()
             }
 		`
 
@@ -926,8 +1183,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(false) } }",
@@ -936,9 +1192,9 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                blockchain.addTransaction(tx)
+                Test.addTransaction(tx)
 
-                blockchain.commitBlock()
+                Test.commitBlock()
             }
 		`
 
@@ -957,8 +1213,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(false) } }",
@@ -968,14 +1223,14 @@ func TestExecutingTransactions(t *testing.T) {
                 )
 
                 // Add two transactions
-                blockchain.addTransaction(tx)
-                blockchain.addTransaction(tx)
+                Test.addTransaction(tx)
+                Test.addTransaction(tx)
 
                 // But execute only one
-                blockchain.executeNextTransaction()
+                Test.executeNextTransaction()
 
                 // Then try to commit
-                blockchain.commitBlock()
+                Test.commitBlock()
             }
 		`
 
@@ -994,9 +1249,8 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                blockchain.commitBlock()
-                blockchain.commitBlock()
+                Test.commitBlock()
+                Test.commitBlock()
             }
 		`
 
@@ -1013,8 +1267,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(true) } }",
@@ -1023,7 +1276,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                let result = blockchain.executeTransaction(tx)
+                let result = Test.executeTransaction(tx)
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -1041,8 +1294,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction(a: Int, b: Int) { execute{ assert(a == b) } }",
@@ -1051,7 +1303,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [4, 4],
                 )
 
-                let result = blockchain.executeTransaction(tx)
+                let result = Test.executeTransaction(tx)
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -1069,9 +1321,8 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account1 = blockchain.createAccount()
-                let account2 = blockchain.createAccount()
+                let account1 = Test.createAccount()
+                let account2 = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction() { prepare(acct1: AuthAccount, acct2: AuthAccount) {}  }",
@@ -1080,7 +1331,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                let result = blockchain.executeTransaction(tx)
+                let result = Test.executeTransaction(tx)
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -1098,8 +1349,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction { execute{ assert(fail) } }",
@@ -1108,7 +1358,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                let result = blockchain.executeTransaction(tx)
+                let result = Test.executeTransaction(tx)
                 Test.expect(result, Test.beFailed())
             }
 		`
@@ -1126,8 +1376,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx1 = Test.Transaction(
                     code: "transaction { execute{ assert(true) } }",
@@ -1150,7 +1399,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                let firstResults = blockchain.executeTransactions([tx1, tx2, tx3])
+                let firstResults = Test.executeTransactions([tx1, tx2, tx3])
 
                 Test.assertEqual(3, firstResults.length)
                 Test.expect(firstResults[0], Test.beSucceeded())
@@ -1159,7 +1408,7 @@ func TestExecutingTransactions(t *testing.T) {
 
 
                 // Execute them again: To verify the proper increment/reset of sequence numbers.
-                let secondResults = blockchain.executeTransactions([tx1, tx2, tx3])
+                let secondResults = Test.executeTransactions([tx1, tx2, tx3])
 
                 Test.assertEqual(3, secondResults.length)
                 Test.expect(secondResults[0], Test.beSucceeded())
@@ -1181,10 +1430,9 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
-                let result = blockchain.executeTransactions([])
+                let result = Test.executeTransactions([])
                 Test.assertEqual(0, result.length)
             }
 		`
@@ -1202,8 +1450,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx1 = Test.Transaction(
                     code: "transaction { execute{ assert(true) } }",
@@ -1212,7 +1459,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                blockchain.addTransaction(tx1)
+                Test.addTransaction(tx1)
 
                 let tx2 = Test.Transaction(
                     code: "transaction { execute{ assert(true) } }",
@@ -1221,7 +1468,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [],
                 )
 
-                let result = blockchain.executeTransaction(tx2)
+                let result = Test.executeTransaction(tx2)
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -1241,8 +1488,7 @@ func TestExecutingTransactions(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx = Test.Transaction(
                     code: "transaction(a: [Int]) { execute{ assert(a[0] == a[1]) } }",
@@ -1251,7 +1497,7 @@ func TestExecutingTransactions(t *testing.T) {
                     arguments: [[4, 4]],
                 )
 
-                let result = blockchain.executeTransaction(tx)
+                let result = Test.executeTransaction(tx)
                 Test.expect(result, Test.beSucceeded())
             }
 		`
@@ -1271,15 +1517,13 @@ func TestSetupAndTearDown(t *testing.T) {
 
 		const code = `
             import Test
-            pub(set) var setupRan = false
 
             pub fun setup() {
-                Test.assert(!setupRan)
-                setupRan = true
+                log("setup is running!")
             }
 
             pub fun testFunc() {
-                Test.assert(setupRan)
+                Test.assert(true)
             }
 		`
 
@@ -1291,6 +1535,8 @@ func TestSetupAndTearDown(t *testing.T) {
 		result := results[0]
 		assert.Equal(t, result.TestName, "testFunc")
 		require.NoError(t, result.Error)
+
+		assert.ElementsMatch(t, []string{"setup is running!"}, runner.Logs())
 	})
 
 	t.Run("setup failed", func(t *testing.T) {
@@ -1320,14 +1566,12 @@ func TestSetupAndTearDown(t *testing.T) {
 		const code = `
             import Test
 
-            pub(set) var tearDownRan = false
-
             pub fun testFunc() {
-                Test.assert(!tearDownRan)
+                Test.assert(true)
             }
 
             pub fun tearDown() {
-                Test.assert(true)
+                log("tearDown is running!")
             }
 		`
 
@@ -1339,13 +1583,15 @@ func TestSetupAndTearDown(t *testing.T) {
 		result := results[0]
 		assert.Equal(t, result.TestName, "testFunc")
 		require.NoError(t, result.Error)
+
+		assert.ElementsMatch(t, []string{"tearDown is running!"}, runner.Logs())
 	})
 
 	t.Run("teardown failed", func(t *testing.T) {
 		t.Parallel()
 
 		const code = `
-			import Test
+            import Test
 
             pub(set) var tearDownRan = false
 
@@ -1378,7 +1624,7 @@ func TestBeforeAndAfterEach(t *testing.T) {
 	t.Run("beforeEach", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub(set) var counter = 0
@@ -1410,7 +1656,7 @@ func TestBeforeAndAfterEach(t *testing.T) {
 	t.Run("beforeEach failed", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub fun beforeEach() {
@@ -1431,7 +1677,7 @@ func TestBeforeAndAfterEach(t *testing.T) {
 	t.Run("afterEach", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub(set) var counter = 2
@@ -1467,7 +1713,7 @@ func TestBeforeAndAfterEach(t *testing.T) {
 	t.Run("afterEach failed", func(t *testing.T) {
 		t.Parallel()
 
-		code := `
+		const code = `
             import Test
 
             pub(set) var tearDownRan = false
@@ -1546,12 +1792,11 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let script = Test.readFile("./sample/script.cdc")
 
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beSucceeded())
                 Test.assertEqual(5, result.returnValue! as! Int)
@@ -1588,12 +1833,11 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let script = Test.readFile("./sample/script.cdc")
 
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beSucceeded())
                 Test.assertEqual(5, result.returnValue! as! Int)
@@ -1625,8 +1869,7 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let script = Test.readFile("./sample/script.cdc")
             }
@@ -1647,28 +1890,41 @@ func TestDeployingContracts(t *testing.T) {
 	t.Run("no args", func(t *testing.T) {
 		t.Parallel()
 
+		const contract = `
+            pub contract Foo {
+                init() {}
+
+                pub fun sayHello(): String {
+                    return "hello from Foo"
+                }
+            }
+		`
+
+		const script = `
+            import Foo from "Foo.cdc"
+
+            pub fun main(): String {
+                return Foo.sayHello()
+            }
+		`
+
 		const code = `
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.getAccount(0x0000000000000005)
 
-                let contractCode = "pub contract Foo{ init(){}  pub fun sayHello(): String { return \"hello from Foo\"} }"
-
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "Foo",
-                    code: contractCode,
-                    account: account,
+                    path: "Foo.cdc",
                     arguments: [],
                 )
 
                 Test.expect(err, Test.beNil())
 
-                var script = "import Foo from ".concat(account.address.toString()).concat("\n")
-                script = script.concat("pub fun main(): String {  return Foo.sayHello() }")
+                let script = Test.readFile("say_hello.cdc")
 
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -1677,7 +1933,24 @@ func TestDeployingContracts(t *testing.T) {
             }
 		`
 
-		runner := NewTestRunner()
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "Foo.cdc":
+				return contract, nil
+			case "say_hello.cdc":
+				return script, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
@@ -1686,28 +1959,45 @@ func TestDeployingContracts(t *testing.T) {
 	t.Run("with args", func(t *testing.T) {
 		t.Parallel()
 
+		const contract = `
+            pub contract Foo {
+                pub let msg: String
+
+                init(_ msg: String) {
+                    self.msg = msg
+                }
+
+                pub fun sayHello(): String {
+                    return self.msg
+                }
+            }
+		`
+
+		const script = `
+            import Foo from "Foo.cdc"
+
+            pub fun main(): String {
+                return Foo.sayHello()
+            }
+		`
+
 		const code = `
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.getAccount(0x0000000000000005)
 
-                let contractCode = "pub contract Foo{ pub let msg: String;   init(_ msg: String){ self.msg = msg }   pub fun sayHello(): String { return self.msg } }" 
-
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "Foo",
-                    code: contractCode,
-                    account: account,
+                    path: "Foo.cdc",
                     arguments: ["hello from args"],
                 )
 
                 Test.expect(err, Test.beNil())
 
-                var script = "import Foo from ".concat(account.address.toString()).concat("\n")
-                script = script.concat("pub fun main(): String {  return Foo.sayHello() }")
+                let script = Test.readFile("say_hello.cdc")
 
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beSucceeded())
 
@@ -1716,7 +2006,24 @@ func TestDeployingContracts(t *testing.T) {
             }
 		`
 
-		runner := NewTestRunner()
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "Foo.cdc":
+				return contract, nil
+			case "say_hello.cdc":
+				return script, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
@@ -1729,19 +2036,23 @@ func TestErrors(t *testing.T) {
 	t.Run("contract deployment error", func(t *testing.T) {
 		t.Parallel()
 
+		const contract = `
+            pub contract Foo {
+                init() {}
+
+                pub fun sayHello() {
+                    return 0
+                }
+            }
+		`
+
 		const code = `
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
-
-                let contractCode = "pub contract Foo{ init(){}  pub fun sayHello() { return 0 } }"
-
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "Foo",
-                    code: contractCode,
-                    account: account,
+                    path: "Foo.cdc",
                     arguments: [],
                 )
 
@@ -1751,7 +2062,22 @@ func TestErrors(t *testing.T) {
             }
 		`
 
-		runner := NewTestRunner()
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "Foo.cdc":
+				return contract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
@@ -1765,11 +2091,8 @@ func TestErrors(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
-
                 let script = "import Foo from 0x01; pub fun main() {}"
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 if result.status == Test.ResultStatus.failed {
                     panic(result.error!.message)
@@ -1795,8 +2118,7 @@ func TestErrors(t *testing.T) {
             import Test
 
             pub fun test() {
-                let blockchain = Test.newEmulatorBlockchain()
-                let account = blockchain.createAccount()
+                let account = Test.createAccount()
 
                 let tx2 = Test.Transaction(
                     code: "transaction { execute{ panic(\"some error\") } }",
@@ -1805,7 +2127,7 @@ func TestErrors(t *testing.T) {
                     arguments: [],
                 )
 
-                let result = blockchain.executeTransaction(tx2)!
+                let result = Test.executeTransaction(tx2)!
 
                 Test.assertError(result, errorMessage: "some error")
                 if result.status == Test.ResultStatus.failed {
@@ -2497,44 +2819,34 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            pub let account = Test.getAccount(0x0000000000000005)
 
             pub fun setup() {
                 // Deploy the contract
-                let contractCode = Test.readFile("./sample/contract.cdc")
-
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "Foo",
-                    code: contractCode,
-                    account: account,
+                    path: "./sample/contract.cdc",
                     arguments: [],
                 )
 
                 Test.expect(err, Test.beNil())
-
-                // Set the configurations to use the address of the deployed contract.
-
-                blockchain.useConfiguration(Test.Configuration({
-                    "./FooContract": account.address
-                }))
             }
 
             pub fun test() {
                 let script = Test.readFile("./sample/script.cdc")
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beSucceeded())
                 Test.assertEqual("hello from Foo", result.returnValue! as! String)
             }
-        `
+		`
 
 		const contractCode = `
-            pub contract Foo{ 
+            pub contract Foo {
                 init() {}
 
                 pub fun sayHello(): String {
-                    return "hello from Foo" 
+                    return "hello from Foo"
                 }
             }
 		`
@@ -2554,11 +2866,17 @@ func TestReplacingImports(t *testing.T) {
 			case "./sample/contract.cdc":
 				return contractCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
-		runner := NewTestRunner().WithFileResolver(fileResolver)
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -2571,31 +2889,21 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            pub let account = Test.getAccount(0x0000000000000005)
 
             pub fun setup() {
-                let contractCode = Test.readFile("./sample/contract.cdc")
-
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "Foo",
-                    code: contractCode,
-                    account: account,
+                    path: "./sample/contract.cdc",
                     arguments: [],
                 )
 
                 Test.expect(err, Test.beNil())
-
-                // Address locations are not replaceable!
-
-                blockchain.useConfiguration(Test.Configuration({
-                    "0x01": account.address
-                }))
             }
 
             pub fun test() {
                 let script = Test.readFile("./sample/script.cdc")
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beFailed())
                 if result.status == Test.ResultStatus.failed {
@@ -2606,11 +2914,11 @@ func TestReplacingImports(t *testing.T) {
 		`
 
 		const contractCode = `
-            pub contract Foo{ 
-                init(){}
+            pub contract Foo {
+                init() {}
 
                 pub fun sayHello(): String {
-                    return "hello from Foo" 
+                    return "hello from Foo"
                 }
             }
 		`
@@ -2630,11 +2938,17 @@ func TestReplacingImports(t *testing.T) {
 			case "./sample/contract.cdc":
 				return contractCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
-		runner := NewTestRunner().WithFileResolver(fileResolver)
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -2652,16 +2966,12 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            pub let account = Test.createAccount()
 
             pub fun setup() {
-                let contractCode = Test.readFile("./sample/contract.cdc")
-
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "Foo",
-                    code: contractCode,
-                    account: account,
+                    path: "./sample/contract.cdc",
                     arguments: [],
                 )
 
@@ -2672,9 +2982,9 @@ func TestReplacingImports(t *testing.T) {
 
             pub fun test() {
                 let script = Test.readFile("./sample/script.cdc")
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
-                Test.expect(result, Test.beFailed())
+                Test.expect(result, Test.beSucceeded())
                 if result.status == Test.ResultStatus.failed {
                     panic(result.error!.message)
                 }
@@ -2683,11 +2993,11 @@ func TestReplacingImports(t *testing.T) {
 		`
 
 		const contractCode = `
-            pub contract Foo{ 
+            pub contract Foo {
                 init() {}
 
                 pub fun sayHello(): String {
-                    return "hello from Foo" 
+                    return "hello from Foo"
                 }
             }
 		`
@@ -2707,20 +3017,21 @@ func TestReplacingImports(t *testing.T) {
 			case "./sample/contract.cdc":
 				return contractCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
-		runner := NewTestRunner().WithFileResolver(fileResolver)
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
-		require.Error(t, result.Error)
-		assert.Contains(
-			t,
-			result.Error.Error(),
-			"expecting an AddressLocation, but other location types are passed",
-		)
+		require.NoError(t, result.Error)
 	})
 
 	t.Run("config with missing imports", func(t *testing.T) {
@@ -2729,19 +3040,21 @@ func TestReplacingImports(t *testing.T) {
 		const code = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            pub let account = Test.getAccount(0x0000000000000005)
 
             pub fun setup() {
-                // Configurations provided, but some imports are missing.
-                blockchain.useConfiguration(Test.Configuration({
-                    "./FooContract": account.address
-                }))
+                let err = Test.deployContract(
+                    name: "Foo",
+                    path: "./FooContract",
+                    arguments: [],
+                )
+
+                Test.expect(err, Test.beNil())
             }
 
             pub fun test() {
                 let script = Test.readFile("./sample/script.cdc")
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
 
                 Test.expect(result, Test.beFailed())
                 if result.status == Test.ResultStatus.failed {
@@ -2753,10 +3066,20 @@ func TestReplacingImports(t *testing.T) {
 
 		const scriptCode = `
             import Foo from "./FooContract"
-            import Foo from "./BarContract"  // This is missing in configs
+            import Bar from "./BarContract"  // This is missing in configs
 
             pub fun main(): String {
                 return Foo.sayHello()
+            }
+		`
+
+		const contractCode = `
+            pub contract Foo {
+                init() {}
+
+                pub fun sayHello(): String {
+                    return "hello from Foo"
+                }
             }
 		`
 
@@ -2764,12 +3087,20 @@ func TestReplacingImports(t *testing.T) {
 			switch path {
 			case "./sample/script.cdc":
 				return scriptCode, nil
+			case "./FooContract":
+				return contractCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
-		runner := NewTestRunner().WithFileResolver(fileResolver)
+		contracts := map[string]common.Address{
+			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -2786,26 +3117,26 @@ func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
 	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
-	emulatorBackend.UseConfiguration(&stdlib.Configuration{
-		Addresses: map[string]common.Address{
-			"./sample/contract1.cdc": {0x1},
-			"./sample/contract2.cdc": {0x2},
-			"./sample/contract3.cdc": {0x3},
-		},
-	})
+	emulatorBackend.contracts = map[string]common.Address{
+		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
+		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
+		"C3": {0, 0, 0, 0, 0, 0, 0, 1},
+	}
 
 	const code = `
         import C1 from "./sample/contract1.cdc"
-        import C2 from "./sample/contract2.cdc"
-        import C3 from "./sample/contract3.cdc"
+        import C2 from "C2"
+        import "C3"
+        import C4 from 0x0000000000000009
 
         pub fun main() {}
 	`
 
 	const expected = `
-        import C1 from 0x0100000000000000
-        import C2 from 0x0200000000000000
-        import C3 from 0x0300000000000000
+        import C1 from 0x0000000000000001
+        import C2 from 0x0000000000000002
+        import C3 from 0x0000000000000001
+        import C4 from 0x0000000000000009
 
         pub fun main() {}
 	`
@@ -2822,15 +3153,12 @@ func TestGetAccountFlowBalance(t *testing.T) {
         import Test
         import BlockchainHelpers
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
         pub fun testGetFlowBalance() {
             // Arrange
-            let account = blockchain.serviceAccount()
+            let account = Test.serviceAccount()
 
             // Act
-            let balance = helpers.getFlowBalance(for: account)
+            let balance = getFlowBalance(for: account)
 
             // Assert
             Test.assertEqual(1000000000.0, balance)
@@ -2851,19 +3179,16 @@ func TestGetCurrentBlockHeight(t *testing.T) {
         import Test
         import BlockchainHelpers
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
         pub fun testGetCurrentBlockHeight() {
             // Act
-            let height = helpers.getCurrentBlockHeight()
+            let height = getCurrentBlockHeight()
 
             // Assert
             Test.expect(height, Test.beGreaterThan(1 as UInt64))
 
             // Act
-            blockchain.commitBlock()
-            let newHeight = helpers.getCurrentBlockHeight()
+            Test.commitBlock()
+            let newHeight = getCurrentBlockHeight()
 
             // Assert
             Test.assertEqual(newHeight, height + 1)
@@ -2884,18 +3209,15 @@ func TestMintFlow(t *testing.T) {
         import Test
         import BlockchainHelpers
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
         pub fun testMintFlow() {
             // Arrange
-            let account = blockchain.createAccount()
+            let account = Test.createAccount()
 
             // Act
-            helpers.mintFlow(to: account, amount: 1500.0)
+            mintFlow(to: account, amount: 1500.0)
 
             // Assert
-            let balance = helpers.getFlowBalance(for: account)
+            let balance = getFlowBalance(for: account)
             Test.assertEqual(1500.0, balance)
         }
 	`
@@ -2914,25 +3236,22 @@ func TestBurnFlow(t *testing.T) {
         import Test
         import BlockchainHelpers
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
         pub fun testBurnFlow() {
             // Arrange
-            let account = blockchain.createAccount()
+            let account = Test.createAccount()
 
             // Act
-            helpers.mintFlow(to: account, amount: 1500.0)
+            mintFlow(to: account, amount: 1500.0)
 
             // Assert
-            var balance = helpers.getFlowBalance(for: account)
+            var balance = getFlowBalance(for: account)
             Test.assertEqual(1500.0, balance)
 
             // Act
-            helpers.burnFlow(from: account, amount: 500.0)
+            burnFlow(from: account, amount: 500.0)
 
             // Assert
-            balance = helpers.getFlowBalance(for: account)
+            balance = getFlowBalance(for: account)
             Test.assertEqual(1000.0, balance)
         }
 	`
@@ -2968,11 +3287,9 @@ func TestServiceAccount(t *testing.T) {
 		const testCode = `
             import Test
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-
             pub fun testGetServiceAccount() {
                 // Act
-                let account = blockchain.serviceAccount()
+                let account = Test.serviceAccount()
 
                 // Assert
                 Test.assertEqual(Type<Address>(), account.address.getType())
@@ -2995,15 +3312,12 @@ func TestServiceAccount(t *testing.T) {
             import Test
             import BlockchainHelpers
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
             pub fun testGetServiceAccountBalance() {
                 // Arrange
-                let account = blockchain.serviceAccount()
+                let account = Test.serviceAccount()
 
                 // Act
-                let balance = helpers.getFlowBalance(for: account)
+                let balance = getFlowBalance(for: account)
 
                 // Assert
                 Test.assertEqual(1000000000.0, balance)
@@ -3011,8 +3325,8 @@ func TestServiceAccount(t *testing.T) {
 
             pub fun testTransferFlowTokens() {
                 // Arrange
-                let account = blockchain.serviceAccount()
-                let receiver = blockchain.createAccount()
+                let account = Test.serviceAccount()
+                let receiver = Test.createAccount()
 
                 let code = Test.readFile("../transactions/transfer_flow_tokens.cdc")
                 let tx = Test.Transaction(
@@ -3023,11 +3337,11 @@ func TestServiceAccount(t *testing.T) {
                 )
 
                 // Act
-                let txResult = blockchain.executeTransaction(tx)
+                let txResult = Test.executeTransaction(tx)
                 Test.expect(txResult, Test.beSucceeded())
 
                 // Assert
-                let balance = helpers.getFlowBalance(for: receiver)
+                let balance = getFlowBalance(for: receiver)
                 Test.assertEqual(1500.0, balance)
             }
 		`
@@ -3058,7 +3372,7 @@ func TestServiceAccount(t *testing.T) {
 			case "../transactions/transfer_flow_tokens.cdc":
 				return transactionCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
@@ -3117,9 +3431,17 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 
 	const code = `
         import Test
-        import FooContract from "FooContract.cdc"
+        import FooContract from "../contracts/FooContract.cdc"
 
-        pub let foo = FooContract()
+        pub fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "../contracts/FooContract.cdc",
+                arguments: []
+            )
+
+            Test.expect(err, Test.beNil())
+        }
 
         pub fun testGetIntegerTrait() {
             // Arrange
@@ -3137,7 +3459,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 
             for input in testInputs.keys {
                 // Act
-                let result = foo.getIntegerTrait(input)
+                let result = FooContract.getIntegerTrait(input)
 
                 // Assert
                 Test.assertEqual(result, testInputs[input]!)
@@ -3146,40 +3468,68 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 
         pub fun testAddSpecialNumber() {
             // Act
-            foo.addSpecialNumber(78557, "Sierpinski")
+            FooContract.addSpecialNumber(78557, "Sierpinski")
 
             // Assert
-            Test.assertEqual("Sierpinski", foo.getIntegerTrait(78557))
+            Test.assertEqual("Sierpinski", FooContract.getIntegerTrait(78557))
         }
 	`
 
-	importResolver := func(location common.Location) (string, error) {
-		if location == common.StringLocation("FooContract.cdc") {
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
 			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "../contracts/FooContract.cdc" {
+				return fooContract, nil
+			}
 		}
 
-		return "", fmt.Errorf("unsupported import %s", location)
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
 	}
 
 	coverageReport := runtime.NewCoverageReport()
+	coverageReport.WithLocationFilter(func(location common.Location) bool {
+		_, addressLoc := location.(common.AddressLocation)
+		_, stringLoc := location.(common.StringLocation)
+		// We only allow inspection of AddressLocation or StringLocation
+		return addressLoc || stringLoc
+	})
 	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
 		WithImportResolver(importResolver).
-		WithCoverageReport(coverageReport)
+		WithCoverageReport(coverageReport).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(code)
+
 	require.NoError(t, err)
-
 	require.Len(t, results, 2)
+	for _, result := range results {
+		assert.NoError(t, result.Error)
+	}
 
-	result1 := results[0]
-	assert.Equal(t, result1.TestName, "testGetIntegerTrait")
-	assert.NoError(t, result1.Error)
-
-	result2 := results[1]
-	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
-	require.NoError(t, result2.Error)
-
-	location := common.StringLocation("FooContract.cdc")
+	address, err := common.HexToAddress("0x0000000000000009")
+	require.NoError(t, err)
+	location := common.AddressLocation{
+		Address: address,
+		Name:    "FooContract",
+	}
 	coverage := coverageReport.Coverage[location]
 
 	assert.Equal(t, []int{}, coverage.MissedLines())
@@ -3197,9 +3547,25 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	assert.ElementsMatch(
 		t,
 		[]string{
-			"s.7465737400000000000000000000000000000000000000000000000000000000",
-			"I.Crypto",
+			"A.0000000000000001.FlowClusterQC",
+			"A.0000000000000001.NFTStorefront",
+			"A.0000000000000002.FungibleToken",
+			"A.0000000000000001.NodeVersionBeacon",
+			"A.0000000000000003.FlowToken",
+			"A.0000000000000001.FlowEpoch",
+			"A.0000000000000001.FlowIDTableStaking",
+			"A.0000000000000001.NFTStorefrontV2",
+			"A.0000000000000001.FlowStakingCollection",
+			"A.0000000000000001.FlowServiceAccount",
+			"A.0000000000000001.FlowStorageFees",
+			"A.0000000000000001.LockedTokens",
+			"A.0000000000000001.FlowDKG",
+			"A.0000000000000004.FlowFees",
+			"A.0000000000000001.ExampleNFT",
+			"A.0000000000000001.StakingProxy",
 			"I.Test",
+			"I.Crypto",
+			"s.7465737400000000000000000000000000000000000000000000000000000000",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -3283,28 +3649,21 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        pub let account = Test.getAccount(0x0000000000000009)
 
         pub fun setup() {
-            let contractCode = Test.readFile("../contracts/FooContract.cdc")
-            let err = blockchain.deployContract(
+            let err = Test.deployContract(
                 name: "FooContract",
-                code: contractCode,
-                account: account,
+                path: "../contracts/FooContract.cdc",
                 arguments: []
             )
 
             Test.expect(err, Test.beNil())
-
-            blockchain.useConfiguration(Test.Configuration({
-                "../contracts/FooContract.cdc": account.address
-            }))
         }
 
         pub fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
-            let result = blockchain.executeScript(script, [])
+            let result = Test.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assert(result.returnValue! as! Bool)
@@ -3319,7 +3678,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
                 arguments: [78557, "Sierpinski"]
             )
 
-            let result = blockchain.executeTransaction(tx)
+            let result = Test.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
         }
 	`
@@ -3349,8 +3708,12 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 		case "../transactions/add_special_number.cdc":
 			return transactionCode, nil
 		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
+	}
+
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
 	}
 
 	coverageReport := runtime.NewCoverageReport()
@@ -3362,7 +3725,8 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	})
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithCoverageReport(coverageReport)
+		WithCoverageReport(coverageReport).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -3377,7 +3741,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
 	require.NoError(t, result2.Error)
 
-	address, err := common.HexToAddress("0x0000000000000005")
+	address, err := common.HexToAddress("0x0000000000000009")
 	require.NoError(t, err)
 	location := common.AddressLocation{
 		Address: address,
@@ -3461,15 +3825,21 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
         import Test
         import FooContract from "FooContract.cdc"
 
-        pub let foo = FooContract()
-
         pub fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "FooContract.cdc",
+                arguments: []
+            )
+
+            Test.expect(err, Test.beNil())
+
             log("setup successful")
         }
 
         pub fun testGetIntegerTrait() {
             // Act
-            let result = foo.getIntegerTrait(1729)
+            let result = FooContract.getIntegerTrait(1729)
 
             // Assert
             Test.assertEqual("Harshad", result)
@@ -3478,23 +3848,46 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
 
         pub fun testAddSpecialNumber() {
             // Act
-            foo.addSpecialNumber(78557, "Sierpinski")
+            FooContract.addSpecialNumber(78557, "Sierpinski")
 
             // Assert
-            Test.assertEqual("Sierpinski", foo.getIntegerTrait(78557))
+            Test.assertEqual("Sierpinski", FooContract.getIntegerTrait(78557))
             log("addSpecialNumber works")
         }
 	`
 
-	importResolver := func(location common.Location) (string, error) {
-		if location == common.StringLocation("FooContract.cdc") {
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "FooContract.cdc":
 			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "FooContract.cdc" {
+				return fooContract, nil
+			}
 		}
 
 		return "", fmt.Errorf("unsupported import %s", location)
 	}
 
-	runner := NewTestRunner().WithImportResolver(importResolver)
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithFileResolver(fileResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(code)
 	require.NoError(t, err)
@@ -3545,11 +3938,19 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
         import Test
         import FooContract from "FooContract.cdc"
 
-        pub let foo = FooContract()
+        pub fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "FooContract.cdc",
+                arguments: []
+            )
+
+            Test.expect(err, Test.beNil())
+        }
 
         pub fun testGetIntegerTrait() {
-	        // Act
-            let result = foo.getIntegerTrait(1729)
+            // Act
+            let result = FooContract.getIntegerTrait(1729)
 
             // Assert
             Test.assertEqual("Harshad", result)
@@ -3557,22 +3958,45 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
 
         pub fun testAddSpecialNumber() {
             // Act
-            foo.addSpecialNumber(78557, "Sierpinski")
+            FooContract.addSpecialNumber(78557, "Sierpinski")
 
             // Assert
-            Test.assertEqual("Sierpinski", foo.getIntegerTrait(78557))
+            Test.assertEqual("Sierpinski", FooContract.getIntegerTrait(78557))
         }
 	`
 
-	importResolver := func(location common.Location) (string, error) {
-		if location == common.StringLocation("FooContract.cdc") {
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "FooContract.cdc":
 			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "FooContract.cdc" {
+				return fooContract, nil
+			}
 		}
 
 		return "", fmt.Errorf("unsupported import %s", location)
 	}
 
-	runner := NewTestRunner().WithImportResolver(importResolver)
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithFileResolver(fileResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(code)
 	require.NoError(t, err)
@@ -3629,28 +4053,21 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        pub let account = Test.getAccount(0x0000000000000005)
 
         pub fun setup() {
-            let contractCode = Test.readFile("../contracts/FooContract.cdc")
-            let err = blockchain.deployContract(
+            let err = Test.deployContract(
                 name: "FooContract",
-                code: contractCode,
-                account: account,
+                path: "../contracts/FooContract.cdc",
                 arguments: []
             )
 
             Test.expect(err, Test.beNil())
-
-            blockchain.useConfiguration(Test.Configuration({
-                "../contracts/FooContract.cdc": account.address
-            }))
         }
 
         pub fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
-            let result = blockchain.executeScript(script, [])
+            let result = Test.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assert(result.returnValue! as! Bool)
@@ -3665,7 +4082,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
                 arguments: [78557, "Sierpinski"]
             )
 
-            let result = blockchain.executeTransaction(tx)
+            let result = Test.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
         }
 
@@ -3676,7 +4093,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
                 "specialNumbers updated",
                 "addSpecialNumber works"
             ]
-            Test.assertEqual(expectedLogs, blockchain.logs())
+            Test.assertEqual(expectedLogs, Test.logs())
         }
 	`
 
@@ -3706,11 +4123,17 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 		case "../transactions/add_special_number.cdc":
 			return transactionCode, nil
 		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
 	}
 
-	runner := NewTestRunner().WithFileResolver(fileResolver)
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -3761,28 +4184,21 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        pub let account = Test.getAccount(0x0000000000000005)
 
         pub fun setup() {
-            let contractCode = Test.readFile("../contracts/FooContract.cdc")
-            let err = blockchain.deployContract(
+            let err = Test.deployContract(
                 name: "FooContract",
-                code: contractCode,
-                account: account,
+                path: "../contracts/FooContract.cdc",
                 arguments: []
             )
 
             Test.expect(err, Test.beNil())
-
-            blockchain.useConfiguration(Test.Configuration({
-                "../contracts/FooContract.cdc": account.address
-            }))
         }
 
         pub fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
-            let result = blockchain.executeScript(script, [])
+            let result = Test.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assert(result.returnValue! as! Bool)
@@ -3797,12 +4213,12 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
                 arguments: [78557, "Sierpinski"]
             )
 
-            let result = blockchain.executeTransaction(tx)
+            let result = Test.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
         }
 
         pub fun tearDown() {
-            Test.assertEqual([] as [String], blockchain.logs() )
+            Test.assertEqual([] as [String], Test.logs() )
         }
 	`
 
@@ -3831,11 +4247,17 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 		case "../transactions/add_special_number.cdc":
 			return transactionCode, nil
 		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
 	}
 
-	runner := NewTestRunner().WithFileResolver(fileResolver)
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -3889,36 +4311,29 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 
 	const testCode = `
         import Test
-        import FooContract from 0x0000000000000005
+        import FooContract from "../contracts/FooContract.cdc"
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        pub let account = Test.getAccount(0x0000000000000005)
 
         pub fun setup() {
-            let contractCode = Test.readFile("../contracts/FooContract.cdc")
-            let err = blockchain.deployContract(
+            let err = Test.deployContract(
                 name: "FooContract",
-                code: contractCode,
-                account: account,
+                path: "../contracts/FooContract.cdc",
                 arguments: []
             )
 
             Test.expect(err, Test.beNil())
-
-            blockchain.useConfiguration(Test.Configuration({
-                "../contracts/FooContract.cdc": account.address
-            }))
         }
 
         pub fun testGetIntegerTrait() {
             let script = Test.readFile("../scripts/get_integer_traits.cdc")
-            let result = blockchain.executeScript(script, [])
+            let result = Test.executeScript(script, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assert(result.returnValue! as! Bool)
 
             let typ = Type<FooContract.ContractInitialized>()
-            let events = blockchain.eventsOfType(typ)
+            let events = Test.eventsOfType(typ)
             Test.assertEqual(1, events.length)
         }
 
@@ -3931,18 +4346,18 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
                 arguments: [78557, "Sierpinski"]
             )
 
-            let result = blockchain.executeTransaction(tx)
+            let result = Test.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
 
             let typ = Type<FooContract.NumberAdded>()
-            let events = blockchain.eventsOfType(typ)
+            let events = Test.eventsOfType(typ)
             Test.assertEqual(1, events.length)
 
             let event = events[0] as! FooContract.NumberAdded
             Test.assertEqual(78557, event.n)
             Test.assertEqual("Sierpinski", event.trait)
 
-            let evts = blockchain.events()
+            let evts = Test.events()
             Test.expect(evts.length, Test.beGreaterThan(1))
         }
 	`
@@ -3972,7 +4387,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 		case "../transactions/add_special_number.cdc":
 			return transactionCode, nil
 		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
 	}
 
@@ -3982,14 +4397,23 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 			if location.Name == "FooContract" {
 				return contractCode, nil
 			}
+		case common.StringLocation:
+			if location == "../contracts/FooContract.cdc" {
+				return contractCode, nil
+			}
 		}
 
 		return "", fmt.Errorf("cannot find import location: %s", location.ID())
 	}
 
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -4032,8 +4456,7 @@ func TestImportingHelperFile(t *testing.T) {
         import Test
         import "test_helpers.cdc"
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        pub let account = Test.createAccount()
 
         pub fun testRunTransaction() {
             let tx = createTransaction(
@@ -4042,7 +4465,7 @@ func TestImportingHelperFile(t *testing.T) {
                 args: []
             )
 
-            let result = blockchain.executeTransaction(tx)
+            let result = Test.executeTransaction(tx)
             Test.expect(result, Test.beSucceeded())
         }
 	`
@@ -4052,7 +4475,7 @@ func TestImportingHelperFile(t *testing.T) {
 		case "../transactions/add_special_number.cdc":
 			return transactionCode, nil
 		default:
-			return "", fmt.Errorf("cannot find file: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
 	}
 
@@ -4085,30 +4508,27 @@ func TestBlockchainReset(t *testing.T) {
         import Test
         import BlockchainHelpers
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
         pub fun testBlockchainReset() {
             // Arrange
-            let account = blockchain.createAccount()
-            var balance = helpers.getFlowBalance(for: account)
+            let account = Test.createAccount()
+            var balance = getFlowBalance(for: account)
             Test.assertEqual(0.0, balance)
 
-            let height = helpers.getCurrentBlockHeight()
+            let height = getCurrentBlockHeight()
 
-            helpers.mintFlow(to: account, amount: 1500.0)
+            mintFlow(to: account, amount: 1500.0)
 
-            balance = helpers.getFlowBalance(for: account)
+            balance = getFlowBalance(for: account)
             Test.assertEqual(1500.0, balance)
-            Test.assertEqual(helpers.getCurrentBlockHeight(), height + 1)
+            Test.assertEqual(getCurrentBlockHeight(), height + 1)
 
             // Act
-            blockchain.reset(to: height)
+            Test.reset(to: height)
 
             // Assert
-            balance = helpers.getFlowBalance(for: account)
+            balance = getFlowBalance(for: account)
             Test.assertEqual(0.0, balance)
-            Test.assertEqual(helpers.getCurrentBlockHeight(), height)
+            Test.assertEqual(getCurrentBlockHeight(), height)
         }
 	`
 
@@ -4213,33 +4633,26 @@ func TestBlockchainMoveTime(t *testing.T) {
 	const testCode = `
         import Test
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let account = blockchain.createAccount()
+        pub let account = Test.getAccount(0x0000000000000005)
         pub var lockedAt: UFix64 = 0.0
 
         pub fun setup() {
             let currentBlockTimestamp = Test.readFile("current_block_timestamp.cdc")
-            let result = blockchain.executeScript(currentBlockTimestamp, [])
+            let result = Test.executeScript(currentBlockTimestamp, [])
             lockedAt = result.returnValue! as! UFix64
 
-            let contractCode = Test.readFile("TimeLocker.cdc")
-            let err = blockchain.deployContract(
+            let err = Test.deployContract(
                 name: "TimeLocker",
-                code: contractCode,
-                account: account,
+                path: "TimeLocker.cdc",
                 arguments: [lockedAt]
             )
 
             Test.expect(err, Test.beNil())
-
-            blockchain.useConfiguration(Test.Configuration({
-                "TimeLocker": account.address
-            }))
         }
 
         pub fun testIsNotOpen() {
             let isLockerOpen = Test.readFile("is_locker_open.cdc")
-            let result = blockchain.executeScript(isLockerOpen, [])
+            let result = Test.executeScript(isLockerOpen, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(false, result.returnValue! as! Bool)
@@ -4248,25 +4661,25 @@ func TestBlockchainMoveTime(t *testing.T) {
         pub fun testIsOpen() {
             // timeDelta is the representation of 20 days, in seconds
             let timeDelta = Fix64(20 * 24 * 60 * 60)
-            blockchain.moveTime(by: timeDelta)
+            Test.moveTime(by: timeDelta)
 
             let isLockerOpen = Test.readFile("is_locker_open.cdc")
-            var result = blockchain.executeScript(isLockerOpen, [])
+            var result = Test.executeScript(isLockerOpen, [])
 
             Test.expect(result, Test.beSucceeded())
             Test.assertEqual(false, result.returnValue! as! Bool)
 
             // We move time forward by another 20 days
-            blockchain.moveTime(by: timeDelta)
+            Test.moveTime(by: timeDelta)
 
-            result = blockchain.executeScript(isLockerOpen, [])
+            result = Test.executeScript(isLockerOpen, [])
 
             Test.assertEqual(true, result.returnValue! as! Bool)
 
             // We move time backward by 20 days
-            blockchain.moveTime(by: timeDelta * -1.0)
+            Test.moveTime(by: timeDelta * -1.0)
 
-            result = blockchain.executeScript(isLockerOpen, [])
+            result = Test.executeScript(isLockerOpen, [])
 
             Test.assertEqual(false, result.returnValue! as! Bool)
         }
@@ -4281,17 +4694,33 @@ func TestBlockchainMoveTime(t *testing.T) {
 		case "current_block_timestamp.cdc":
 			return currentBlockTimestamp, nil
 		default:
-			return "", fmt.Errorf("cannot find import location: %s", path)
+			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
 	}
 
 	importResolver := func(location common.Location) (string, error) {
-		return "", nil
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "TimeLocker" {
+				return contractCode, nil
+			}
+		case common.StringLocation:
+			if location == "TimeLocker.cdc" {
+				return contractCode, nil
+			}
+		}
+
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	contracts := map[string]common.Address{
+		"TimeLocker": {0, 0, 0, 0, 0, 0, 0, 5},
 	}
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -4337,44 +4766,6 @@ func TestRandomizedTestExecution(t *testing.T) {
 `
 
 	assert.Equal(t, expected, resultsStr)
-}
-
-func TestNewEmulatorBlockchainCleanState(t *testing.T) {
-	t.Parallel()
-
-	const code = `
-        import Test
-        import BlockchainHelpers
-
-        pub fun test() {
-            let blockchain = Test.newEmulatorBlockchain()
-            let helpers = BlockchainHelpers(blockchain: blockchain)
-            let account = blockchain.createAccount()
-
-            let typ = CompositeType("flow.AccountCreated")!
-            let events = blockchain.eventsOfType(typ)
-            Test.assertEqual(1, events.length)
-
-            let blockchain2 = Test.newEmulatorBlockchain()
-            let helpers2 = BlockchainHelpers(blockchain: blockchain2)
-
-            let events2 = blockchain2.eventsOfType(typ)
-            Test.assertEqual(0, events2.length)
-
-            Test.assert(
-                helpers.getCurrentBlockHeight() > helpers2.getCurrentBlockHeight()
-            )
-        }
-	`
-
-	importResolver := func(location common.Location) (string, error) {
-		return "", nil
-	}
-
-	runner := NewTestRunner().WithImportResolver(importResolver)
-	result, err := runner.RunTest(code, "test")
-	require.NoError(t, err)
-	require.NoError(t, result.Error)
 }
 
 func TestReferenceDeployedContractTypes(t *testing.T) {
@@ -4425,29 +4816,22 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		const testCode = `
             import Test
-            import FooContract from 0x0000000000000005
+            import FooContract from "../contracts/FooContract.cdc"
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            pub let account = Test.getAccount(0x0000000000000005)
 
             pub fun setup() {
-                let contractCode = Test.readFile("../contracts/FooContract.cdc")
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "FooContract",
-                    code: contractCode,
-                    account: account,
+                    path: "../contracts/FooContract.cdc",
                     arguments: []
                 )
                 Test.expect(err, Test.beNil())
-
-                blockchain.useConfiguration(Test.Configuration({
-                    "../contracts/FooContract.cdc": account.address
-                }))
             }
 
             pub fun testGetSpecialNumber() {
                 let script = Test.readFile("../scripts/get_special_number.cdc")
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
                 Test.expect(result, Test.beSucceeded())
 
                 let specialNumbers = result.returnValue! as! [FooContract.SpecialNumber]
@@ -4468,7 +4852,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 			case "../scripts/get_special_number.cdc":
 				return scriptCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
@@ -4478,14 +4862,23 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 				if location.Name == "FooContract" {
 					return contractCode, nil
 				}
+			case common.StringLocation:
+				if location == "../contracts/FooContract.cdc" {
+					return contractCode, nil
+				}
 			}
 
 			return "", fmt.Errorf("cannot find import location: %s", location.ID())
 		}
 
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithImportResolver(importResolver)
+			WithImportResolver(importResolver).
+			WithContracts(contracts)
 
 		results, err := runner.RunTests(testCode)
 		require.NoError(t, err)
@@ -4548,29 +4941,22 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		const testCode = `
             import Test
-            import FooContract from 0x0000000000000005
+            import FooContract from "../contracts/FooContract.cdc"
 
-            pub let blockchain = Test.newEmulatorBlockchain()
-            pub let account = blockchain.createAccount()
+            pub let account = Test.getAccount(0x0000000000000005)
 
             pub fun setup() {
-                let contractCode = Test.readFile("../contracts/FooContract.cdc")
-                let err = blockchain.deployContract(
+                let err = Test.deployContract(
                     name: "FooContract",
-                    code: contractCode,
-                    account: account,
+                    path: "../contracts/FooContract.cdc",
                     arguments: [{1729: "Harshad"}]
                 )
                 Test.expect(err, Test.beNil())
-
-                blockchain.useConfiguration(Test.Configuration({
-                    "../contracts/FooContract.cdc": account.address
-                }))
             }
 
             pub fun testGetSpecialNumber() {
                 let script = Test.readFile("../scripts/get_special_number.cdc")
-                let result = blockchain.executeScript(script, [])
+                let result = Test.executeScript(script, [])
                 Test.expect(result, Test.beSucceeded())
 
                 let specialNumbers = result.returnValue! as! [FooContract.SpecialNumber]
@@ -4582,31 +4968,6 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
                 Test.assertEqual(1729, specialNumber.n)
                 Test.assertEqual("Harshad", specialNumber.trait)
             }
-
-            pub fun testNewDeploymentWithEmptyArgs() {
-                let contractCode = Test.readFile("../contracts/FooContract.cdc")
-                let blockchain2 = Test.newEmulatorBlockchain()
-                let account2 = blockchain2.createAccount()
-                let args: {Int: String} = {}
-                let err = blockchain2.deployContract(
-                    name: "FooContract",
-                    code: contractCode,
-                    account: account2,
-                    arguments: [args]
-                )
-                Test.expect(err, Test.beNil())
-
-                blockchain2.useConfiguration(Test.Configuration({
-                    "../contracts/FooContract.cdc": account2.address
-                }))
-
-                let script = Test.readFile("../scripts/get_special_number.cdc")
-                let result = blockchain2.executeScript(script, [])
-                Test.expect(result, Test.beSucceeded())
-
-                let specialNumbers = result.returnValue! as! [FooContract.SpecialNumber]
-                Test.expect(specialNumbers, Test.beEmpty())
-            }
 		`
 
 		fileResolver := func(path string) (string, error) {
@@ -4616,7 +4977,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 			case "../scripts/get_special_number.cdc":
 				return scriptCode, nil
 			default:
-				return "", fmt.Errorf("cannot find import location: %s", path)
+				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
@@ -4626,14 +4987,23 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 				if location.Name == "FooContract" {
 					return contractCode, nil
 				}
+			case common.StringLocation:
+				if location == "../contracts/FooContract.cdc" {
+					return contractCode, nil
+				}
 			}
 
 			return "", fmt.Errorf("cannot find import location: %s", location.ID())
 		}
 
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithImportResolver(importResolver)
+			WithImportResolver(importResolver).
+			WithContracts(contracts)
 
 		results, err := runner.RunTests(testCode)
 		require.NoError(t, err)
@@ -4650,27 +5020,24 @@ func TestEmulatorBlockchainSnapshotting(t *testing.T) {
         import Test
         import BlockchainHelpers
 
-        pub let blockchain = Test.newEmulatorBlockchain()
-        pub let helpers = BlockchainHelpers(blockchain: blockchain)
-
         pub fun test() {
-            let admin = blockchain.createAccount()
-            blockchain.createSnapshot(name: "adminCreated")
+            let admin = Test.createAccount()
+            Test.createSnapshot(name: "adminCreated")
 
-            helpers.mintFlow(to: admin, amount: 1000.0)
-            blockchain.createSnapshot(name: "adminFunded")
+            mintFlow(to: admin, amount: 1000.0)
+            Test.createSnapshot(name: "adminFunded")
 
-            var balance = helpers.getFlowBalance(for: admin)
+            var balance = getFlowBalance(for: admin)
             Test.assertEqual(1000.0, balance)
 
-            blockchain.loadSnapshot(name: "adminCreated")
+            Test.loadSnapshot(name: "adminCreated")
 
-            balance = helpers.getFlowBalance(for: admin)
+            balance = getFlowBalance(for: admin)
             Test.assertEqual(0.0, balance)
 
-            blockchain.loadSnapshot(name: "adminFunded")
+            Test.loadSnapshot(name: "adminFunded")
 
-            balance = helpers.getFlowBalance(for: admin)
+            balance = getFlowBalance(for: admin)
             Test.assertEqual(1000.0, balance)
         }
 	`
@@ -4679,4 +5046,126 @@ func TestEmulatorBlockchainSnapshotting(t *testing.T) {
 	result, err := runner.RunTest(code, "test")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
+}
+
+func TestEnvironmentForUnitTests(t *testing.T) {
+	t.Parallel()
+
+	const fooContract = `
+        pub contract FooContract {
+            pub let specialNumbers: {Int: String}
+
+            init() {
+                self.specialNumbers = {
+                    1729: "Harshad",
+                    8128: "Harmonic",
+                    41041: "Carmichael"
+                }
+                self.account.save(self.specialNumbers, to: /storage/specialNumbers)
+            }
+
+            pub fun getSpecialNumbers(): {Int: String} {
+                return self.account.load<{Int: String}>(from: /storage/specialNumbers)!
+            }
+
+            pub fun addSpecialNumber(_ n: Int, _ trait: String) {
+                self.specialNumbers[n] = trait
+                self.account.load<{Int: String}>(from: /storage/specialNumbers)!
+                self.account.save(self.specialNumbers, to: /storage/specialNumbers)
+            }
+
+            pub fun getIntegerTrait(_ n: Int): String {
+                if self.specialNumbers.containsKey(n) {
+                    return self.specialNumbers[n]!
+                }
+
+                return "Enormous"
+            }
+
+            pub fun getBlockHeight(): UInt64 {
+                return getCurrentBlock().height
+            }
+        }
+	`
+
+	const code = `
+        import Test
+        import BlockchainHelpers
+        import FooContract from "../contracts/FooContract.cdc"
+
+        pub fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "../contracts/FooContract.cdc",
+                arguments: []
+            )
+
+            Test.expect(err, Test.beNil())
+        }
+
+        pub fun testAddSpecialNumber() {
+            // Act
+            FooContract.addSpecialNumber(78557, "Sierpinski")
+
+            // Assert
+            Test.assertEqual("Sierpinski", FooContract.getIntegerTrait(78557))
+
+            let specialNumbers = FooContract.getSpecialNumbers()
+            let expected: {Int: String} = {
+                8128: "Harmonic",
+                1729: "Harshad",
+                41041: "Carmichael",
+                78557: "Sierpinski"
+            }
+            Test.assertEqual(expected, specialNumbers)
+        }
+
+        pub fun testGetCurrentBlockHeight() {
+            // Act
+            let height = FooContract.getBlockHeight()
+
+            // Assert
+            Test.expect(height, Test.beGreaterThan(UInt64(1)))
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../contracts/FooContract.cdc":
+			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "../contracts/FooContract.cdc" {
+				return fooContract, nil
+			}
+		}
+
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver).
+		WithContracts(contracts)
+
+	results, err := runner.RunTests(code)
+
+	require.NoError(t, err)
+	for _, result := range results {
+		assert.NoError(t, result.Error)
+	}
 }

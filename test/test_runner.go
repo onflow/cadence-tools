@@ -21,23 +21,19 @@ package test
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"regexp"
 	"strings"
 
-	"github.com/logrusorgru/aurora"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-emulator/emulator"
-	"github.com/onflow/flow-go/engine/execution/testutil"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 )
@@ -130,57 +126,27 @@ type TestRunner struct {
 	importResolver ImportResolver
 
 	// fileResolver is used to resolve local files.
-	//
 	fileResolver FileResolver
 
 	testRuntime runtime.Runtime
 
 	coverageReport *runtime.CoverageReport
 
-	// logger is injected as the program logger for the script
-	// environment.
-	logger zerolog.Logger
-
-	// logCollection is a hook attached in the program logger of
-	// the script environment, in order to aggregate and expose
-	// log messages from test cases and contracts.
-	logCollection *logCollectionHook
-
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
 
-	// blockchain is mainly used to obtain system-defined
-	// contracts & their exposed types
-	blockchain *emulator.Blockchain
+	contracts map[string]common.Address
+
+	testFramework stdlib.TestFramework
+
+	backend *EmulatorBackend
+
+	storage *runtime.Storage
 }
 
 func NewTestRunner() *TestRunner {
-	logCollectionHook := newLogCollectionHook()
-	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	output.FormatMessage = func(i interface{}) string {
-		msg := i.(string)
-		return strings.Replace(
-			msg,
-			"Cadence log:",
-			aurora.Colorize("LOG:", aurora.BlueFg|aurora.BoldFm).String(),
-			1,
-		)
-	}
-	logger := zerolog.New(output).With().Timestamp().Logger().Hook(logCollectionHook)
-	blockchain, err := emulator.New(
-		emulator.WithStorageLimitEnabled(false),
-		emulator.Contracts(commonContracts),
-		emulator.WithChainID(chain.ChainID()),
-	)
-	if err != nil {
-		panic(err)
-	}
-
 	return &TestRunner{
-		testRuntime:   runtime.NewInterpreterRuntime(runtime.Config{}),
-		logCollection: logCollectionHook,
-		logger:        logger,
-		blockchain:    blockchain,
+		contracts: baseContracts(),
 	}
 }
 
@@ -201,6 +167,15 @@ func (r *TestRunner) WithCoverageReport(coverageReport *runtime.CoverageReport) 
 
 func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
 	r.randomSeed = seed
+	return r
+}
+
+func (r *TestRunner) WithContracts(contracts map[string]common.Address) *TestRunner {
+	for contract, address := range contracts {
+		// We do not want to override the base configuration,
+		// which includes the mapping for system/common contracts.
+		r.contracts[contract] = address
+	}
 	return r
 }
 
@@ -312,6 +287,10 @@ func (r *TestRunner) RunTests(script string) (results Results, err error) {
 	return results, err
 }
 
+func (r *TestRunner) replaceImports(code string) string {
+	return r.backend.replaceImports(code)
+}
+
 func (r *TestRunner) runTestSetup(inter *interpreter.Interpreter) error {
 	if !hasSetup(inter) {
 		return nil
@@ -377,7 +356,7 @@ func (r *TestRunner) invokeTestFunction(inter *interpreter.Interpreter, funcName
 // logs from their respective contracts, also appear in the resulting
 // string slice.
 func (r *TestRunner) Logs() []string {
-	return r.logCollection.Logs
+	return r.backend.Logs()
 }
 
 func recoverPanics(onError func(error)) {
@@ -394,12 +373,29 @@ func recoverPanics(onError func(error)) {
 
 func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
 	config := runtime.Config{
-		CoverageReport: r.coverageReport,
+		AccountLinkingEnabled:        true,
+		AttachmentsEnabled:           true,
+		CapabilityControllersEnabled: true,
+		CoverageReport:               r.coverageReport,
 	}
 	env := runtime.NewBaseInterpreterEnvironment(config)
+	r.testRuntime = runtime.NewInterpreterRuntime(config)
+
+	r.testFramework = NewTestFrameworkProvider(
+		r.fileResolver,
+		env,
+		r.coverageReport,
+	)
+	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
+	if !ok {
+		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
+	}
+	backend.fileResolver = r.fileResolver
+	backend.contracts = r.contracts
+	r.backend = backend
 
 	ctx := runtime.Context{
-		Interface:   newScriptEnvironment(r.logger),
+		Interface:   r.backend.blockchain.NewScriptEnvironment(),
 		Location:    testScriptLocation,
 		Environment: env,
 	}
@@ -422,17 +418,12 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	// returned from blockchain to the test script)
 	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
 
-	// TODO: The default injected fields handler only supports 'address' locations.
-	//   However, during tests, it is possible to get non-address locations. e.g: file paths.
-	//   Thus, need to properly handle them. Make this nil for now.
-	env.InterpreterConfig.InjectedCompositeFieldsHandler = nil
-
-	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
+	code, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
-		return nil, nil, err
+		panic(err)
 	}
 
-	for _, funcDecl := range program.Program.FunctionDeclarations() {
+	for _, funcDecl := range code.FunctionDeclarations() {
 		funcName := funcDecl.Identifier.Identifier
 
 		if !strings.HasPrefix(funcName, testFunctionPrefix) {
@@ -448,8 +439,15 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		}
 	}
 
+	script = r.replaceImports(script)
+	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
-	env.InterpreterConfig.Storage = runtime.NewStorage(ctx.Interface, nil)
+	r.storage = runtime.NewStorage(ctx.Interface, nil)
+	env.InterpreterConfig.Storage = r.storage
 
 	_, inter, err := env.Interpret(
 		ctx.Location,
@@ -504,29 +502,16 @@ func contractValueHandler(
 	declaration *ast.CompositeDeclaration,
 	compositeType *sema.CompositeType,
 ) sema.ValueDeclaration {
-	constructorType, constructorArgumentLabels := sema.CompositeLikeConstructorType(
+	_, constructorArgumentLabels := sema.CompositeLikeConstructorType(
 		checker.Elaboration,
 		declaration,
 		compositeType,
 	)
 
-	// In unit tests, contracts are imported with string locations, e.g
-	// import FooContract from "../contracts/FooContract.cdc"
-	if _, ok := compositeType.Location.(common.StringLocation); ok {
-		return stdlib.StandardLibraryValue{
-			Name:           declaration.Identifier.Identifier,
-			Type:           constructorType,
-			DocString:      declaration.DocString,
-			Kind:           declaration.DeclarationKind(),
-			Position:       &declaration.Identifier.Pos,
-			ArgumentLabels: constructorArgumentLabels,
-		}
-	}
-
 	// For composite types (e.g. contracts) that are deployed on
 	// EmulatorBackend's blockchain, we have to declare the
-	// define the value declaration as a composite. This is needed
-	// for nested types that are defined in the composite type,
+	// value declaration as a composite. This is needed to access
+	// nested types that are defined in the composite type,
 	// e.g events / structs / resources / enums etc.
 	return stdlib.StandardLibraryValue{
 		Name:           declaration.Identifier.Identifier,
@@ -561,15 +546,10 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		case stdlib.TestContractLocation:
-			testFramework := NewTestFrameworkProvider(
-				r.fileResolver,
-				stdlibHandler,
-				r.coverageReport,
-			)
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
 					inter,
-					testFramework,
+					r.testFramework,
 					constructorGenerator(common.Address{}),
 					invocationRange,
 				)
@@ -579,33 +559,33 @@ func (r *TestRunner) interpreterContractValueHandler(
 			return contract
 
 		default:
-			if _, ok := compositeType.Location.(common.AddressLocation); ok {
-				invocation, found := contractInvocations[compositeType.Identifier]
-				if !found {
-					panic(fmt.Errorf("contract invocation not found"))
-				}
-				parameterTypes := make([]sema.Type, len(compositeType.ConstructorParameters))
-				for i, constructorParameter := range compositeType.ConstructorParameters {
-					parameterTypes[i] = constructorParameter.TypeAnnotation.Type
-				}
+			var storedValue interpreter.Value
 
-				value, err := inter.InvokeFunctionValue(
-					constructorGenerator(common.Address{}),
-					invocation.ConstructorArguments,
-					invocation.ArgumentTypes,
-					parameterTypes,
-					invocationRange,
+			switch location := compositeType.Location.(type) {
+			case common.AddressLocation:
+				storageMap := r.storage.GetStorageMap(
+					location.Address,
+					runtime.StorageDomainContract,
+					false,
 				)
-				if err != nil {
-					panic(err)
+				if storageMap != nil {
+					storedValue = storageMap.ReadValue(
+						inter,
+						interpreter.StringStorageMapKey(location.Name),
+					)
 				}
-
-				return value.(*interpreter.CompositeValue)
 			}
 
-			// During tests, imported contracts can be constructed using the constructor,
-			// similar to structs. Therefore, generate a constructor function.
-			return constructorGenerator(common.Address{})
+			if storedValue == nil {
+				panic(
+					errors.NewDefaultUserError(
+						"failed to load contract: %s",
+						compositeType.Location,
+					),
+				)
+			}
+
+			return storedValue.(*interpreter.CompositeValue)
 		}
 	}
 }
@@ -648,25 +628,6 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 	}
 }
 
-// newScriptEnvironment creates an environment for test scripts to run.
-// Leverages the functionality of FVM.
-func newScriptEnvironment(logger zerolog.Logger) environment.Environment {
-	vm := fvm.NewVirtualMachine()
-	ctx := fvm.NewContext(fvm.WithLogger(zerolog.Nop()))
-	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
-	environmentParams := environment.DefaultEnvironmentParams()
-	environmentParams.ProgramLoggerParams = environment.ProgramLoggerParams{
-		Logger:                logger,
-		CadenceLoggingEnabled: true,
-		MetricsReporter:       environment.NoopMetricsReporter{},
-	}
-
-	return environment.NewScriptEnvironmentFromStorageSnapshot(
-		environmentParams,
-		snapshotTree,
-	)
-}
-
 func (r *TestRunner) parseAndCheckImport(
 	location common.Location,
 	startCtx runtime.Context,
@@ -685,7 +646,7 @@ func (r *TestRunner) parseAndCheckImport(
 		if ok {
 			// System-defined contracts are obtained from
 			// the blockchain.
-			account, err := r.blockchain.GetAccount(
+			account, err := r.backend.blockchain.GetAccount(
 				flow.Address(addressLocation.Address),
 			)
 			if err != nil {
@@ -725,7 +686,7 @@ func (r *TestRunner) parseAndCheckImport(
 			if ok {
 				// System-defined contracts are obtained from
 				// the blockchain.
-				account, err := r.blockchain.GetAccount(
+				account, err := r.backend.blockchain.GetAccount(
 					flow.Address(addressLoc.Address),
 				)
 				if err != nil {
@@ -742,9 +703,27 @@ func (r *TestRunner) parseAndCheckImport(
 				return sema.ElaborationImport{
 					Elaboration: program.Elaboration,
 				}, nil
-			} else {
-				return nil, fmt.Errorf("nested imports are not supported")
 			}
+
+			stringLocation, ok := importedLocation.(common.StringLocation)
+			if ok {
+				code, err := r.importResolver(stringLocation)
+				if err != nil {
+					return nil, err
+				}
+				program, err := env.ParseAndCheckProgram(
+					[]byte(code), stringLocation, true,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				return sema.ElaborationImport{
+					Elaboration: program.Elaboration,
+				}, nil
+			}
+
+			return nil, fmt.Errorf("unable to import location: %s", importedLocation)
 		}
 	}
 
@@ -757,6 +736,26 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	return program.Program, program.Elaboration, nil
+}
+
+func baseContracts() map[string]common.Address {
+	contracts := make(map[string]common.Address, 0)
+	serviceAddress := common.Address(chain.ServiceAddress())
+	contracts["NonFungibleToken"] = serviceAddress
+	contracts["MetadataViews"] = serviceAddress
+	contracts["ViewResolver"] = serviceAddress
+	for _, addressLocation := range systemContracts {
+		contract := addressLocation.Name
+		address := common.Address(addressLocation.Address)
+		contracts[contract] = address
+	}
+	for _, contractDescription := range commonContracts {
+		contract := contractDescription.Name
+		address := common.Address(contractDescription.Address)
+		contracts[contract] = address
+	}
+
+	return contracts
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.

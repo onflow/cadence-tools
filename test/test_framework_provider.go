@@ -34,6 +34,8 @@ type TestFrameworkProvider struct {
 	stdlibHandler stdlib.StandardLibraryHandler
 
 	coverageReport *runtime.CoverageReport
+
+	emulatorBackend *EmulatorBackend
 }
 
 func (tf *TestFrameworkProvider) ReadFile(path string) (string, error) {
@@ -60,12 +62,8 @@ func (tf *TestFrameworkProvider) ReadFile(path string) (string, error) {
 	return tf.fileResolver(path)
 }
 
-func (tf *TestFrameworkProvider) NewEmulatorBackend() stdlib.Blockchain {
-	return NewEmulatorBackend(
-		tf.fileResolver,
-		tf.stdlibHandler,
-		tf.coverageReport,
-	)
+func (tf *TestFrameworkProvider) EmulatorBackend() stdlib.Blockchain {
+	return tf.emulatorBackend
 }
 
 func NewTestFrameworkProvider(
@@ -77,5 +75,10 @@ func NewTestFrameworkProvider(
 		fileResolver:   fileResolver,
 		stdlibHandler:  stdlibHandler,
 		coverageReport: coverageReport,
+		emulatorBackend: NewEmulatorBackend(
+			fileResolver,
+			stdlibHandler,
+			coverageReport,
+		),
 	}
 }
