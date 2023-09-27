@@ -575,6 +575,70 @@ func TestImportContract(t *testing.T) {
 		_, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 	})
+
+	t.Run("undeployed contract", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+            import Test
+            import FooContract from "./FooContract"
+
+            pub fun test() {
+                Test.assertEqual("Hello", FooContract.sayHello())
+            }
+		`
+
+		const fooContract = `
+            pub contract FooContract {
+                init() {}
+
+                pub fun sayHello(): String {
+                    return "Hello"
+                }
+            }
+		`
+
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "./FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("unsupported import %s", location)
+		}
+
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithContracts(contracts).
+			WithFileResolver(fileResolver)
+
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		assert.ErrorContains(
+			t,
+			result.Error,
+			"failed to load contract: 0000000000000005.FooContract",
+		)
+	})
 }
 
 func TestImportBuiltinContracts(t *testing.T) {
