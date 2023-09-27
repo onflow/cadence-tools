@@ -372,51 +372,7 @@ func recoverPanics(onError func(error)) {
 }
 
 func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
-	config := runtime.Config{
-		AccountLinkingEnabled:        true,
-		AttachmentsEnabled:           true,
-		CapabilityControllersEnabled: true,
-		CoverageReport:               r.coverageReport,
-	}
-	env := runtime.NewBaseInterpreterEnvironment(config)
-	r.testRuntime = runtime.NewInterpreterRuntime(config)
-
-	r.testFramework = NewTestFrameworkProvider(
-		r.fileResolver,
-		env,
-		r.coverageReport,
-	)
-	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
-	if !ok {
-		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
-	}
-	backend.fileResolver = r.fileResolver
-	backend.contracts = r.contracts
-	r.backend = backend
-
-	ctx := runtime.Context{
-		Interface:   r.backend.blockchain.NewScriptEnvironment(),
-		Location:    testScriptLocation,
-		Environment: env,
-	}
-	if r.coverageReport != nil {
-		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
-		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
-		r.coverageReport.ExcludeLocation(testScriptLocation)
-		ctx.CoverageReport = r.coverageReport
-	}
-
-	// Checker configs
-	env.CheckerConfig.ImportHandler = r.checkerImportHandler(ctx)
-	env.CheckerConfig.ContractValueHandler = contractValueHandler
-
-	// Interpreter configs
-	env.InterpreterConfig.ImportLocationHandler = r.interpreterImportHandler(ctx)
-
-	// It is safe to use the test-runner's environment as the standard library handler
-	// in the test framework, since it is only used for value conversions (i.e: values
-	// returned from blockchain to the test script)
-	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
+	env, ctx := r.initializeEnvironment()
 
 	code, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
@@ -440,14 +396,11 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	}
 
 	script = r.replaceImports(script)
-	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
+
+	program, err := env.ParseAndCheckProgram([]byte(script), ctx.Location, false)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
-	r.storage = runtime.NewStorage(ctx.Interface, nil)
-	env.InterpreterConfig.Storage = r.storage
 
 	_, inter, err := env.Interpret(
 		ctx.Location,
@@ -460,6 +413,70 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	}
 
 	return program, inter, nil
+}
+
+func (r *TestRunner) initializeEnvironment() (runtime.Environment, runtime.Context) {
+	config := runtime.Config{
+		AccountLinkingEnabled:        true,
+		AttachmentsEnabled:           true,
+		CapabilityControllersEnabled: true,
+		CoverageReport:               r.coverageReport,
+	}
+
+	env := runtime.NewBaseInterpreterEnvironment(config)
+
+	r.testRuntime = runtime.NewInterpreterRuntime(config)
+
+	r.testFramework = NewTestFrameworkProvider(
+		r.fileResolver,
+		env,
+		r.coverageReport,
+	)
+
+	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
+	if !ok {
+		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
+	}
+	backend.fileResolver = r.fileResolver
+	backend.contracts = r.contracts
+	r.backend = backend
+
+	ctx := runtime.Context{
+		Interface:   r.backend.blockchain.NewScriptEnvironment(),
+		Location:    testScriptLocation,
+		Environment: env,
+	}
+
+	if r.coverageReport != nil {
+		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
+		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
+		r.coverageReport.ExcludeLocation(testScriptLocation)
+		ctx.CoverageReport = r.coverageReport
+	}
+
+	// Checker configs
+	env.CheckerConfig.ImportHandler = r.checkerImportHandler(ctx)
+	env.CheckerConfig.ContractValueHandler = contractValueHandler
+
+	// Interpreter configs
+	env.InterpreterConfig.ImportLocationHandler = r.interpreterImportHandler(ctx)
+
+	// It is safe to use the test-runner's environment as the standard library handler
+	// in the test framework, since it is only used for value conversions (i.e: values
+	// returned from blockchain to the test script)
+	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
+
+	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
+	r.storage = runtime.NewStorage(ctx.Interface, nil)
+
+	env.Configure(
+		ctx.Interface,
+		runtime.NewCodesAndPrograms(),
+		r.storage,
+		r.coverageReport,
+	)
+
+	return env, ctx
 }
 
 func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandlerFunc {
