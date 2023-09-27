@@ -35,7 +35,7 @@ type TestFrameworkProvider struct {
 
 	coverageReport *runtime.CoverageReport
 
-	EmulatorBackend *EmulatorBackend
+	emulatorBackend *EmulatorBackend
 }
 
 func (tf *TestFrameworkProvider) ReadFile(path string) (string, error) {
@@ -62,8 +62,8 @@ func (tf *TestFrameworkProvider) ReadFile(path string) (string, error) {
 	return tf.fileResolver(path)
 }
 
-func (tf *TestFrameworkProvider) NewEmulatorBackend() stdlib.Blockchain {
-	return tf.EmulatorBackend
+func (tf *TestFrameworkProvider) EmulatorBackend() stdlib.Blockchain {
+	return tf.emulatorBackend
 }
 
 func NewTestFrameworkProvider(
@@ -72,17 +72,15 @@ func NewTestFrameworkProvider(
 	coverageReport *runtime.CoverageReport,
 	testRuntime runtime.Runtime,
 ) stdlib.TestFramework {
-	provider := &TestFrameworkProvider{
+	return &TestFrameworkProvider{
 		fileResolver:   fileResolver,
 		stdlibHandler:  stdlibHandler,
 		coverageReport: coverageReport,
+		emulatorBackend: NewEmulatorBackend(
+			fileResolver,
+			stdlibHandler,
+			coverageReport,
+			testRuntime,
+		),
 	}
-	provider.EmulatorBackend = NewEmulatorBackend(
-		fileResolver,
-		stdlibHandler,
-		coverageReport,
-		testRuntime,
-	)
-
-	return provider
 }
