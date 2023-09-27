@@ -431,7 +431,7 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		r.coverageReport,
 		r.testRuntime,
 	)
-	backend, ok := r.testFramework.NewEmulatorBackend().(*EmulatorBackend)
+	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
 	}
