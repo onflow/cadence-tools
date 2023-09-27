@@ -675,15 +675,16 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 		}
 
 		var address common.Address
+		var found bool
 		if len(importDeclaration.Identifiers) > 0 {
-			address, ok = e.contracts[importDeclaration.Identifiers[0].Identifier]
-			if !ok {
-				// keep import statement it as-is
-				sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
-				continue
-			}
+			address, found = e.contracts[importDeclaration.Identifiers[0].Identifier]
 		} else {
-			address = e.contracts[location.String()]
+			address, found = e.contracts[location.String()]
+		}
+		if !found {
+			// keep import statement it as-is
+			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+			continue
 		}
 
 		var importStr string

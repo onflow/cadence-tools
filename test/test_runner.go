@@ -287,52 +287,8 @@ func (r *TestRunner) RunTests(script string) (results Results, err error) {
 	return results, err
 }
 
-func (r *TestRunner) replaceImports(program *ast.Program, code string) string {
-	sb := strings.Builder{}
-	importDeclEnd := 0
-
-	for _, importDeclaration := range program.ImportDeclarations() {
-		prevImportDeclEnd := importDeclEnd
-		importDeclEnd = importDeclaration.EndPos.Offset + 1
-
-		location, ok := importDeclaration.Location.(common.StringLocation)
-		if !ok {
-			// keep the import statement it as-is
-			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
-			continue
-		}
-
-		var address common.Address
-		var found bool
-		if len(importDeclaration.Identifiers) > 0 {
-			address, found = r.contracts[importDeclaration.Identifiers[0].Identifier]
-		} else {
-			address, found = r.contracts[location.String()]
-		}
-		if !found {
-			// keep import statement it as-is
-			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
-			continue
-		}
-
-		var importStr string
-		if strings.Contains(importDeclaration.String(), "from") {
-			importStr = fmt.Sprintf("0x%s", address)
-		} else {
-			// Imports of the form `import "FungibleToken"` should be
-			// expanded to `import FungibleToken from 0xee82856bf20e2aa6`
-			importStr = fmt.Sprintf("%s from 0x%s", location, address)
-		}
-
-		locationStart := importDeclaration.LocationPos.Offset
-
-		sb.WriteString(code[prevImportDeclEnd:locationStart])
-		sb.WriteString(importStr)
-	}
-
-	sb.WriteString(code[importDeclEnd:])
-
-	return sb.String()
+func (r *TestRunner) replaceImports(code string) string {
+	return r.backend.replaceImports(code)
 }
 
 func (r *TestRunner) runTestSetup(inter *interpreter.Interpreter) error {
@@ -467,7 +423,6 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	if err != nil {
 		panic(err)
 	}
-	script = r.replaceImports(code, script)
 
 	for _, funcDecl := range code.FunctionDeclarations() {
 		funcName := funcDecl.Identifier.Identifier
@@ -485,6 +440,7 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 		}
 	}
 
+	script = r.replaceImports(script)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
 	if err != nil {
 		return nil, nil, err
