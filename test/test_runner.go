@@ -371,14 +371,67 @@ func recoverPanics(onError func(error)) {
 	}
 }
 
-func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program, *interpreter.Interpreter, error) {
+func (r *TestRunner) parseCheckAndInterpret(script string) (
+	*interpreter.Program,
+	*interpreter.Interpreter,
+	error,
+) {
+	env, ctx := r.initializeEnvironment()
+
+	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, funcDecl := range astProgram.FunctionDeclarations() {
+		funcName := funcDecl.Identifier.Identifier
+
+		if !strings.HasPrefix(funcName, testFunctionPrefix) {
+			continue
+		}
+
+		if !funcDecl.ParameterList.IsEmpty() {
+			return nil, nil, fmt.Errorf("test functions should have no arguments")
+		}
+
+		if funcDecl.ReturnTypeAnnotation != nil {
+			return nil, nil, fmt.Errorf("test functions should have no return values")
+		}
+	}
+
+	script = r.replaceImports(script)
+
+	program, err := env.ParseAndCheckProgram([]byte(script), ctx.Location, false)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, inter, err := env.Interpret(
+		ctx.Location,
+		program,
+		nil,
+	)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return program, inter, nil
+}
+
+func (r *TestRunner) initializeEnvironment() (
+	runtime.Environment,
+	runtime.Context,
+) {
 	config := runtime.Config{
 		AccountLinkingEnabled:        true,
 		AttachmentsEnabled:           true,
 		CapabilityControllersEnabled: true,
 		CoverageReport:               r.coverageReport,
 	}
+
 	env := runtime.NewBaseInterpreterEnvironment(config)
+
 	r.testRuntime = runtime.NewInterpreterRuntime(config)
 
 	r.testFramework = NewTestFrameworkProvider(
@@ -418,48 +471,16 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (*interpreter.Program
 	// returned from blockchain to the test script)
 	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
 
-	code, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
-	if err != nil {
-		panic(err)
-	}
-
-	for _, funcDecl := range code.FunctionDeclarations() {
-		funcName := funcDecl.Identifier.Identifier
-
-		if !strings.HasPrefix(funcName, testFunctionPrefix) {
-			continue
-		}
-
-		if !funcDecl.ParameterList.IsEmpty() {
-			return nil, nil, fmt.Errorf("test functions should have no arguments")
-		}
-
-		if funcDecl.ReturnTypeAnnotation != nil {
-			return nil, nil, fmt.Errorf("test functions should have no return values")
-		}
-	}
-
-	script = r.replaceImports(script)
-	program, err := r.testRuntime.ParseAndCheckProgram([]byte(script), ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Set the storage after checking, because `ParseAndCheckProgram` clears the storage.
 	r.storage = runtime.NewStorage(ctx.Interface, nil)
-	env.InterpreterConfig.Storage = r.storage
 
-	_, inter, err := env.Interpret(
-		ctx.Location,
-		program,
-		nil,
+	env.Configure(
+		ctx.Interface,
+		runtime.NewCodesAndPrograms(),
+		r.storage,
+		r.coverageReport,
 	)
 
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return program, inter, nil
+	return env, ctx
 }
 
 func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandlerFunc {
