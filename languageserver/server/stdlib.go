@@ -255,6 +255,12 @@ func (l standardLibrary) GenerateAccountID(_ common.Address) (uint64, error) {
 	panic(errors.NewUnreachableError())
 }
 
+func (l standardLibrary) ReadRandom(_ []byte) error {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
 func newStandardLibrary() (result standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
 	for _, valueDeclaration := range stdlib.DefaultStandardLibraryValues(result) {
