@@ -3273,6 +3273,104 @@ func TestBurnFlow(t *testing.T) {
 	require.NoError(t, result.Error)
 }
 
+func TestExecuteScriptHelper(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+        import BlockchainHelpers
+
+        pub fun test() {
+            let scriptResult = executeScript("add_integers.cdc", [])
+
+            Test.expect(scriptResult, Test.beSucceeded())
+            Test.assertEqual(5, scriptResult.returnValue! as! Int)
+        }
+	`
+
+	const script = `
+        pub fun main(): Int {
+            return 2 + 3
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "add_integers.cdc":
+			return script, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	runner := NewTestRunner().WithFileResolver(fileResolver)
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestExecuteTransactionHelper(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+        import BlockchainHelpers
+
+        pub fun test() {
+            let account = Test.createAccount()
+            let txResult = executeTransaction(
+                "setup_example_nft_collection.cdc",
+                [],
+                account
+            )
+
+            Test.expect(txResult, Test.beSucceeded())
+        }
+	`
+
+	const transaction = `
+        import "NonFungibleToken"
+        import "ExampleNFT"
+        import "MetadataViews"
+
+        transaction {
+
+            prepare(signer: AuthAccount) {
+                // Return early if the account already has a collection
+                if signer.borrow<&ExampleNFT.Collection>(from: ExampleNFT.CollectionStoragePath) != nil {
+                    return
+                }
+
+                // Create a new empty collection
+                let collection <- ExampleNFT.createEmptyCollection()
+
+                // save it to the account
+                signer.save(<-collection, to: ExampleNFT.CollectionStoragePath)
+
+                // create a public capability for the collection
+                signer.link<&{NonFungibleToken.CollectionPublic, ExampleNFT.ExampleNFTCollectionPublic, MetadataViews.ResolverCollection}>(
+                    ExampleNFT.CollectionPublicPath,
+                    target: ExampleNFT.CollectionStoragePath
+                )
+            }
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "setup_example_nft_collection.cdc":
+			return transaction, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	runner := NewTestRunner().WithFileResolver(fileResolver)
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestServiceAccount(t *testing.T) {
 	t.Parallel()
 

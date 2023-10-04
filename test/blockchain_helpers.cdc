@@ -65,6 +65,38 @@ fun burnFlow(
     return Test.executeTransaction(tx)
 }
 
+/// Executes a script and returns the script return value and the status.
+/// `returnValue` field of the result will be `nil` if the script failed.
+///
+access(all)
+fun executeScript(
+    _ path: String,
+    _ arguments: [AnyStruct]
+): Test.ScriptResult {
+    let script = Test.readFile(path)
+    return Test.executeScript(script, arguments)
+}
+
+/// Executes a given transaction, commits the current block
+/// and returns the result of transaction execution.
+///
+access(all)
+fun executeTransaction(
+    _ path: String,
+    _ arguments: [AnyStruct],
+    _ account: Test.Account
+): Test.TransactionResult {
+    let code = Test.readFile(path)
+    let tx = Test.Transaction(
+        code: code,
+        authorizers: [account.address],
+        signers: [account],
+        arguments: arguments
+    )
+
+    return Test.executeTransaction(tx)
+}
+
 /// Reads the code for the script/transaction with the given
 /// file name and returns its content as a String.
 ///
