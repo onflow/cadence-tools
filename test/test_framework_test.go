@@ -493,8 +493,6 @@ func TestImportContract(t *testing.T) {
             import BarContract from "./BarContract"
             import FooContract from "./FooContract"
 
-            pub let account = Test.getAccount(0x0000000000000005)
-
             pub fun setup() {
                 var err = Test.deployContract(
                     name: "BarContract",
@@ -525,6 +523,103 @@ func TestImportContract(t *testing.T) {
 
                 pub fun sayHi(): String {
                     return BarContract.sayHi()
+                }
+            }
+		`
+
+		const barContract = `
+            pub contract BarContract {
+                init() {}
+
+                pub fun sayHi(): String {
+                    return "Hi from BarContract"
+                }
+            }
+		`
+
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+				if location.Name == "BarContract" {
+					return barContract, nil
+				}
+			case common.StringLocation:
+				if location == "./FooContract" {
+					return fooContract, nil
+				}
+				if location == "./BarContract" {
+					return barContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("unsupported import %s", location)
+		}
+
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			case "./BarContract":
+				return barContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		contracts := map[string]common.Address{
+			"BarContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithContracts(contracts).
+			WithFileResolver(fileResolver)
+
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("multiple imports", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+            import Test
+            import FooContract from "./FooContract"
+            import BarContract from "./BarContract"
+
+            pub fun setup() {
+                var err = Test.deployContract(
+                    name: "BarContract",
+                    path: "./BarContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
+
+                err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
+            }
+
+            pub fun test() {
+                Test.assertEqual("Hi from BarContract", BarContract.sayHi())
+                Test.assertEqual("Hi from FooContract", FooContract.sayHi())
+            }
+		`
+
+		const fooContract = `
+            pub contract FooContract {
+                init() {}
+
+                pub fun sayHi(): String {
+                    return "Hi from FooContract"
                 }
             }
 		`
