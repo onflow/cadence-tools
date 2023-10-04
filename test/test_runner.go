@@ -140,8 +140,6 @@ type TestRunner struct {
 	testFramework stdlib.TestFramework
 
 	backend *EmulatorBackend
-
-	storage *runtime.Storage
 }
 
 func NewTestRunner() *TestRunner {
@@ -471,12 +469,10 @@ func (r *TestRunner) initializeEnvironment() (
 	// returned from blockchain to the test script)
 	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
 
-	r.storage = runtime.NewStorage(ctx.Interface, nil)
-
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		r.storage,
+		runtime.NewStorage(ctx.Interface, nil),
 		r.coverageReport,
 	)
 
@@ -584,7 +580,11 @@ func (r *TestRunner) interpreterContractValueHandler(
 
 			switch location := compositeType.Location.(type) {
 			case common.AddressLocation:
-				storageMap := r.storage.GetStorageMap(
+				storage := runtime.NewStorage(
+					r.backend.blockchain.NewScriptEnvironment(),
+					nil,
+				)
+				storageMap := storage.GetStorageMap(
 					location.Address,
 					runtime.StorageDomainContract,
 					false,
@@ -704,7 +704,12 @@ func (r *TestRunner) parseAndCheckImport(
 
 		default:
 			addressLoc, ok := importedLocation.(common.AddressLocation)
-			if ok {
+			if !ok {
+				return nil, fmt.Errorf("unable to import location: %s", importedLocation)
+			}
+
+			var code []byte
+			if _, found := baseContracts()[addressLoc.Name]; found {
 				// System-defined contracts are obtained from
 				// the blockchain.
 				account, err := r.backend.blockchain.GetAccount(
@@ -713,43 +718,31 @@ func (r *TestRunner) parseAndCheckImport(
 				if err != nil {
 					return nil, err
 				}
-				code := account.Contracts[addressLoc.Name]
-				program, err := env.ParseAndCheckProgram(
-					code, addressLoc, true,
-				)
+				code = account.Contracts[addressLoc.Name]
+			} else if _, found := r.contracts[addressLoc.Name]; found {
+				contract, err := r.importResolver(addressLoc)
 				if err != nil {
 					return nil, err
 				}
-
-				return sema.ElaborationImport{
-					Elaboration: program.Elaboration,
-				}, nil
+				code = []byte(contract)
 			}
 
-			stringLocation, ok := importedLocation.(common.StringLocation)
-			if ok {
-				code, err := r.importResolver(stringLocation)
-				if err != nil {
-					return nil, err
-				}
-				program, err := env.ParseAndCheckProgram(
-					[]byte(code), stringLocation, true,
-				)
-				if err != nil {
-					return nil, err
-				}
-
-				return sema.ElaborationImport{
-					Elaboration: program.Elaboration,
-				}, nil
+			program, err := env.ParseAndCheckProgram(
+				code, addressLoc, true,
+			)
+			if err != nil {
+				return nil, err
 			}
 
-			return nil, fmt.Errorf("unable to import location: %s", importedLocation)
+			return sema.ElaborationImport{
+				Elaboration: program.Elaboration,
+			}, nil
 		}
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
 
+	code = r.replaceImports(code)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
 	if err != nil {

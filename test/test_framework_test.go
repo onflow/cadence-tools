@@ -512,7 +512,8 @@ func TestImportContract(t *testing.T) {
             }
 
             pub fun test() {
-                Test.assertEqual(1, 1)
+                Test.assertEqual("Hi from BarContract", BarContract.sayHi())
+                Test.assertEqual("Hi from BarContract", FooContract.sayHi())
             }
 		`
 
@@ -521,12 +522,20 @@ func TestImportContract(t *testing.T) {
 
             pub contract FooContract {
                 init() {}
+
+                pub fun sayHi(): String {
+                    return BarContract.sayHi()
+                }
             }
 		`
 
 		const barContract = `
             pub contract BarContract {
                 init() {}
+
+                pub fun sayHi(): String {
+                    return "Hi from BarContract"
+                }
             }
 		`
 
@@ -572,8 +581,9 @@ func TestImportContract(t *testing.T) {
 			WithContracts(contracts).
 			WithFileResolver(fileResolver)
 
-		_, err := runner.RunTest(code, "test")
+		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
+		require.NoError(t, result.Error)
 	})
 
 	t.Run("undeployed contract", func(t *testing.T) {
@@ -3550,6 +3560,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.FlowClusterQC",
 			"A.0000000000000001.NFTStorefront",
 			"A.0000000000000002.FungibleToken",
+			"A.0000000000000002.FungibleTokenMetadataViews",
 			"A.0000000000000001.NodeVersionBeacon",
 			"A.0000000000000003.FlowToken",
 			"A.0000000000000001.FlowEpoch",
@@ -3766,6 +3777,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 		[]string{
 			"A.0000000000000003.FlowToken",
 			"A.0000000000000002.FungibleToken",
+			"A.0000000000000002.FungibleTokenMetadataViews",
 			"A.0000000000000004.FlowFees",
 			"A.0000000000000001.FlowStorageFees",
 			"A.0000000000000001.FlowServiceAccount",

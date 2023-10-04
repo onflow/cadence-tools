@@ -115,19 +115,20 @@ var commonContracts = emulator.NewCommonContracts(chain)
 var systemContracts = func() []common.AddressLocation {
 	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
-		"FlowServiceAccount":    serviceAddress,
-		"FlowToken":             fvm.FlowTokenAddress(chain).HexWithPrefix(),
-		"FungibleToken":         fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-		"FlowFees":              environment.FlowFeesAddress(chain).HexWithPrefix(),
-		"FlowStorageFees":       serviceAddress,
-		"FlowClusterQC":         serviceAddress,
-		"FlowDKG":               serviceAddress,
-		"FlowEpoch":             serviceAddress,
-		"FlowIDTableStaking":    serviceAddress,
-		"FlowStakingCollection": serviceAddress,
-		"LockedTokens":          serviceAddress,
-		"NodeVersionBeacon":     serviceAddress,
-		"StakingProxy":          serviceAddress,
+		"FlowServiceAccount":         serviceAddress,
+		"FlowToken":                  fvm.FlowTokenAddress(chain).HexWithPrefix(),
+		"FungibleToken":              fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+		"FungibleTokenMetadataViews": fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+		"FlowFees":                   environment.FlowFeesAddress(chain).HexWithPrefix(),
+		"FlowStorageFees":            serviceAddress,
+		"FlowClusterQC":              serviceAddress,
+		"FlowDKG":                    serviceAddress,
+		"FlowEpoch":                  serviceAddress,
+		"FlowIDTableStaking":         serviceAddress,
+		"FlowStakingCollection":      serviceAddress,
+		"LockedTokens":               serviceAddress,
+		"NodeVersionBeacon":          serviceAddress,
+		"StakingProxy":               serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
