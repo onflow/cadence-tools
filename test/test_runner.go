@@ -584,6 +584,9 @@ func (r *TestRunner) interpreterContractValueHandler(
 					r.backend.blockchain.NewScriptEnvironment(),
 					nil,
 				)
+				// Update the storage to reflect the changes
+				// from deployments in setup() function.
+				inter.SharedState.Config.Storage = storage
 				storageMap := storage.GetStorageMap(
 					location.Address,
 					runtime.StorageDomainContract,

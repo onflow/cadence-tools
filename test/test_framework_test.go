@@ -609,14 +609,19 @@ func TestImportContract(t *testing.T) {
             }
 
             pub fun test() {
-                Test.assertEqual("Hi from BarContract", BarContract.sayHi())
                 Test.assertEqual("Hi from FooContract", FooContract.sayHi())
+                Test.assertEqual("Hi from BarContract", BarContract.sayHi())
+                Test.assertEqual(3, FooContract.numbers.length)
             }
 		`
 
 		const fooContract = `
             pub contract FooContract {
-                init() {}
+                pub let numbers: {Int: String}
+
+                init() {
+                    self.numbers = {1: "one", 2: "two", 3: "three"}
+                }
 
                 pub fun sayHi(): String {
                     return "Hi from FooContract"
