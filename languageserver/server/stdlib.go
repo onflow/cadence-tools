@@ -165,6 +165,12 @@ func (standardLibrary) RecordContractUpdate(_ common.AddressLocation, _ *interpr
 	panic(errors.NewUnreachableError())
 }
 
+func (standardLibrary) ContractUpdateRecorded(_ common.AddressLocation) bool {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
 func (standardLibrary) InterpretContract(
 	_ common.AddressLocation,
 	_ *interpreter.Program,
