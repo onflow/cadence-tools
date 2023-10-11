@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/onflow/cadence v0.42.0
 	github.com/onflow/flow-emulator v0.54.2-0.20230928194031-75caeb6a3378
-	github.com/onflow/flow-go v0.31.1-0.20230901090702-eeeef3a7bd58
+	github.com/onflow/flow-go v0.32.1-0.20231009165946-259992f09ef0
 	github.com/onflow/flow-go-sdk v0.41.10
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.8.4
@@ -44,6 +44,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
@@ -89,7 +90,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect
 	github.com/onflow/flow-go/crypto v0.24.9 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230628215638-83439d22e0ce // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230915140723-432828f7afb9 // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
