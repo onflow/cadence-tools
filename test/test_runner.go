@@ -374,6 +374,7 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	*interpreter.Interpreter,
 	error,
 ) {
+	// TODO: move this eventually to the `NewTestRunner`
 	env, ctx := r.initializeEnvironment()
 
 	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
