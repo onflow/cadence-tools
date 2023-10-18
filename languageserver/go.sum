@@ -580,8 +580,8 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
 github.com/onflow/cadence v0.42.0 h1:XatyCy1pZu10x+JouRU6cZ9A50dF3uM+ubqYUER1/Vk=
 github.com/onflow/cadence v0.42.0/go.mod h1:raU8va8QRyTa/eUbhej4mbyW2ETePfSaywoo36MddgE=
-github.com/onflow/cadence-tools/lint v0.11.1 h1:3LuXC9yY5127qBpK0LI1ZSNveEPuJ/JfzfzemtoDi7k=
-github.com/onflow/cadence-tools/lint v0.11.1/go.mod h1:cPTvbS0Z3hQbwXyWR0gTYiWkIRQb762WAaeOuP6rqrU=
+github.com/onflow/cadence-tools/lint v0.13.0 h1:9KEhxLWYOia1+PgoUbW3f565gQDToZ/Jjz3soWOHjiY=
+github.com/onflow/cadence-tools/lint v0.13.0/go.mod h1:CHG36RWxqm2ptL3aYzbTGkf38VtMJCjgaipIEGEZ1Ys=
 github.com/onflow/cadence-tools/test v0.11.1-0.20231013154910-de381d86eb19 h1:EfBqdqQIZkkzSxgrHZy6rGtQzwgDbEeRkoDtwagRI+k=
 github.com/onflow/cadence-tools/test v0.11.1-0.20231013154910-de381d86eb19/go.mod h1:PNbz+xsaz3fvcL0VaDJFWCJ9EASoGe4BOln3Au5PMhQ=
 github.com/onflow/flow-cli/flowkit v1.3.5-0.20230808220356-6a2bfeb10552 h1:fZJ/uf0dHswHy2Jw7ZzfpZ3aIpbUSSt4/imUq0lBOxA=
@@ -597,8 +597,8 @@ github.com/onflow/flow-ft/lib/go/contracts v0.7.0/go.mod h1:kTMFIySzEJJeupk+7EmX
 github.com/onflow/flow-go v0.32.1-0.20231009165946-259992f09ef0 h1:F65hcC5jGrLh95UMZiS/CHnrkiP/INTb1A+MyOsDA+k=
 github.com/onflow/flow-go v0.32.1-0.20231009165946-259992f09ef0/go.mod h1:zR/4oxlMRzUxNgSPLhjzLI989x3F7dkswxSsE9t7VLQ=
 github.com/onflow/flow-go-sdk v0.24.0/go.mod h1:IoptMLPyFXWvyd9yYA6/4EmSeeozl6nJoIv4FaEMg74=
-github.com/onflow/flow-go-sdk v0.41.10 h1:Cio6GJhtx532TUY+cqrqWglD5sZCXkWeM5QvaRha3p4=
-github.com/onflow/flow-go-sdk v0.41.10/go.mod h1:0a0LiQFbFt8RW/ptoMUU7YkvW9ArVcbjLE0XS78uz1E=
+github.com/onflow/flow-go-sdk v0.41.11 h1:x1nS91Tn0M4BZbZNSCMU7Vjgx9yjBJfjWWAIOihxDVk=
+github.com/onflow/flow-go-sdk v0.41.11/go.mod h1:M6wvgjcpfnmaqM+3IgaVgbHWRCmns3sbg3KfYj4+5MM=
 github.com/onflow/flow-go/crypto v0.21.3/go.mod h1:vI6V4CY3R6c4JKBxdcRiR/AnjBfL8OSD97bJc60cLuQ=
 github.com/onflow/flow-go/crypto v0.24.9 h1:0EQp+kSZYJepMIiSypfJVe7tzsPcb6UXOdOtsTCDhBs=
 github.com/onflow/flow-go/crypto v0.24.9/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
