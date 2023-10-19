@@ -129,6 +129,9 @@ var systemContracts = func() []common.AddressLocation {
 		"LockedTokens":               serviceAddress,
 		"NodeVersionBeacon":          serviceAddress,
 		"StakingProxy":               serviceAddress,
+		"NonFungibleToken":           serviceAddress,
+		"MetadataViews":              serviceAddress,
+		"ViewResolver":               serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
