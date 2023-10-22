@@ -326,6 +326,7 @@ describe("diagnostics", () => {
   }
 
   const fooContractCode = fs.readFileSync('./foo.cdc', 'utf8')
+  const ftContractCode = fs.readFileSync('./FungibleToken.cdc', 'utf8')
 
   async function testImports(docs: TestDoc[]): Promise<DocNotification[]> {
     return new Promise<DocNotification[]>(resolve => {
@@ -389,6 +390,25 @@ describe("diagnostics", () => {
     ])
 
     let script = await docNotifications.find(n => n.name == scriptName).notification
+    expect(script.uri).toEqual(`file://${scriptName}.cdc`)
+    expect(script.diagnostics).toHaveLength(0)
+  })
+
+  test("script with string import aliased contract", async () => {
+    const contractName = "FungibleToken";
+    const scriptName = "script";
+    const scriptCode = `
+      import "FungibleToken"
+      pub fun main() { }
+    `;
+
+    let docNotifications = await testImports([
+      { name: contractName, code: ftContractCode },
+      { name: scriptName, code: scriptCode },
+    ]);
+
+    let script = await docNotifications.find((n) => n.name == scriptName)
+      .notification
     expect(script.uri).toEqual(`file://${scriptName}.cdc`)
     expect(script.diagnostics).toHaveLength(0)
   })

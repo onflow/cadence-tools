@@ -21,17 +21,17 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-cli/flowkit/accounts"
-	"github.com/onflow/flow-cli/flowkit/transactions"
 	"net/url"
 	"os"
 	"path/filepath"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-cli/flowkit"
+	"github.com/onflow/flow-cli/flowkit/accounts"
 	"github.com/onflow/flow-cli/flowkit/config"
 	"github.com/onflow/flow-cli/flowkit/gateway"
 	"github.com/onflow/flow-cli/flowkit/output"
+	"github.com/onflow/flow-cli/flowkit/transactions"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
@@ -393,22 +393,36 @@ func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, e
 }
 
 func (f *flowkitClient) GetCodeByName(name string) (string, error) {
-	contracts, err := f.state.DeploymentContractsByNetwork(config.EmulatorNetwork)
+	// Try to find the contract by name
+	contract, err := f.state.Contracts().ByName(name)
+	if err != nil {
+		return "", fmt.Errorf("couldn't find the contract by import identifier: %s", name)
+	}
+
+	// If no location is set, return an error
+	if contract.Location == "" {
+		return "", fmt.Errorf("source file could not be found for import identifier: %s", name)
+	}
+
+	// Resolve the contract source code from file location
+	code, err := f.getCodeFromLocation(name, contract.Location)
 	if err != nil {
 		return "", err
 	}
-
-	for _, contract := range contracts {
-		if name == contract.Name {
-			return string(contract.Code()), nil
-		}
-	}
-
-	return "", fmt.Errorf(fmt.Sprintf("couldn't find the contract by import identifier: %s", name))
+	return code, nil
 }
 
 // Helpers
 //
+
+// Helper function to get code from a source file location
+func (f *flowkitClient) getCodeFromLocation(name, location string) (string, error) {
+	code, err := f.loader.ReadFile(filepath.Join(filepath.Dir(f.getConfigPath()), location))
+	if err != nil {
+		return "", err
+	}
+	return string(code), nil
+}
 
 // resolveFilename helper converts the transaction file to a relative location to config file
 func resolveFilename(configPath string, path string) (string, error) {
