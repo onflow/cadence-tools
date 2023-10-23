@@ -26,6 +26,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence-tools/test/helpers"
@@ -61,6 +62,8 @@ const afterEachFunctionName = "afterEach"
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
 var quotedLog = regexp.MustCompile("\"(.*)\"")
+
+var StorageIDUndefined = atree.StorageID{}
 
 type Results []Result
 
@@ -600,14 +603,14 @@ func (r *TestRunner) interpreterContractValueHandler(
 
 			switch location := compositeType.Location.(type) {
 			case common.AddressLocation:
-				storage := runtime.NewStorage(
+				// All contracts are deployed on EmulatorBackend's
+				// blockchain, so we construct a storage based on
+				// its ledger.
+				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
-					nil,
+					inter,
 				)
-				// Update the storage to reflect the changes
-				// from deployments in setup() function.
-				inter.SharedState.Config.Storage = storage
-				storageMap := storage.GetStorageMap(
+				storageMap := blockchainStorage.GetStorageMap(
 					location.Address,
 					runtime.StorageDomainContract,
 					false,
@@ -617,6 +620,30 @@ func (r *TestRunner) interpreterContractValueHandler(
 						inter,
 						interpreter.StringStorageMapKey(location.Name),
 					)
+				}
+
+				// We need to store every slab of `blockchainStorage`
+				// to the current environment's storage, so that
+				// we can access fields & types.
+				iterator, err := blockchainStorage.SlabIterator()
+				if err != nil {
+					panic(err)
+				}
+				storage := inter.Storage().(*runtime.Storage)
+
+				for {
+					id, slab := iterator()
+					if id == StorageIDUndefined {
+						break
+					}
+					err := storage.Store(id, slab)
+					if err != nil {
+						panic(err)
+					}
+					err = storage.Commit(inter, true)
+					if err != nil {
+						panic(err)
+					}
 				}
 			}
 
