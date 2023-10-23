@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v0.42.0
-	github.com/onflow/flow-go-sdk v0.41.11
+	github.com/onflow/cadence v0.42.1
+	github.com/onflow/flow-go-sdk v0.41.12
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/exp v0.0.0-20221217163422-3c43f8badb15
 	google.golang.org/grpc v1.53.0
