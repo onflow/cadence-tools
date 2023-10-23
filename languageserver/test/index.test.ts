@@ -326,7 +326,6 @@ describe("diagnostics", () => {
   }
 
   const fooContractCode = fs.readFileSync('./foo.cdc', 'utf8')
-  const aContractCode = fs.readFileSync('./a.cdc', 'utf8')
 
   async function testImports(docs: TestDoc[]): Promise<DocNotification[]> {
     return new Promise<DocNotification[]>(resolve => {
@@ -394,8 +393,7 @@ describe("diagnostics", () => {
     expect(script.diagnostics).toHaveLength(0)
   })
 
-  test("script with string import aliased contract", async () => {
-    const contractName = "A";
+  test("script with string import non-deployment contract", async () => {
     const scriptName = "script";
     const scriptCode = `
       import "A"
@@ -403,7 +401,6 @@ describe("diagnostics", () => {
     `;
 
     let docNotifications = await testImports([
-      { name: contractName, code: aContractCode },
       { name: scriptName, code: scriptCode },
     ]);
 
