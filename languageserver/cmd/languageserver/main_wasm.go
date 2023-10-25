@@ -167,7 +167,7 @@ func start(id int) {
 		return res.String(), nil
 	}
 
-	stringImportResolver := func(location common.AddressLocation) (code string, err error) {
+	stringImportResolver := func(location common.StringLocation) (code string, err error) {
 		res := global.Call(globalFunctionName(id, "getStringCode"), location.String())
 		if res.IsNull() || res.IsUndefined() {
 			return "", fmt.Errorf("CLS %d: getStringCode failed: %s", id, res)
