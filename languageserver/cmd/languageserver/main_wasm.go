@@ -160,7 +160,12 @@ func start(id int) {
 	)
 
 	addressImportResolver := func(location common.AddressLocation) (code string, err error) {
-		res := global.Call(globalFunctionName(id, "getAddressCode"), location.String())
+		getAddressCodeFunc := global.Get(globalFunctionName(id, "getAddressCode"))
+		if getAddressCodeFunc.IsNull() || getAddressCodeFunc.IsUndefined() {
+			return "", fmt.Errorf("CLS %d: getAddressCode not defined", id)
+		}
+
+		res := getAddressCodeFunc.Invoke(location.Address().String())
 		if res.IsNull() || res.IsUndefined() {
 			return "", fmt.Errorf("CLS %d: getAddressCode failed: %s", id, res)
 		}
@@ -168,7 +173,12 @@ func start(id int) {
 	}
 
 	stringImportResolver := func(location common.StringLocation) (code string, err error) {
-		res := global.Call(globalFunctionName(id, "getStringCode"), location.String())
+		getStringCodeFunc = global.Get(globalFunctionName(id, "getStringCode"))
+		if getStringCodeFunc.IsNull() || getStringCodeFunc.IsUndefined() {
+			return "", fmt.Errorf("CLS %d: getStringCode not defined", id)
+		}
+
+		res := getStringCodeFunc.Invoke(location.String())
 		if res.IsNull() || res.IsUndefined() {
 			return "", fmt.Errorf("CLS %d: getStringCode failed: %s", id, res)
 		}
