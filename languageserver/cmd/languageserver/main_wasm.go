@@ -167,6 +167,14 @@ func start(id int) {
 		return res.String(), nil
 	}
 
+	stringImportResolver := func(location common.AddressLocation) (code string, err error) {
+		res := global.Call(globalFunctionName(id, "getStringCode"), location.String())
+		if res.IsNull() || res.IsUndefined() {
+			return "", fmt.Errorf("CLS %d: getStringCode failed: %s", id, res)
+		}
+		return res.String(), nil
+	}
+
 	languageServer, err := server.NewServer()
 	if err != nil {
 		panic(err)
@@ -174,6 +182,7 @@ func start(id int) {
 
 	err = languageServer.SetOptions(
 		server.WithAddressImportResolver(addressImportResolver),
+		server.WithStringImportResolver(stringImportResolver),
 	)
 	if err != nil {
 		panic(err)
