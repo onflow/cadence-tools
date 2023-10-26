@@ -417,7 +417,9 @@ func (f *flowkitClient) GetCodeByName(name string) (string, error) {
 
 // Helper function to get code from a source file location
 func (f *flowkitClient) getCodeFromLocation(name, location string) (string, error) {
-	code, err := f.loader.ReadFile(filepath.Join(filepath.Dir(f.getConfigPath()), location))
+	dir := filepath.Dir(f.getConfigPath())
+	path := filepath.Join(dir, location)
+	code, err := f.loader.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
