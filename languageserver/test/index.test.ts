@@ -393,6 +393,23 @@ describe("diagnostics", () => {
     expect(script.diagnostics).toHaveLength(0)
   })
 
+  test("script with string import non-deployment contract", async () => {
+    const scriptName = "script";
+    const scriptCode = `
+      import "A"
+      pub fun main() { }
+    `;
+
+    let docNotifications = await testImports([
+      { name: scriptName, code: scriptCode },
+    ]);
+
+    let script = await docNotifications.find((n) => n.name == scriptName)
+      .notification
+    expect(script.uri).toEqual(`file://${scriptName}.cdc`)
+    expect(script.diagnostics).toHaveLength(0)
+  })
+
   test("script import failure", async() => {
     const contractName = "foo"
     const scriptName = "script"

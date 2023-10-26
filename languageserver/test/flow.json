@@ -7,7 +7,11 @@
 	},
 	"contracts": {
 		"Foo": "./foo.cdc",
-		"Bar": "./bar.cdc"
+		"Bar": "./bar.cdc",
+		"A": {
+			"source": "./a.cdc",
+			"aliases": {}
+		}
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
