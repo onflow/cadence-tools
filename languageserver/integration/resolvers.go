@@ -19,6 +19,7 @@
 package integration
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 )
 
 type resolvers struct {
+	state  flowState
 	client flowClient
 	loader flowkit.ReaderWriter
 }
@@ -38,7 +40,7 @@ type resolvers struct {
 func (r *resolvers) stringImport(location common.StringLocation) (string, error) {
 	// if the location is not a cadence file try getting the code by identifier
 	if !strings.Contains(location.String(), ".cdc") {
-		return r.client.GetCodeByName(location.String())
+		return r.state.GetCodeByName(location.String())
 	}
 
 	filename := cleanWindowsPath(location.String())
@@ -52,6 +54,10 @@ func (r *resolvers) stringImport(location common.StringLocation) (string, error)
 
 // addressImport loads the code for an address location.
 func (r *resolvers) addressImport(location common.AddressLocation) (string, error) {
+	if r.client == nil {
+		return "", errors.New("client is not initialized")
+	}
+
 	account, err := r.client.GetAccount(flow.HexToAddress(location.Address.String()))
 	if err != nil {
 		return "", err
@@ -62,6 +68,10 @@ func (r *resolvers) addressImport(location common.AddressLocation) (string, erro
 
 // addressContractNames returns a slice of all the contract names on the address location.
 func (r *resolvers) addressContractNames(address common.Address) ([]string, error) {
+	if r.client == nil {
+		return nil, errors.New("client is not initialized")
+	}
+
 	account, err := r.client.GetAccount(flow.HexToAddress(address.String()))
 	if err != nil {
 		return nil, err
@@ -81,7 +91,11 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 //
 // if the contracts were deployed on the same account then it returns true and hence allows the access, false otherwise.
 func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.Location) bool {
-	contracts, err := r.client.getState().DeploymentContractsByNetwork(config.EmulatorNetwork)
+	if r.client == nil {
+		return false
+	}
+
+	contracts, err := r.client.getState().getState().DeploymentContractsByNetwork(config.EmulatorNetwork)
 	if err != nil {
 		return false
 	}

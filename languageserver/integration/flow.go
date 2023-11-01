@@ -25,20 +25,21 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/onflow/flow-cli/flowkit/accounts"
+	"github.com/onflow/flow-cli/flowkit/transactions"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-cli/flowkit"
-	"github.com/onflow/flow-cli/flowkit/accounts"
 	"github.com/onflow/flow-cli/flowkit/config"
 	"github.com/onflow/flow-cli/flowkit/gateway"
 	"github.com/onflow/flow-cli/flowkit/output"
-	"github.com/onflow/flow-cli/flowkit/transactions"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowClient --filename mock_flow_test.go --inpkg
 type flowClient interface {
-	Initialize(configPath string, numberOfAccounts int) error
+	Initialize(state flowState, numberOfAccounts int) error
 	Reload() error
 	GetClientAccount(name string) *clientAccount
 	GetActiveClientAccount() *clientAccount
@@ -53,8 +54,7 @@ type flowClient interface {
 	) (*flow.Transaction, *flow.TransactionResult, error)
 	GetAccount(address flow.Address) (*flow.Account, error)
 	CreateAccount() (*clientAccount, error)
-	GetCodeByName(name string) (string, error)
-	getState() *flowkit.State
+	getState() flowState
 	getConfigPath() string
 }
 
@@ -80,10 +80,9 @@ var names = []string{
 type flowkitClient struct {
 	services      flowkit.Services
 	loader        flowkit.ReaderWriter
-	state         *flowkit.State
+	state         flowState
 	accounts      []*clientAccount
 	activeAccount *clientAccount
-	configPath    string
 }
 
 func newFlowkitClient(loader flowkit.ReaderWriter) *flowkitClient {
@@ -92,17 +91,11 @@ func newFlowkitClient(loader flowkit.ReaderWriter) *flowkitClient {
 	}
 }
 
-func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) error {
-	f.configPath = configPath
-	state, err := flowkit.Load([]string{f.configPath}, f.loader)
-	if err != nil {
-		return err
-	}
+func (f *flowkitClient) Initialize(state flowState, numberOfAccounts int) error {
 	f.state = state
-
 	logger := output.NewStdoutLogger(output.NoneLog)
 
-	acc, err := state.EmulatorServiceAccount()
+	acc, err := state.getState().EmulatorServiceAccount()
 	if err != nil {
 		return err
 	}
@@ -119,7 +112,7 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 		})
 	}
 
-	f.services = flowkit.NewFlowkit(state, config.EmulatorNetwork, emulator, logger)
+	f.services = flowkit.NewFlowkit(state.getState(), config.EmulatorNetwork, emulator, logger)
 	if numberOfAccounts > len(names) || numberOfAccounts <= 0 {
 		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
 	}
@@ -141,20 +134,19 @@ func (f *flowkitClient) Initialize(configPath string, numberOfAccounts int) erro
 	return nil
 }
 
-func (f *flowkitClient) getState() *flowkit.State {
+func (f *flowkitClient) getState() flowState {
 	return f.state
 }
 
 func (f *flowkitClient) getConfigPath() string {
-	return f.configPath
+	return f.state.getConfigPath()
 }
 
 func (f *flowkitClient) Reload() error {
-	state, err := flowkit.Load([]string{f.configPath}, f.loader)
+	err := f.state.Load(f.getConfigPath())
 	if err != nil {
 		return err
 	}
-	f.state = state
 	return nil
 }
 
@@ -200,7 +192,7 @@ func (f *flowkitClient) ExecuteScript(
 		return nil, err
 	}
 
-	codeFilename, err := resolveFilename(f.configPath, location.Path)
+	codeFilename, err := resolveFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +218,7 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
-	codeFilename, err := resolveFilename(f.configPath, location.Path)
+	codeFilename, err := resolveFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return err
 	}
@@ -258,12 +250,12 @@ func (f *flowkitClient) SendTransaction(
 		return nil, nil, err
 	}
 
-	service, err := f.state.EmulatorServiceAccount()
+	service, err := f.state.getState().EmulatorServiceAccount()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	codeFilename, err := resolveFilename(f.configPath, location.Path)
+	codeFilename, err := resolveFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -302,7 +294,7 @@ func (f *flowkitClient) GetAccount(address flow.Address) (*flow.Account, error) 
 }
 
 func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
-	service, err := f.state.EmulatorServiceAccount()
+	service, err := f.state.getState().EmulatorServiceAccount()
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +336,7 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 // we skip it since we don't have a way to automatically create it.
 func (f *flowkitClient) accountsFromState() []*clientAccount {
 	accounts := make([]*clientAccount, 0)
-	for _, acc := range *f.state.Accounts() {
+	for _, acc := range *f.state.getState().Accounts() {
 		account, err := f.services.GetAccount(context.Background(), acc.Address)
 		if err != nil {
 			// we skip user configured accounts that weren't already created on-chain
@@ -379,7 +371,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, e
 	if account.Key != nil {
 		accountKey = *account.Key
 	} else { // default to service account if key not set
-		service, err := f.state.EmulatorServiceAccount()
+		service, err := f.state.getState().EmulatorServiceAccount()
 		if err != nil {
 			return nil, err
 		}
@@ -392,39 +384,8 @@ func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, e
 	}, nil
 }
 
-func (f *flowkitClient) GetCodeByName(name string) (string, error) {
-	// Try to find the contract by name
-	contract, err := f.state.Contracts().ByName(name)
-	if err != nil {
-		return "", fmt.Errorf("couldn't find the contract by import identifier: %s", name)
-	}
-
-	// If no location is set, return an error
-	if contract.Location == "" {
-		return "", fmt.Errorf("source file could not be found for import identifier: %s", name)
-	}
-
-	// Resolve the contract source code from file location
-	code, err := f.getCodeFromLocation(name, contract.Location)
-	if err != nil {
-		return "", err
-	}
-	return code, nil
-}
-
 // Helpers
 //
-
-// Helper function to get code from a source file location
-func (f *flowkitClient) getCodeFromLocation(name, location string) (string, error) {
-	dir := filepath.Dir(f.getConfigPath())
-	path := filepath.Join(dir, location)
-	code, err := f.loader.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(code), nil
-}
 
 // resolveFilename helper converts the transaction file to a relative location to config file
 func resolveFilename(configPath string, path string) (string, error) {
