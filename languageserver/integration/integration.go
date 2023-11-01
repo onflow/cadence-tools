@@ -36,11 +36,11 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 	state := newFlowkitState(loader)
 
 	integration := &FlowIntegration{
-		entryPointInfo: 	map[protocol.DocumentURI]*entryPointInfo{},
-		contractInfo:   	map[protocol.DocumentURI]*contractInfo{},
-		enableFlowClient: enableFlowClient,
-		loader:         	loader,
-		state:          	state,
+		entryPointInfo:		map[protocol.DocumentURI]*entryPointInfo{},
+		contractInfo:			map[protocol.DocumentURI]*contractInfo{},
+		enableFlowClient:	enableFlowClient,
+		loader:						loader,
+		state:						state,
 	}
 
 	resolve := resolvers{

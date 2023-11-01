@@ -118,7 +118,7 @@ func Test_SimpleImport(t *testing.T) {
 	}
 
 	mock.On("GetCodeByName", "Test").Return(code, nil)
-	mock.On("GetCodeByName", "Foo").Return("", fmt.Errorf("not found"))
+	mock.On("GetCodeByName", "Foo").Return("", fmt.Errorf("couldn't find the contract by import identifier: Foo"))
 
 	t.Run("existing import", func(t *testing.T) {
 		resolved, err := resolver.stringImport("Test")
