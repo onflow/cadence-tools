@@ -127,7 +127,7 @@ func Test_ExecuteTransaction(t *testing.T) {
 
 func Test_SwitchActiveAccount(t *testing.T) {
 	client := newFlowkitClient(nil)
-	cmds := commands{client}
+	cmds := commands{client, client.getState()}
 
 	name, _ := json.Marshal("koko")
 	runTestInputs(
@@ -158,7 +158,7 @@ func Test_SwitchActiveAccount(t *testing.T) {
 
 func Test_DeployContract(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{mock}
+	cmds := commands{mock, mock.getState()}
 
 	name, _ := json.Marshal("NFT")
 	runTestInputs(

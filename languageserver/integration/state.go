@@ -49,19 +49,22 @@ func newFlowkitState(loader flowkit.ReaderWriter) (*flowkitState) {
 	}
 }
 
-func (f *flowkitState) Load(configPath string) (error) {
-	state, err := flowkit.Load([]string{configPath}, f.loader)
+func (s *flowkitState) Load(configPath string) (error) {
+	state, err := flowkit.Load([]string{configPath}, s.loader)
 	if err != nil {
 		return err
 	}
 
-	f.state = state
-	f.configPath = configPath
+	s.configPath = configPath
+	s.state = state
 	return nil
 }
 
-func (f *flowkitState) Reload() (error) {
-	return f.Load(f.configPath)
+func (s *flowkitState) Reload() (error) {
+	if !s.IsLoaded() {
+		return fmt.Errorf("state is not initialized")
+	}
+	return s.Load(s.configPath)
 }
 
 func (s *flowkitState) GetCodeByName(name string) (string, error) {
@@ -90,7 +93,7 @@ func (s *flowkitState) GetCodeByName(name string) (string, error) {
 }
 
 func (s *flowkitState) IsLoaded() (bool) {
-	return s.state != nil
+	return s.state != nil && s.configPath != ""
 }
 
 func (s *flowkitState) getConfigPath() (string) {
