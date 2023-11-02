@@ -127,7 +127,7 @@ func Test_ExecuteTransaction(t *testing.T) {
 
 func Test_SwitchActiveAccount(t *testing.T) {
 	client := newFlowkitClient(nil)
-	cmds := commands{client, client.getState()}
+	cmds := commands{client, nil}
 
 	name, _ := json.Marshal("koko")
 	runTestInputs(
@@ -158,7 +158,7 @@ func Test_SwitchActiveAccount(t *testing.T) {
 
 func Test_DeployContract(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{mock, mock.getState()}
+	cmds := commands{mock, nil}
 
 	name, _ := json.Marshal("NFT")
 	runTestInputs(
@@ -219,5 +219,29 @@ func Test_DeployContract(t *testing.T) {
 		res, err := cmds.deployContract(locationURL, name, signerArg)
 		assert.NoError(t, err)
 		assert.Equal(t, "Contract NFT has been deployed to account bob", res)
+	})
+}
+
+func Test_ReloadConfig(t *testing.T) {
+	state := mockFlowState{}
+	cmds := commands{nil, &state}
+
+	runTestInputs(
+		"invalid arguments",
+		t,
+		cmds.reloadConfig,
+		[]argInputTest{
+			{args: []json.RawMessage{[]byte("1")}, err: "arguments error: expected 0 arguments, got 1"},
+		})
+
+	t.Run("reload configuration", func(t *testing.T) {
+		t.Parallel()
+		resp, err := cmds.reloadConfig()
+
+		reload := state.On("Reload").Return(nil)
+		state.ExpectedCalls = append(state.ExpectedCalls, reload)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "Configuration reloaded", resp)
 	})
 }
