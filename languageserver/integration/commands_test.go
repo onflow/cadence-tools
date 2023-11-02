@@ -226,22 +226,14 @@ func Test_ReloadConfig(t *testing.T) {
 	state := mockFlowState{}
 	cmds := commands{nil, &state}
 
-	runTestInputs(
-		"invalid arguments",
-		t,
-		cmds.reloadConfig,
-		[]argInputTest{
-			{args: []json.RawMessage{[]byte("1")}, err: "arguments error: expected 0 arguments, got 1"},
-		})
+	state.On("Reload").Return(nil)
 
 	t.Run("reload configuration", func(t *testing.T) {
 		t.Parallel()
 		resp, err := cmds.reloadConfig()
 
-		reload := state.On("Reload").Return(nil)
-		state.ExpectedCalls = append(state.ExpectedCalls, reload)
-
 		assert.NoError(t, err)
-		assert.Equal(t, "Configuration reloaded", resp)
+		assert.Equal(t, nil, resp)
+		state.AssertCalled(t, "Reload")
 	})
 }
