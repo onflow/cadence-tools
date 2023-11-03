@@ -454,6 +454,7 @@ func (r *TestRunner) initializeEnvironment() (
 	if r.coverageReport != nil {
 		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
 		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
+		r.coverageReport.ExcludeLocation(BlockchainHelpersLocation)
 		r.coverageReport.ExcludeLocation(testScriptLocation)
 		ctx.CoverageReport = r.coverageReport
 	}
