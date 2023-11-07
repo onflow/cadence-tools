@@ -53,7 +53,7 @@ const helperFilePrefix = "\x00helper/"
 
 // The number of predefined accounts that are created
 // upon initialization of EmulatorBackend.
-const initialAccountsNumber = 10
+const initialAccountsNumber = 20
 
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
