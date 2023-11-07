@@ -33,20 +33,25 @@ import (
 
 func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegration, error) {
 	loader := &afero.Afero{Fs: afero.NewOsFs()}
+	state := newFlowkitState(loader)
 
 	integration := &FlowIntegration{
-		entryPointInfo: map[protocol.DocumentURI]*entryPointInfo{},
-		contractInfo:   map[protocol.DocumentURI]*contractInfo{},
-		loader:         loader,
+		entryPointInfo:		map[protocol.DocumentURI]*entryPointInfo{},
+		contractInfo:			map[protocol.DocumentURI]*contractInfo{},
+		enableFlowClient:	enableFlowClient,
+		loader:						loader,
+		state:						state,
 	}
 
 	resolve := resolvers{
 		loader: loader,
+		state: state,
 	}
 
 	options := []server.Option{
 		server.WithDiagnosticProvider(diagnostics),
 		server.WithStringImportResolver(resolve.stringImport),
+		server.WithInitializationOptionsHandler(integration.initialize),
 	}
 
 	if enableFlowClient {
@@ -55,17 +60,16 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		resolve.client = client
 
 		options = append(options,
-			server.WithInitializationOptionsHandler(integration.initialize),
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
 			server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
+	}
 
-		comm := commands{client: client}
-		for _, command := range comm.getAll() {
-			options = append(options, server.WithCommand(command))
-		}
+	comm := commands{client: integration.client, state: integration.state}
+	for _, command := range comm.getAll() {
+		options = append(options, server.WithCommand(command))
 	}
 
 	err := s.SetOptions(options...)
@@ -77,37 +81,56 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 }
 
 type FlowIntegration struct {
-	entryPointInfo map[protocol.DocumentURI]*entryPointInfo
-	contractInfo   map[protocol.DocumentURI]*contractInfo
+	entryPointInfo 		map[protocol.DocumentURI]*entryPointInfo
+	contractInfo   		map[protocol.DocumentURI]*contractInfo
 
-	client flowClient
-	loader flowkit.ReaderWriter
+	enableFlowClient 	bool
+	client  					flowClient
+	state   					*flowkitState
+	loader  					flowkit.ReaderWriter
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {
 	optsMap, ok := initializationOptions.(map[string]any)
 	if !ok {
-		return errors.New("invalid initialization options")
+		// If client is enabled, initialization options are required
+		if i.enableFlowClient {
+			return errors.New("invalid initialization options")
+		}
+		return nil
 	}
 
 	configPath, ok := optsMap["configPath"].(string)
 	if !ok || configPath == "" {
-		return errors.New("initialization options: invalid config path")
+		// If client is enabled, config path is required, otherwise it's optional
+		if i.enableFlowClient {
+			return errors.New("initialization options: invalid config path")
+		}
+		return nil
 	}
+
+	// Load the config state if provided
 	configPath = cleanWindowsPath(configPath)
-
-	numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
-	if !ok || numberOfAccountsString == "" {
-		return errors.New("initialization options: invalid account number value, should be passed as a string")
-	}
-	numberOfAccounts, err := strconv.Atoi(numberOfAccountsString)
-	if err != nil {
-		return errors.New("initialization options: invalid account number value")
-	}
-
-	err = i.client.Initialize(configPath, numberOfAccounts)
+	err := i.state.Load(configPath)
 	if err != nil {
 		return err
+	}
+
+	// If client is enabled, initialize the client
+	if (i.enableFlowClient) {
+		numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
+		if !ok || numberOfAccountsString == "" {
+			return errors.New("initialization options: invalid account number value, should be passed as a string")
+		}
+		numberOfAccounts, err := strconv.Atoi(numberOfAccountsString)
+		if err != nil {
+			return errors.New("initialization options: invalid account number value")
+		}
+
+		err = i.client.Initialize(i.state, numberOfAccounts)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

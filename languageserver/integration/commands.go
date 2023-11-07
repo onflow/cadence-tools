@@ -21,8 +21,9 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-cli/flowkit/arguments"
 	"net/url"
+
+	"github.com/onflow/flow-cli/flowkit/arguments"
 
 	"github.com/onflow/flow-go-sdk"
 
@@ -41,39 +42,47 @@ const (
 
 type commands struct {
 	client flowClient
+	state flowState
 }
 
 func (c *commands) getAll() []server.Command {
-	return []server.Command{
-		{
-			Name:    CommandSendTransaction,
-			Handler: c.sendTransaction,
-		},
-		{
-			Name:    CommandExecuteScript,
-			Handler: c.executeScript,
-		},
-		{
-			Name:    CommandDeployContract,
-			Handler: c.deployContract,
-		},
-		{
-			Name:    CommandSwitchActiveAccount,
-			Handler: c.switchActiveAccount,
-		},
-		{
-			Name:    CommandCreateAccount,
-			Handler: c.createAccount,
-		},
-		{
-			Name:    CommandGetAccounts,
-			Handler: c.getAccounts,
-		},
-		{
-			Name:    CommandReloadConfig,
-			Handler: c.reloadConfig,
-		},
+	// Commands always available
+	commands := []server.Command{{
+		Name:    CommandReloadConfig,
+		Handler: c.reloadConfig,
+	}}
+	
+	// Commands only available when client is enabled
+	if c.client != nil {
+		commands = append(commands, []server.Command{
+			{
+				Name:    CommandSendTransaction,
+				Handler: c.sendTransaction,
+			},
+			{
+				Name:    CommandExecuteScript,
+				Handler: c.executeScript,
+			},
+			{
+				Name:    CommandDeployContract,
+				Handler: c.deployContract,
+			},
+			{
+				Name:    CommandSwitchActiveAccount,
+				Handler: c.switchActiveAccount,
+			},
+			{
+				Name:    CommandCreateAccount,
+				Handler: c.createAccount,
+			},
+			{
+				Name:    CommandGetAccounts,
+				Handler: c.getAccounts,
+			},
+		}...)
 	}
+
+	return commands
 }
 
 // sendTransaction handles submitting a transaction defined in the
@@ -196,7 +205,7 @@ func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 
 // reloadConfig when the client detects changes in flow.json so we have an updated state.
 func (c *commands) reloadConfig(_ ...json.RawMessage) (any, error) {
-	return nil, c.client.Reload()
+	return nil, c.state.Reload()
 }
 
 // getAccounts return the client account list with information about the active client.

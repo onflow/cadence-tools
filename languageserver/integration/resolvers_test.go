@@ -104,3 +104,31 @@ func Test_AddressImport(t *testing.T) {
 		assert.ElementsMatch(t, []string{"foo", "test"}, contracts)
 	})
 }
+
+func Test_SimpleImport(t *testing.T) {
+	mockFS := afero.NewMemMapFs()
+	af := afero.Afero{Fs: mockFS}
+	code := `pub contract Test {}`
+	_ = afero.WriteFile(mockFS, "./test.cdc", []byte(code), 0644)
+
+	mock := &mockFlowState{}
+	resolver := resolvers{
+		loader: af,
+		state: mock,
+	}
+
+	mock.On("GetCodeByName", "Test").Return(code, nil)
+	mock.On("GetCodeByName", "Foo").Return("", fmt.Errorf("couldn't find the contract by import identifier: Foo"))
+
+	t.Run("existing import", func(t *testing.T) {
+		resolved, err := resolver.stringImport("Test")
+		assert.NoError(t, err)
+		assert.Equal(t, code, resolved)
+	})
+
+	t.Run("non existing import", func(t *testing.T) {
+		resolved, err := resolver.stringImport("Foo")
+		assert.EqualError(t, err, "couldn't find the contract by import identifier: Foo")
+		assert.Empty(t, resolved)
+	})
+}
