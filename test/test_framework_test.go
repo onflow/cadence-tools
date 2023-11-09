@@ -3775,6 +3775,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.MetadataViews",
 			"A.0000000000000001.NonFungibleToken",
 			"A.0000000000000001.ViewResolver",
+			"A.0000000000000001.RandomBeaconHistory",
 			"I.Test",
 			"I.Crypto",
 			"I.BlockchainHelpers",
@@ -4001,6 +4002,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.MetadataViews",
 			"A.0000000000000001.NonFungibleToken",
 			"A.0000000000000001.ViewResolver",
+			"A.0000000000000001.RandomBeaconHistory",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
