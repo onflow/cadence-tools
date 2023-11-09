@@ -132,6 +132,7 @@ var systemContracts = func() []common.AddressLocation {
 		"NonFungibleToken":           serviceAddress,
 		"MetadataViews":              serviceAddress,
 		"ViewResolver":               serviceAddress,
+		"RandomBeaconHistory":        serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)

@@ -70,7 +70,9 @@ func BlockchainHelpersChecker() *sema.Checker {
 		common.IdentifierLocation("BlockchainHelpers"),
 		nil,
 		&sema.Config{
-			BaseValueActivation: activation,
+			BaseValueActivationHandler: func(_ common.Location) *sema.VariableActivation {
+				return activation
+			},
 			AccessCheckMode:     sema.AccessCheckModeStrict,
 			ImportHandler:       importHandler,
 		},
