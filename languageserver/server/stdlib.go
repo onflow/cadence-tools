@@ -267,6 +267,24 @@ func (l standardLibrary) ReadRandom(_ []byte) error {
 	panic(errors.NewUnreachableError())
 }
 
+func (standardLibrary) StartContractAddition(_ common.AddressLocation) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) EndContractAddition(_ common.AddressLocation) {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) IsContractBeingAdded(_ common.AddressLocation) bool {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
 func newStandardLibrary() (result standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
 	for _, valueDeclaration := range stdlib.DefaultStandardLibraryValues(result) {

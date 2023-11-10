@@ -228,6 +228,15 @@ func (f *flowkitClient) DeployContract(
 		return err
 	}
 
+	// TODO: Remove this code
+	// This is a temporary workaround to prevent an error thrown by flowkit
+	// Changes in https://github.com/onflow/flow-cli/pull/1247 add contracts
+	// to the state when AddContract is called, but this causes an error to
+	// be thrown here because LS-managed accounts are not in the state.
+	// 
+	// This code adds the account to the state before deploying the contract
+	f.state.getState().Accounts().AddOrUpdate(signer)
+
 	_, _, err = f.services.AddContract(
 		context.Background(),
 		signer,
@@ -381,6 +390,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, e
 	return &accounts.Account{
 		Address: address,
 		Key:     accountKey,
+		Name: 	 fmt.Sprintf("%s [LS]", account.Name),
 	}, nil
 }
 
