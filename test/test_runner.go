@@ -28,6 +28,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 
+	"github.com/onflow/cadence-tools/test/helpers"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
@@ -58,8 +59,6 @@ const beforeEachFunctionName = "beforeEach"
 const afterEachFunctionName = "afterEach"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
-
-const BlockchainHelpersLocation = common.IdentifierLocation("BlockchainHelpers")
 
 var quotedLog = regexp.MustCompile("\"(.*)\"")
 
@@ -454,7 +453,7 @@ func (r *TestRunner) initializeEnvironment() (
 	if r.coverageReport != nil {
 		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
 		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
-		r.coverageReport.ExcludeLocation(BlockchainHelpersLocation)
+		r.coverageReport.ExcludeLocation(helpers.BlockchainHelpersLocation)
 		r.coverageReport.ExcludeLocation(testScriptLocation)
 		ctx.CoverageReport = r.coverageReport
 	}
@@ -497,8 +496,8 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 			testChecker := stdlib.GetTestContractType().Checker
 			elaboration = testChecker.Elaboration
 
-		case BlockchainHelpersLocation:
-			helpersChecker := BlockchainHelpersChecker()
+		case helpers.BlockchainHelpersLocation:
+			helpersChecker := helpers.BlockchainHelpersChecker()
 			elaboration = helpersChecker.Elaboration
 
 		default:
@@ -628,8 +627,8 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 			testChecker := stdlib.GetTestContractType().Checker
 			program = interpreter.ProgramFromChecker(testChecker)
 
-		case BlockchainHelpersLocation:
-			helpersChecker := BlockchainHelpersChecker()
+		case helpers.BlockchainHelpersLocation:
+			helpersChecker := helpers.BlockchainHelpersChecker()
 			program = interpreter.ProgramFromChecker(helpersChecker)
 
 		default:

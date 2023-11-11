@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package test
+package helpers
 
 import (
 	_ "embed"
@@ -31,6 +31,8 @@ import (
 
 //go:embed blockchain_helpers.cdc
 var BlockchainHelpers []byte
+
+const BlockchainHelpersLocation = common.IdentifierLocation("BlockchainHelpers")
 
 func BlockchainHelpersChecker() *sema.Checker {
 	program, err := parser.ParseProgram(
@@ -73,8 +75,8 @@ func BlockchainHelpersChecker() *sema.Checker {
 			BaseValueActivationHandler: func(_ common.Location) *sema.VariableActivation {
 				return activation
 			},
-			AccessCheckMode:     sema.AccessCheckModeStrict,
-			ImportHandler:       importHandler,
+			AccessCheckMode: sema.AccessCheckModeStrict,
+			ImportHandler:   importHandler,
 		},
 	)
 	if err != nil {
