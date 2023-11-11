@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence-tools/test/helpers"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -4762,7 +4764,7 @@ func TestBlockchainReset(t *testing.T) {
 func TestBlockchainHelpersChecker(t *testing.T) {
 	t.Parallel()
 
-	checker := BlockchainHelpersChecker()
+	checker := helpers.BlockchainHelpersChecker()
 	err := checker.Check()
 	assert.NoError(t, err)
 }
