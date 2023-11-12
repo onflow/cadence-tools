@@ -50,7 +50,7 @@ import (
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 
 	linter "github.com/onflow/cadence-tools/lint"
-	cdcTests "github.com/onflow/cadence-tools/test"
+	cdcTests "github.com/onflow/cadence-tools/test/helpers"
 )
 
 // Document represents an open document on the client. It contains all cached
