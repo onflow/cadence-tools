@@ -706,6 +706,13 @@ func (r *TestRunner) parseAndCheckImport(
 				Elaboration: elaboration,
 			}, nil
 
+		case stdlib.CryptoCheckerLocation:
+			cryptoChecker := stdlib.CryptoChecker()
+			elaboration := cryptoChecker.Elaboration
+			return sema.ElaborationImport{
+				Elaboration: elaboration,
+			}, nil
+
 		default:
 			addressLoc, ok := importedLocation.(common.AddressLocation)
 			if !ok {

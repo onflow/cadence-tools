@@ -751,6 +751,92 @@ func TestImportContract(t *testing.T) {
 	})
 }
 
+func TestImportCryptoContract(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+        import Crypto
+        import FooContract from "./FooContract"
+
+        access(all)
+        fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "./FooContract",
+                arguments: []
+            )
+            Test.expect(err, Test.beNil())
+        }
+
+        access(all)
+        fun test() {
+            let hash = Crypto.hash(
+                [0, 0, 1, 2, 3, 5, 8, 11],
+                algorithm: HashAlgorithm.SHA3_256
+            )
+            Test.assertEqual(hash, FooContract.hashNumbers())
+        }
+	`
+
+	const fooContract = `
+        import Crypto
+
+        access(all) contract FooContract {
+            access(self) let numbers: [UInt8]
+
+            init() {
+                self.numbers = [0, 0, 1, 2, 3, 5, 8, 11]
+            }
+
+            access(all)
+            fun hashNumbers(): [UInt8] {
+                return Crypto.hash(
+                    self.numbers,
+                    algorithm: HashAlgorithm.SHA3_256
+                )
+            }
+        }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "./FooContract" {
+				return fooContract, nil
+			}
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "./FooContract":
+			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithContracts(contracts).
+		WithFileResolver(fileResolver)
+
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestImportBuiltinContracts(t *testing.T) {
 	t.Parallel()
 
