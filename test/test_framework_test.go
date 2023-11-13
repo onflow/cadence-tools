@@ -490,11 +490,18 @@ func TestImportContract(t *testing.T) {
 
 		const code = `
             import Test
-            import BarContract from "./BarContract"
             import FooContract from "./FooContract"
 
-            pub fun setup() {
+            access(all)
+            fun setup() {
                 var err = Test.deployContract(
+                    name: "BazContract",
+                    path: "./BazContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
+
+                err = Test.deployContract(
                     name: "BarContract",
                     path: "./BarContract",
                     arguments: []
@@ -509,30 +516,45 @@ func TestImportContract(t *testing.T) {
                 Test.expect(err, Test.beNil())
             }
 
-            pub fun test() {
-                Test.assertEqual("Hi from BarContract", BarContract.sayHi())
-                Test.assertEqual("Hi from BarContract", FooContract.sayHi())
+            access(all)
+            fun test() {
+                Test.assertEqual("Hi from BazContract", FooContract.sayHi())
             }
 		`
 
 		const fooContract = `
             import BarContract from "./BarContract"
 
-            pub contract FooContract {
+            access(all) contract FooContract {
                 init() {}
 
-                pub fun sayHi(): String {
+                access(all)
+                fun sayHi(): String {
                     return BarContract.sayHi()
                 }
             }
 		`
 
 		const barContract = `
-            pub contract BarContract {
+            import BazContract from "./BazContract"
+
+            access(all) contract BarContract {
                 init() {}
 
-                pub fun sayHi(): String {
-                    return "Hi from BarContract"
+                access(all)
+                fun sayHi(): String {
+                    return BazContract.sayHi()
+                }
+            }
+		`
+
+		const bazContract = `
+            access(all) contract BazContract {
+                init() {}
+
+                access(all)
+                fun sayHi(): String {
+                    return "Hi from BazContract"
                 }
             }
 		`
@@ -546,12 +568,18 @@ func TestImportContract(t *testing.T) {
 				if location.Name == "BarContract" {
 					return barContract, nil
 				}
+				if location.Name == "BazContract" {
+					return bazContract, nil
+				}
 			case common.StringLocation:
 				if location == "./FooContract" {
 					return fooContract, nil
 				}
 				if location == "./BarContract" {
 					return barContract, nil
+				}
+				if location == "./BazContract" {
+					return bazContract, nil
 				}
 			}
 
@@ -564,14 +592,17 @@ func TestImportContract(t *testing.T) {
 				return fooContract, nil
 			case "./BarContract":
 				return barContract, nil
+			case "./BazContract":
+				return bazContract, nil
 			default:
 				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
 		contracts := map[string]common.Address{
-			"BarContract": {0, 0, 0, 0, 0, 0, 0, 5},
 			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"BarContract": {0, 0, 0, 0, 0, 0, 0, 6},
+			"BazContract": {0, 0, 0, 0, 0, 0, 0, 7},
 		}
 
 		runner := NewTestRunner().

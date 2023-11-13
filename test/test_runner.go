@@ -719,34 +719,13 @@ func (r *TestRunner) parseAndCheckImport(
 				return nil, fmt.Errorf("unable to import location: %s", importedLocation)
 			}
 
-			var code []byte
-			if _, found := baseContracts()[addressLoc.Name]; found {
-				// System-defined contracts are obtained from
-				// the blockchain.
-				account, err := r.backend.blockchain.GetAccount(
-					flow.Address(addressLoc.Address),
-				)
-				if err != nil {
-					return nil, err
-				}
-				code = account.Contracts[addressLoc.Name]
-			} else if _, found := r.contracts[addressLoc.Name]; found {
-				contract, err := r.importResolver(addressLoc)
-				if err != nil {
-					return nil, err
-				}
-				code = []byte(contract)
-			}
-
-			program, err := env.ParseAndCheckProgram(
-				code, addressLoc, true,
-			)
+			_, elaboration, err := r.parseAndCheckImport(addressLoc, ctx)
 			if err != nil {
 				return nil, err
 			}
 
 			return sema.ElaborationImport{
-				Elaboration: program.Elaboration,
+				Elaboration: elaboration,
 			}, nil
 		}
 	}
