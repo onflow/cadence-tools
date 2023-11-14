@@ -3,7 +3,6 @@ import * as fs from "fs"
 import {
   createProtocolConnection,
   DidOpenTextDocumentNotification,
-  ExitNotification,
   InitializeRequest,
   ProtocolConnection,
   PublishDiagnosticsNotification,
@@ -16,14 +15,12 @@ import {
   MessageWriter,
   PartialMessageInfo,
   TextDocumentItem,
+  ExitNotification
 } from "vscode-languageserver-protocol"
 import {Callbacks} from "../dist"
 
 const binary = fs.readFileSync(require.resolve('../dist/cadence-language-server.wasm'))
 async function withConnection(callbacks: Callbacks = {}, callback: (connection: ProtocolConnection) => Promise<void>) {  
-  // Hack to load the wasm module multiple times for testing
-  await (CadenceLanguageServer as any).load(binary)
-
   // Start the language server
   await CadenceLanguageServer.create(binary, callbacks)
 
@@ -73,10 +70,6 @@ async function withConnection(callbacks: Callbacks = {}, callback: (connection: 
       return Disposable.create(() => {});
     },
     dispose() {
-      console.log(
-        '-------------------------->',
-        'Language Client is closed. Do something!',
-      );
       callbacks.onClientClose?.();
     },
   };
@@ -97,7 +90,9 @@ async function withConnection(callbacks: Callbacks = {}, callback: (connection: 
   try {
     await callback(connection)
   } finally {
-    connection.sendNotification(ExitNotification.type)
+    try {
+      connection.dispose()
+    } catch {}
   }
 }
 
@@ -157,5 +152,11 @@ test("address import", async () => {
 
     expect(notificaiton.uri).toEqual(uri)
     expect(notificaiton.diagnostics).toEqual([])
+  })
+})
+
+afterAll(() => {
+  withConnection({}, async (connection) => {
+    await connection.sendNotification(ExitNotification.type)
   })
 })
