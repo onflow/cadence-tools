@@ -126,10 +126,10 @@ test("string import", async () => {
       connection.onNotification(PublishDiagnosticsNotification.type, resolve)
     })
 
-    const notificaiton = await notificationPromise
+    const notification = await notificationPromise
 
-    expect(notificaiton.uri).toEqual(uri)
-    expect(notificaiton.diagnostics).toEqual([])
+    expect(notification.uri).toEqual(uri)
+    expect(notification.diagnostics).toEqual([])
   })
 })
 
@@ -148,10 +148,10 @@ test("address import", async () => {
       connection.onNotification(PublishDiagnosticsNotification.type, resolve)
     })
 
-    const notificaiton = await notificationPromise
+    const notification = await notificationPromise
 
-    expect(notificaiton.uri).toEqual(uri)
-    expect(notificaiton.diagnostics).toEqual([])
+    expect(notification.uri).toEqual(uri)
+    expect(notification.diagnostics).toEqual([])
   })
 })
 
