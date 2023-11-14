@@ -107,6 +107,9 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Build
+        working-directory: languageserver
+        run: make build
       - name: Test
         run: make test-languageserver
       - name: Check tidy
