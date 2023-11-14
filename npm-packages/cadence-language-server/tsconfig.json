@@ -15,7 +15,8 @@
     "baseUrl": ".",
     "lib": ["dom", "es2015", "es2016"],
     "declaration": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "esModuleInterop": true
   },
   "exclude": ["node_modules", "dist", "tests", "*.js"]
 }
