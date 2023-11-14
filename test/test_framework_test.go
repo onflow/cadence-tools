@@ -23,8 +23,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence-tools/test/helpers"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -492,11 +490,18 @@ func TestImportContract(t *testing.T) {
 
 		const code = `
             import Test
-            import BarContract from "./BarContract"
             import FooContract from "./FooContract"
 
-            pub fun setup() {
+            access(all)
+            fun setup() {
                 var err = Test.deployContract(
+                    name: "BazContract",
+                    path: "./BazContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
+
+                err = Test.deployContract(
                     name: "BarContract",
                     path: "./BarContract",
                     arguments: []
@@ -511,30 +516,45 @@ func TestImportContract(t *testing.T) {
                 Test.expect(err, Test.beNil())
             }
 
-            pub fun test() {
-                Test.assertEqual("Hi from BarContract", BarContract.sayHi())
-                Test.assertEqual("Hi from BarContract", FooContract.sayHi())
+            access(all)
+            fun test() {
+                Test.assertEqual("Hi from BazContract", FooContract.sayHi())
             }
 		`
 
 		const fooContract = `
             import BarContract from "./BarContract"
 
-            pub contract FooContract {
+            access(all) contract FooContract {
                 init() {}
 
-                pub fun sayHi(): String {
+                access(all)
+                fun sayHi(): String {
                     return BarContract.sayHi()
                 }
             }
 		`
 
 		const barContract = `
-            pub contract BarContract {
+            import BazContract from "./BazContract"
+
+            access(all) contract BarContract {
                 init() {}
 
-                pub fun sayHi(): String {
-                    return "Hi from BarContract"
+                access(all)
+                fun sayHi(): String {
+                    return BazContract.sayHi()
+                }
+            }
+		`
+
+		const bazContract = `
+            access(all) contract BazContract {
+                init() {}
+
+                access(all)
+                fun sayHi(): String {
+                    return "Hi from BazContract"
                 }
             }
 		`
@@ -548,12 +568,18 @@ func TestImportContract(t *testing.T) {
 				if location.Name == "BarContract" {
 					return barContract, nil
 				}
+				if location.Name == "BazContract" {
+					return bazContract, nil
+				}
 			case common.StringLocation:
 				if location == "./FooContract" {
 					return fooContract, nil
 				}
 				if location == "./BarContract" {
 					return barContract, nil
+				}
+				if location == "./BazContract" {
+					return bazContract, nil
 				}
 			}
 
@@ -566,14 +592,17 @@ func TestImportContract(t *testing.T) {
 				return fooContract, nil
 			case "./BarContract":
 				return barContract, nil
+			case "./BazContract":
+				return bazContract, nil
 			default:
 				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
 		contracts := map[string]common.Address{
-			"BarContract": {0, 0, 0, 0, 0, 0, 0, 5},
 			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"BarContract": {0, 0, 0, 0, 0, 0, 0, 6},
+			"BazContract": {0, 0, 0, 0, 0, 0, 0, 7},
 		}
 
 		runner := NewTestRunner().
@@ -751,6 +780,92 @@ func TestImportContract(t *testing.T) {
 			"failed to load contract: 0000000000000005.FooContract",
 		)
 	})
+}
+
+func TestImportCryptoContract(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+        import Crypto
+        import FooContract from "./FooContract"
+
+        access(all)
+        fun setup() {
+            let err = Test.deployContract(
+                name: "FooContract",
+                path: "./FooContract",
+                arguments: []
+            )
+            Test.expect(err, Test.beNil())
+        }
+
+        access(all)
+        fun test() {
+            let hash = Crypto.hash(
+                [0, 0, 1, 2, 3, 5, 8, 11],
+                algorithm: HashAlgorithm.SHA3_256
+            )
+            Test.assertEqual(hash, FooContract.hashNumbers())
+        }
+	`
+
+	const fooContract = `
+        import Crypto
+
+        access(all) contract FooContract {
+            access(self) let numbers: [UInt8]
+
+            init() {
+                self.numbers = [0, 0, 1, 2, 3, 5, 8, 11]
+            }
+
+            access(all)
+            fun hashNumbers(): [UInt8] {
+                return Crypto.hash(
+                    self.numbers,
+                    algorithm: HashAlgorithm.SHA3_256
+                )
+            }
+        }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "FooContract" {
+				return fooContract, nil
+			}
+		case common.StringLocation:
+			if location == "./FooContract" {
+				return fooContract, nil
+			}
+		}
+
+		return "", fmt.Errorf("unsupported import %s", location)
+	}
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "./FooContract":
+			return fooContract, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	contracts := map[string]common.Address{
+		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+	}
+
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithContracts(contracts).
+		WithFileResolver(fileResolver)
+
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
 }
 
 func TestImportBuiltinContracts(t *testing.T) {
@@ -4759,14 +4874,6 @@ func TestBlockchainReset(t *testing.T) {
 	result, err := runner.RunTest(testCode, "testBlockchainReset")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
-}
-
-func TestBlockchainHelpersChecker(t *testing.T) {
-	t.Parallel()
-
-	checker := helpers.BlockchainHelpersChecker()
-	err := checker.Check()
-	assert.NoError(t, err)
 }
 
 func TestTestFunctionValidSignature(t *testing.T) {
