@@ -49,10 +49,6 @@ e2e-test:
 wasm-test:
 	cd ../npm-packages/cadence-language-server && npm install && npm run build && npm test
 
-.PHONY: wasm
-wasm:
-	GOARCH=wasm GOOS=js go build -o languageserver.wasm  ./cmd/languageserver
-
 .PHONY: check-headers
 check-headers:
 	@../check-headers.sh
