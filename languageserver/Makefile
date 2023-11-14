@@ -34,7 +34,7 @@ generate:
 	go mod tidy
 
 .PHONY: test
-test: e2e-test generate unit-test
+test: e2e-test generate unit-test wasm-test
 
 .PHONY: unit-test
 unit-test:
@@ -44,6 +44,10 @@ unit-test:
 e2e-test:
 	cd test && npm install && npm t
 	GO111MODULE=on go test -parallel 8 ./...
+
+.PHONY: wasm-test
+wasm-test:
+	cd ../npm-packages/cadence-language-server && npm install && npm run build && npm test
 
 .PHONY: check-headers
 check-headers:

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import {Message} from "vscode-jsonrpc/lib/messages";
+import {Message} from "vscode-jsonrpc";
 import {go} from './go.js'
 import WebAssemblyInstantiatedSource = WebAssembly.WebAssemblyInstantiatedSource
 
@@ -32,6 +32,10 @@ export interface Callbacks {
   // The function that the language server calls
   // to get the code for an imported address, if any
   getAddressCode?(address: string): string | undefined
+
+  // The function that the language server calls
+  // to get the code for a string import, if any
+  getStringCode?(location: string): string | undefined
 
   // The function that the language client calls
   // to write a message object to the server.
@@ -119,6 +123,14 @@ export class CadenceLanguageServer {
       }
 
       return callbacks.getAddressCode(address)
+    }
+
+    env[this.functionName('getStringCode')] = (location: string): string | undefined => {
+      if (!callbacks.getStringCode) {
+        return undefined
+      }
+
+      return callbacks.getStringCode(location)
     }
 
     env[this.functionName('onServerClose')] = (): void => {
