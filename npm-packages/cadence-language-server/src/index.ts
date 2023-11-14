@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import {Message} from "vscode-languageserver-protocol";
+import {Message} from "vscode-jsonrpc";
 import {go} from './go.js'
 import WebAssemblyInstantiatedSource = WebAssembly.WebAssemblyInstantiatedSource
 

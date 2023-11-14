@@ -24,5 +24,8 @@
   },
   "files": [
     "dist/**/*"
-  ]
+  ],
+  "dependencies": {
+    "vscode-jsonrpc": "^8.2.0"
+  }
 }
