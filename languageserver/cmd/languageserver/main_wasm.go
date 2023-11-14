@@ -165,7 +165,7 @@ func start(id int) {
 			return "", fmt.Errorf("CLS %d: getAddressCode not defined", id)
 		}
 
-		res := getAddressCodeFunc.Invoke(location.Address.String())
+		res := getAddressCodeFunc.Invoke(location.String())
 		if res.IsNull() || res.IsUndefined() {
 			return "", fmt.Errorf("CLS %d: getAddressCode failed: %s", id, res)
 		}
