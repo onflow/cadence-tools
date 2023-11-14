@@ -111,51 +111,118 @@ async function createTestDocument(connection: ProtocolConnection, code: string):
   return uri
 }
 
-test("string import", async () => {
-  await withConnection({
-    getStringCode(location: string) {
-      if (location === "Test") {
-        return "pub contract Test {}"
+describe("import", () => {
+  test("string import", async () => {
+    await withConnection({
+      getStringCode(location: string) {
+        if (location === "Test") {
+          return "pub contract Test {}"
+        }
+        return undefined
       }
-      return undefined
-    }
-  }, async (connection) => {
-    const uri = await createTestDocument(connection, "import Test from \"Test\"")
-
-    const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
-      connection.onNotification(PublishDiagnosticsNotification.type, resolve)
+    }, async (connection) => {
+      const uri = await createTestDocument(connection, "import \"Test\"")
+  
+      const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
+        connection.onNotification(PublishDiagnosticsNotification.type, resolve)
+      })
+  
+      const notification = await notificationPromise
+  
+      expect(notification.uri).toEqual(uri)
+      expect(notification.diagnostics).toEqual([])
     })
-
-    const notification = await notificationPromise
-
-    expect(notification.uri).toEqual(uri)
-    expect(notification.diagnostics).toEqual([])
   })
-})
 
-test("address import", async () => {
-  await withConnection({
-    getAddressCode(address: string) {
-      if (address === "0000000000000001.Test") {
-        return "pub contract Test {}"
+  test("string import not found", async () => {
+    await withConnection({
+      getStringCode(_: string) {
+        return undefined
       }
-      return undefined
-    }
-  }, async (connection) => {
-    const uri = await createTestDocument(connection, "import Test from 0x01")
-
-    const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
-      connection.onNotification(PublishDiagnosticsNotification.type, resolve)
+    }, async (connection) => {
+      const uri = await createTestDocument(connection, "import \"Test\"")
+  
+      const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
+        connection.onNotification(PublishDiagnosticsNotification.type, resolve)
+      })
+  
+      const notification = await notificationPromise
+  
+      expect(notification.uri).toEqual(uri)
+      expect(notification.diagnostics).toEqual([{
+        severity: 1,
+        range: {
+          start: {
+            line: 0,
+            character: 7
+          },
+          end: {
+            line: 0,
+            character: 8
+          }
+        },
+        message: "checking of imported program `Test` failed"
+      }])
     })
+  })
+  
+  test("address import", async () => {
+    await withConnection({
+      getAddressCode(address: string) {
+        if (address === "0000000000000001.Test") {
+          return "pub contract Test {}"
+        }
+        return undefined
+      }
+    }, async (connection) => {
+      const uri = await createTestDocument(connection, "import Test from 0x01")
+  
+      const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
+        connection.onNotification(PublishDiagnosticsNotification.type, resolve)
+      })
+  
+      const notification = await notificationPromise
+  
+      expect(notification.uri).toEqual(uri)
+      expect(notification.diagnostics).toEqual([])
+    })
+  })
 
-    const notification = await notificationPromise
-
-    expect(notification.uri).toEqual(uri)
-    expect(notification.diagnostics).toEqual([])
+  test("address import not found", async () => {
+    await withConnection({
+      getAddressCode(_: string) {
+        return undefined
+      }
+    }, async (connection) => {
+      const uri = await createTestDocument(connection, "import Test from 0x01")
+  
+      const notificationPromise = new Promise<PublishDiagnosticsParams>((resolve) => {
+        connection.onNotification(PublishDiagnosticsNotification.type, resolve)
+      })
+  
+      const notification = await notificationPromise
+  
+      expect(notification.uri).toEqual(uri)
+      expect(notification.diagnostics).toEqual([{
+        severity: 1,
+        range: {
+          start: {
+            line: 0,
+            character: 17
+          },
+          end: {
+            line: 0,
+            character: 18
+          }
+        },
+        message: "checking of imported program `0000000000000001.Test` failed"
+      }])
+    })
   })
 })
 
 afterAll(() => {
+  // Kill the WASM instance when the tests are done
   withConnection({}, async (connection) => {
     await connection.sendNotification(ExitNotification.type)
   })
