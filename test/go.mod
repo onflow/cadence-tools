@@ -3,6 +3,7 @@ module github.com/onflow/cadence-tools/test
 go 1.18
 
 require (
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/cadence v0.42.5
 	github.com/onflow/flow-emulator v0.58.0
 	github.com/onflow/flow-go v0.32.4-0.20231115172515-c1ec969fd6f2
