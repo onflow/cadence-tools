@@ -5498,8 +5498,6 @@ func TestEnvironmentForUnitTests(t *testing.T) {
 		assert.NoError(t, result.Error)
 	}
 }
-
-
 func TestGetTests(t *testing.T) {
 	t.Parallel()
 
