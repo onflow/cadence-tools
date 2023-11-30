@@ -284,6 +284,25 @@ func (r *TestRunner) RunTests(script string) (results Results, err error) {
 	return results, err
 }
 
+func (r *TestRunner) GetTests(script string) ([]string, error) {
+	program, _, err := r.parseCheckAndInterpret(script)
+	if err != nil {
+		return nil, err
+	}
+
+	tests := make([]string, 0)
+
+	for _, funcDecl := range program.Program.FunctionDeclarations() {
+		funcName := funcDecl.Identifier.Identifier
+
+		if strings.HasPrefix(funcName, testFunctionPrefix) {
+			tests = append(tests, funcName)
+		}
+	}
+
+	return tests, nil
+}
+
 func (r *TestRunner) replaceImports(code string) string {
 	return r.backend.replaceImports(code)
 }

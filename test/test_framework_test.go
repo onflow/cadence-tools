@@ -5498,3 +5498,30 @@ func TestEnvironmentForUnitTests(t *testing.T) {
 		assert.NoError(t, result.Error)
 	}
 }
+
+
+func TestGetTests(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+				import Test
+
+				pub fun test1() {
+						log("test1")
+				}
+
+				pub fun test2() {
+						log("test2")
+				}
+
+				pub fun test3() {
+						log("test3")
+				}
+	`
+
+	runner := NewTestRunner()
+	tests, err := runner.GetTests(code)
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []string{"test1", "test2", "test3"}, tests)
+}
