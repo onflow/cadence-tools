@@ -5504,19 +5504,19 @@ func TestGetTests(t *testing.T) {
 	t.Parallel()
 
 	const code = `
-	import Test
+        import Test
 
-	pub fun test1() {
-			log("test1")
-	}
+        pub fun test1() {
+            log("test1")
+        }
 
-	pub fun test2() {
-			log("test2")
-	}
+        pub fun test2() {
+            log("test2")
+        }
 
-	pub fun test3() {
-			log("test3")
-	}
+        pub fun test3() {
+            log("test3")
+        }
 	`
 
 	runner := NewTestRunner()
