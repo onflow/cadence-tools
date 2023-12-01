@@ -640,10 +640,11 @@ func (r *TestRunner) interpreterContractValueHandler(
 					if err != nil {
 						panic(err)
 					}
-					err = storage.Commit(inter, true)
-					if err != nil {
-						panic(err)
-					}
+				}
+
+				err = storage.Commit(inter, true)
+				if err != nil {
+					panic(err)
 				}
 			}
 
