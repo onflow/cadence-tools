@@ -620,10 +620,17 @@ func TestImportContract(t *testing.T) {
 
 		const code = `
             import Test
-            import FooContract from "./FooContract"
+            import BlockchainHelpers
+            import Crypto
+            import "FlowToken"
             import BarContract from "./BarContract"
+            import FooContract from "./FooContract"
+            import BazContract from "./BazContract"
 
-            pub fun setup() {
+            access(all) let admin = Test.getAccount(0x0000000000000008)
+
+            access(all)
+            fun setup() {
                 var err = Test.deployContract(
                     name: "BarContract",
                     path: "./BarContract",
@@ -637,12 +644,78 @@ func TestImportContract(t *testing.T) {
                     arguments: []
                 )
                 Test.expect(err, Test.beNil())
+
+                err = Test.deployContract(
+                    name: "BazContract",
+                    path: "./BazContract",
+                    arguments: []
+                )
+                Test.expect(err, Test.beNil())
             }
 
-            pub fun test() {
-                Test.assertEqual("Hi from FooContract", FooContract.sayHi())
+            access(all)
+            fun test() {
+                var scriptResult = Test.executeScript(
+                    "access(all) fun main(): Int { return 5 }",
+                    []
+                )
+                var value = scriptResult.returnValue! as! Int
+                Test.assertEqual(5, value)
+
+                // Test access of methods & fields from built-in contract
+                let keyList = Crypto.KeyList()
+                Test.assert(keyList.get(keyIndex: 0) == nil)
+
+                let hash = Crypto.hash([1, 2, 3], algorithm: HashAlgorithm.SHA3_256)
+                Test.assertEqual(32, hash.length)
+
+                let totalSupply = FlowToken.totalSupply
+                Test.assertEqual(1000000000.0, totalSupply)
+
+                // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from BarContract", BarContract.sayHi())
-                Test.assertEqual(3, FooContract.numbers.length)
+                Test.assertEqual(/public/BarContractPublicPath, BarContract.publicPath)
+                Test.assertEqual(
+                    ["one", "two", "three"],
+                    BarContract.proposals
+                )
+
+                // Test access of methods & fields from deployed contract
+                Test.assertEqual("Hi from FooContract", FooContract.sayHi())
+                Test.assertEqual(
+                    {1: "one", 2: "two", 3: "three"},
+                    FooContract.numbers
+                )
+
+                // Test access of methods & fields from deployed contract
+                Test.assertEqual("Hi from BazContract", BazContract.sayHi())
+                Test.assertEqual(/public/BazContractPublicPath, BazContract.publicPath)
+
+                // Test that we can still create accounts, execute scripts
+                // and transactions.
+                scriptResult = Test.executeScript(
+                    "access(all) fun main(): Int { return 15 }",
+                    []
+                )
+                value = scriptResult.returnValue! as! Int
+                Test.assertEqual(15, value)
+
+                let account = Test.createAccount()
+                let tx = Test.Transaction(
+                    code: "transaction { execute{ assert(true) } }",
+                    authorizers: [],
+                    signers: [account],
+                    arguments: [],
+                )
+                let result = Test.executeTransaction(tx)
+
+                Test.expect(result, Test.beSucceeded())
+
+                let blockHeight = getCurrentBlockHeight()
+                Test.assert(blockHeight > 1)
+
+                mintFlow(to: admin, amount: 500.0)
+                Test.assertEqual(500.0, getFlowBalance(for: admin))
             }
 		`
 
@@ -662,10 +735,30 @@ func TestImportContract(t *testing.T) {
 
 		const barContract = `
             pub contract BarContract {
-                init() {}
+                pub let publicPath: PublicPath
+                pub let proposals: [String]
+
+                init() {
+                    self.publicPath = /public/BarContractPublicPath
+                    self.proposals = ["one", "two", "three"]
+                }
 
                 pub fun sayHi(): String {
                     return "Hi from BarContract"
+                }
+            }
+		`
+
+		const bazContract = `
+            pub contract BazContract {
+                pub let publicPath: PublicPath
+
+                init() {
+                    self.publicPath = /public/BazContractPublicPath
+                }
+
+                pub fun sayHi(): String {
+                    return "Hi from BazContract"
                 }
             }
 		`
@@ -679,12 +772,18 @@ func TestImportContract(t *testing.T) {
 				if location.Name == "BarContract" {
 					return barContract, nil
 				}
+				if location.Name == "BazContract" {
+					return bazContract, nil
+				}
 			case common.StringLocation:
 				if location == "./FooContract" {
 					return fooContract, nil
 				}
 				if location == "./BarContract" {
 					return barContract, nil
+				}
+				if location == "./BazContract" {
+					return bazContract, nil
 				}
 			}
 
@@ -697,12 +796,15 @@ func TestImportContract(t *testing.T) {
 				return fooContract, nil
 			case "./BarContract":
 				return barContract, nil
+			case "./BazContract":
+				return bazContract, nil
 			default:
 				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
 		contracts := map[string]common.Address{
+			"BazContract": {0, 0, 0, 0, 0, 0, 0, 8},
 			"BarContract": {0, 0, 0, 0, 0, 0, 0, 5},
 			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
 		}
