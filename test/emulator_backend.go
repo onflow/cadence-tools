@@ -40,9 +40,8 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkTest "github.com/onflow/flow-go-sdk/test"
-	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 )
@@ -113,13 +112,14 @@ var chain = flow.MonotonicEmulator.Chain()
 var commonContracts = emulator.NewCommonContracts(chain)
 
 var systemContracts = func() []common.AddressLocation {
+	chainContracts := systemcontracts.SystemContractsForChain(chain.ChainID())
 	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
 		"FlowServiceAccount":         serviceAddress,
-		"FlowToken":                  fvm.FlowTokenAddress(chain).HexWithPrefix(),
-		"FungibleToken":              fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-		"FungibleTokenMetadataViews": fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-		"FlowFees":                   environment.FlowFeesAddress(chain).HexWithPrefix(),
+		"FlowToken":                  chainContracts.FlowToken.Address.HexWithPrefix(),
+		"FungibleToken":              chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"FungibleTokenMetadataViews": chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"FlowFees":                   chainContracts.FlowFees.Address.HexWithPrefix(),
 		"FlowStorageFees":            serviceAddress,
 		"FlowClusterQC":              serviceAddress,
 		"FlowDKG":                    serviceAddress,
