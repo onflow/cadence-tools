@@ -23,37 +23,8 @@ import (
 	"regexp"
 
 	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/tools/analysis"
 )
-
-func memberReplacement(memberInfo sema.MemberInfo) string {
-	memberName := memberInfo.Member.Identifier.Identifier
-	switch memberInfo.AccessedType {
-	case sema.AuthAccountType:
-		switch memberName {
-		case sema.AuthAccountTypeAddPublicKeyFunctionName:
-			return "keys.add"
-
-		case sema.AuthAccountTypeRemovePublicKeyFunctionName:
-			return "keys.revoke"
-
-		case sema.AuthAccountTypeGetCapabilityFunctionName:
-			return "capabilities.get"
-
-		case sema.AuthAccountTypeLinkFunctionName:
-			return "capabilities.storage.issue"
-
-		case sema.AuthAccountTypeLinkAccountFunctionName:
-			return "capabilities.account.issue"
-
-		case sema.AuthAccountTypeUnlinkFunctionName:
-			return "capabilities.unpublish"
-		}
-	}
-
-	return ""
-}
 
 var docStringDeprecationWarningPattern = regexp.MustCompile(`(?i)[\t *_]*deprecated\b(?:[*_]*: (.*))?`)
 
@@ -87,7 +58,7 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					memberInfo, _ := elaboration.MemberExpressionMemberInfo(memberExpression)
+					memberInfo, _ := elaboration.MemberExpressionMemberAccessInfo(memberExpression)
 					member := memberInfo.Member
 					if member == nil {
 						return
@@ -102,22 +73,6 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 
 					identifierRange := ast.NewRangeFromPositioned(nil, memberExpression.Identifier)
 
-					var suggestedFixes []analysis.SuggestedFix
-
-					replacement := memberReplacement(memberInfo)
-					if replacement != "" {
-						suggestedFix := analysis.SuggestedFix{
-							Message: "replace",
-							TextEdits: []analysis.TextEdit{
-								{
-									Replacement: replacement,
-									Range:       identifierRange,
-								},
-							},
-						}
-						suggestedFixes = append(suggestedFixes, suggestedFix)
-					}
-
 					report(
 						analysis.Diagnostic{
 							Location: location,
@@ -129,7 +84,6 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 								memberName,
 							),
 							SecondaryMessage: docStringMatch[1],
-							SuggestedFixes:   suggestedFixes,
 						},
 					)
 				},
