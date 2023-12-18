@@ -2,8 +2,8 @@ import "FungibleToken"
 import "FlowToken"
 
 transaction(amount: UFix64) {
-    prepare(account: AuthAccount) {
-        let flowVault = account.borrow<&FlowToken.Vault>(
+    prepare(account: auth(BorrowValue) &Account) {
+        let flowVault = account.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(
             from: /storage/flowTokenVault
         ) ?? panic("Could not borrow BlpToken.Vault reference)")
 

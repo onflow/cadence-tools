@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/stdlib"
@@ -148,7 +149,6 @@ var systemContracts = func() []common.AddressLocation {
 }()
 
 func NewEmulatorBackend(
-	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
@@ -410,7 +410,7 @@ func (e *EmulatorBackend) DeployContract(
 
 	const deployContractTransactionTemplate = `
         transaction(%s) {
-            prepare(signer: AuthAccount) {
+            prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex()%s)
             }
         }
@@ -525,20 +525,28 @@ func (e *EmulatorBackend) Events(
 	latestBlockHeight := latestBlock.Header.Height
 	height := uint64(0)
 	values := make([]interpreter.Value, 0)
-	evtType, _ := eventType.(interpreter.CompositeStaticType)
+
+	var eventTypeString string
+	switch eventType := eventType.(type) {
+	case nil:
+		eventTypeString = ""
+	case *interpreter.CompositeStaticType:
+		eventTypeString = eventType.String()
+	default:
+		panic(errors.NewUnreachableError())
+	}
 
 	for height <= latestBlockHeight {
-		events, err := e.blockchain.GetEventsByHeight(
-			height,
-			evtType.String(),
-		)
+		events, err := e.blockchain.GetEventsByHeight(height, eventTypeString)
 		if err != nil {
 			panic(err)
 		}
+
 		sdkEvents, err := convert.FlowEventsToSDK(events)
 		if err != nil {
 			panic(err)
 		}
+
 		for _, event := range sdkEvents {
 			value, err := runtime.ImportValue(
 				inter,
@@ -573,21 +581,25 @@ func (e *EmulatorBackend) Events(
 	)
 }
 
-// Moves the time of the Blockchain's clock, by the
+// MoveTime Moves the time of the Blockchain's clock, by the
 // given time delta, in the form of seconds.
 func (e *EmulatorBackend) MoveTime(timeDelta int64) {
 	e.clock.TimeDelta += timeDelta
 	e.blockchain.SetClock(e.clock)
-	e.CommitBlock()
+
+	err := e.CommitBlock()
+	if err != nil {
+		panic(err)
+	}
 }
 
-// Creates a snapshot of the blockchain, at the
+// CreateSnapshot Creates a snapshot of the blockchain, at the
 // current ledger state, with the given name.
 func (e *EmulatorBackend) CreateSnapshot(name string) error {
 	return e.blockchain.CreateSnapshot(name)
 }
 
-// Loads a snapshot of the blockchain, with the
+// LoadSnapshot Loads a snapshot of the blockchain, with the
 // given name, and updates the current ledger
 // state.
 func (e *EmulatorBackend) LoadSnapshot(name string) error {

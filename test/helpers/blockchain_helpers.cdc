@@ -16,7 +16,7 @@ fun getCurrentBlockHeight(): UInt64 {
 /// Returns the Flow token balance for the given account.
 ///
 access(all)
-fun getFlowBalance(for account: Test.Account): UFix64 {
+fun getFlowBalance(account: Test.TestAccount): UFix64 {
     let script = readFile("get_flow_balance.cdc")
     let scriptResult = Test.executeScript(script, [account.address])
 
@@ -32,7 +32,7 @@ fun getFlowBalance(for account: Test.Account): UFix64 {
 ///
 access(all)
 fun mintFlow(
-    to receiver: Test.Account,
+    to receiver: Test.TestAccount,
     amount: UFix64
 ): Test.TransactionResult {
     let code = readFile("mint_flow.cdc")
@@ -51,7 +51,7 @@ fun mintFlow(
 ///
 access(all)
 fun burnFlow(
-    from account: Test.Account,
+    from account: Test.TestAccount,
     amount: UFix64
 ): Test.TransactionResult {
     let code = readFile("burn_flow.cdc")
@@ -84,7 +84,7 @@ access(all)
 fun executeTransaction(
     _ path: String,
     _ arguments: [AnyStruct],
-    _ account: Test.Account
+    _ account: Test.TestAccount
 ): Test.TransactionResult {
     let code = Test.readFile(path)
     let tx = Test.Transaction(
