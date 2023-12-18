@@ -38,8 +38,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			pub contract Test {
-				pub fun test() {
+			access(all) contract Test {
+				access(all) fun test() {
 					let x = true as Bool
 				}
 			}
@@ -52,8 +52,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 66, Line: 4, Column: 21},
-						EndPos:   ast.Position{Offset: 69, Line: 4, Column: 24},
+						StartPos: ast.Position{Offset: 82, Line: 4, Column: 21},
+						EndPos:   ast.Position{Offset: 85, Line: 4, Column: 24},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
@@ -70,8 +70,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			pub contract Test {
-				pub fun test() {
+			access(all) contract Test {
+				access(all) fun test() {
 					let x = true as! Bool
 				}
 			}
@@ -84,8 +84,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 58, Line: 4, Column: 13},
-						EndPos:   ast.Position{Offset: 70, Line: 4, Column: 25},
+						StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
+						EndPos:   ast.Position{Offset: 86, Line: 4, Column: 25},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
@@ -102,8 +102,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			pub contract Test {
-				pub fun test() {
+			access(all) contract Test {
+				access(all) fun test() {
 					let x = true as? Bool
 				}
 			}
@@ -116,8 +116,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 58, Line: 4, Column: 13},
-						EndPos:   ast.Position{Offset: 70, Line: 4, Column: 25},
+						StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
+						EndPos:   ast.Position{Offset: 86, Line: 4, Column: 25},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
