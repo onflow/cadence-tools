@@ -1,6 +1,6 @@
 module github.com/onflow/cadence-tools/test
 
-go 1.18
+go 1.20
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
