@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/cadence-tools/test/helpers"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
@@ -38,6 +37,8 @@ import (
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+
+	"github.com/onflow/cadence-tools/test/helpers"
 )
 
 // This Provides utility methods to easily run test-scripts.
@@ -444,10 +445,8 @@ func (r *TestRunner) initializeEnvironment() (
 	runtime.Context,
 ) {
 	config := runtime.Config{
-		AccountLinkingEnabled:        true,
-		AttachmentsEnabled:           true,
-		CapabilityControllersEnabled: true,
-		CoverageReport:               r.coverageReport,
+		AttachmentsEnabled: true,
+		CoverageReport:     r.coverageReport,
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(config)
