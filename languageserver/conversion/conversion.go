@@ -70,9 +70,6 @@ func DeclarationKindToSymbolKind(kind common.DeclarationKind) protocol.SymbolKin
 	case common.DeclarationKindInitializer:
 		return protocol.Constructor
 
-	case common.DeclarationKindDestructor:
-		return protocol.Function
-
 	case common.DeclarationKindStructure,
 		common.DeclarationKindResource,
 		common.DeclarationKindEvent,

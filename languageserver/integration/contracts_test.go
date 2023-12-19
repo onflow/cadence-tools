@@ -37,16 +37,20 @@ func Test_ContractUpdate(t *testing.T) {
 
 	const code = `
       /// pragma signers Alice
-	  pub contract HelloWorld {
-			pub let greeting: String
+      access(all)
+      contract HelloWorld {
 
-			pub fun hello(): String {
-				return self.greeting
-			}
+            access(all)
+            let greeting: String
 
-			init(a: String) {
-				self.greeting = a
-			}
+            access(all)
+            fun hello(): String {
+                return self.greeting
+            }
+
+            init(a: String) {
+                self.greeting = a
+            }
      }
     `
 
@@ -103,13 +107,17 @@ func Test_ContractUpdate(t *testing.T) {
 
 		codelenses := contract.codelens(client)
 
-		assert.Len(t, codelenses, 1)
-		assert.Equal(t, "💡 Deploy contract HelloWorld to Alice", codelenses[0].Command.Title)
-		assert.Equal(t, "cadence.server.flow.deployContract", codelenses[0].Command.Command)
-		assert.Equal(t, nil, codelenses[0].Data)
-		assert.Equal(t, protocol.Range{
-			Start: protocol.Position{Line: 2, Character: 3},
-			End:   protocol.Position{Line: 2, Character: 4},
-		}, codelenses[0].Range)
+		require.Len(t, codelenses, 1)
+		codeLens := codelenses[0]
+		assert.Equal(t, "💡 Deploy contract HelloWorld to Alice", codeLens.Command.Title)
+		assert.Equal(t, "cadence.server.flow.deployContract", codeLens.Command.Command)
+		assert.Equal(t, nil, codeLens.Data)
+		assert.Equal(t,
+			protocol.Range{
+				Start: protocol.Position{Line: 2, Character: 6},
+				End:   protocol.Position{Line: 2, Character: 7},
+			},
+			codeLens.Range,
+		)
 	})
 }

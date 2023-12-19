@@ -322,14 +322,12 @@ func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
 		BaseValueActivationHandler: func(_ common.Location) *sema.VariableActivation {
 			return lib.baseValueActivation
 		},
-		AccessCheckMode:              s.accessCheckMode,
-		PositionInfoEnabled:          true,
-		ExtendedElaborationEnabled:   true,
-		LocationHandler:              s.handleLocation,
-		ImportHandler:                s.handleImport,
-		AttachmentsEnabled:           true,
-		AccountLinkingEnabled:        true,
-		CapabilityControllersEnabled: true,
+		AccessCheckMode:            s.accessCheckMode,
+		PositionInfoEnabled:        true,
+		ExtendedElaborationEnabled: true,
+		LocationHandler:            s.handleLocation,
+		ImportHandler:              s.handleImport,
+		AttachmentsEnabled:         true,
 	}
 }
 
@@ -2346,7 +2344,7 @@ func (s *Server) convertError(
 		}
 	}
 
-	if hasSuggestedFixes, ok := err.(sema.HasSuggestedFixes); ok {
+	if hasSuggestedFixes, ok := err.(errors.HasSuggestedFixes[ast.TextEdit]); ok {
 		if document, ok := s.documents[uri]; ok {
 			codeActionsResolver = combineCodeActionResolvers(
 				codeActionsResolver,
@@ -2525,10 +2523,8 @@ func maybeAddMissingMembersCodeActionResolver(
 
 			builder.WriteRune('\n')
 			builder.WriteString(indentation)
-			if missingMember.Access != ast.AccessNotSpecified {
-				builder.WriteString(missingMember.Access.Keyword())
-				builder.WriteRune(' ')
-			}
+			builder.WriteString(missingMember.Access.String())
+			builder.WriteRune(' ')
 			builder.WriteString(newMemberSource)
 			builder.WriteRune('\n')
 		}

@@ -1,1 +1,2 @@
-pub contract A {}
+access(all)
+contract A {}

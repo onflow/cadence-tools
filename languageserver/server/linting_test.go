@@ -42,7 +42,7 @@ func TestLinting(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := checkProgram(t, `pub fun test() {
+		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = Int8(-1)
 		}`)
 
@@ -68,7 +68,7 @@ func TestLinting(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := checkProgram(t, `pub fun test() {
+		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = 3
 			let y = x!
 		}`)
@@ -95,7 +95,7 @@ func TestLinting(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := checkProgram(t, `pub fun test() {
+		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = true as! Bool
 		}`)
 
@@ -116,7 +116,7 @@ func TestLinting(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := checkProgram(t, `pub fun test() {
+		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = true as! Bool
 			let y: Bool = 3
 		}`)
