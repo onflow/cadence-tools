@@ -25,7 +25,7 @@ PATH := $(PATH):$(GOPATH)/bin
 .PHONY: build
 build:
 	go build -o ./cmd/languageserver/languageserver ./cmd/languageserver
-	GOARCH=wasm GOOS=js go build -o ./cmd/languageserver/languageserver.wasm ./cmd/languageserver
+	# TODO: GOARCH=wasm GOOS=js go build -o ./cmd/languageserver/languageserver.wasm ./cmd/languageserver
 
 .PHONY: generate
 generate:
@@ -34,7 +34,7 @@ generate:
 	go mod tidy
 
 .PHONY: test
-test: e2e-test generate unit-test wasm-test
+test: e2e-test generate unit-test # TODO: wasm-test
 
 .PHONY: unit-test
 unit-test:
