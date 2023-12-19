@@ -1,8 +1,12 @@
 import Foo from "./foo.cdc"
 
-pub contract Bar {
-     pub let x: String
+access(all)
+contract Bar {
+
+     access(all)
+     let x: String
+
      init() {
-       self.x = Foo.bar
+         self.x = Foo.bar
      }
 }

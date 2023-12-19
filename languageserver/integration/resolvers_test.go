@@ -108,7 +108,7 @@ func Test_AddressImport(t *testing.T) {
 func Test_SimpleImport(t *testing.T) {
 	mockFS := afero.NewMemMapFs()
 	af := afero.Afero{Fs: mockFS}
-	code := `pub contract Test {}`
+	code := `access(all) contract Test {}`
 	_ = afero.WriteFile(mockFS, "./test.cdc", []byte(code), 0644)
 
 	mock := &mockFlowState{}

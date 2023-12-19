@@ -1,4 +1,4 @@
 transaction {
-    prepare(signer: AuthAccount) {}
+    prepare(signer: &Account) {}
     execute {}
 }

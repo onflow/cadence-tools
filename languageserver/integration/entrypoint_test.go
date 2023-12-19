@@ -99,11 +99,11 @@ func setupMockClient() *mockFlowClient {
 func Test_EntrypointUpdate(t *testing.T) {
 	t.Run("update entrypoint information", func(t *testing.T) {
 		entrypoint := buildEntrypoint(t, `
-			/// pragma signers Alice
-			/// pragma arguments (hello: 10.0)
-			transaction(hello: UFix64) {
-				prepare(signer: AuthAccount) {} 
-			}`,
+            /// pragma signers Alice
+            /// pragma arguments (hello: 10.0)
+            transaction(hello: UFix64) {
+                prepare(signer: &Account) {} 
+            }`,
 		)
 
 		val, _ := cadence.NewUFix64("10.0")
@@ -122,11 +122,12 @@ func Test_EntrypointUpdate(t *testing.T) {
 
 	t.Run("update script entrypoint information", func(t *testing.T) {
 		entrypoint := buildEntrypoint(t, `
-			/// pragma arguments (hello: "hi")
-			pub fun main(hello: String): String {
-				return hello.concat(" world")
-			}
-		`)
+            /// pragma arguments (hello: "hi")
+            access(all)
+            fun main(hello: String): String {
+                return hello.concat(" world")
+            }
+        `)
 
 		val, _ := cadence.NewString("hi")
 
@@ -152,69 +153,91 @@ func Test_Codelensses(t *testing.T) {
 		args    string
 	}{{
 		code: `
-			/// pragma signers Alice
-			/// pragma arguments (hello: 10.0)
-			transaction(hello: UFix64) {
-				prepare(signer: AuthAccount) {} 
-			}`,
+            /// pragma signers Alice
+            /// pragma arguments (hello: 10.0)
+            transaction(hello: UFix64) {
+                prepare(signer: &Account) {} 
+            }`,
 		title:   "💡 Send with (hello: 10.0) signed by Alice",
 		command: "cadence.server.flow.sendTransaction",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x3, Character: 0x3}, End: protocol.Position{Line: 0x3, Character: 0x4}},
-		args:    `"[{\"value\":\"10.00000000\",\"type\":\"UFix64\"}]"`,
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 3, Character: 12},
+			End:   protocol.Position{Line: 3, Character: 13},
+		},
+		args: `"[{\"value\":\"10.00000000\",\"type\":\"UFix64\"}]"`,
 	}, {
 		code:    `transaction {}`,
 		title:   "💡 Send signed by service account",
 		command: "cadence.server.flow.sendTransaction",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x0, Character: 0x0}, End: protocol.Position{Line: 0x0, Character: 0x1}},
-		args:    `"[]"`,
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: 0, Character: 1},
+		},
+		args: `"[]"`,
 	}, {
 		code: `
-			/// pragma arguments (hello: "hi")
-			pub fun main(hello: String): String {
-				return hello.concat(" world")
-			}
-		`,
+            /// pragma arguments (hello: "hi")
+            access(all)
+            fun main(hello: String): String {
+                return hello.concat(" world")
+            }
+        `,
 		title:   `💡 Execute script with (hello: "hi")`,
 		command: "cadence.server.flow.executeScript",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x2, Character: 0x3}, End: protocol.Position{Line: 0x2, Character: 0x4}},
-		args:    `"[{\"value\":\"hi\",\"type\":\"String\"}]"`,
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 12},
+			End:   protocol.Position{Line: 2, Character: 13},
+		},
+		args: `"[{\"value\":\"hi\",\"type\":\"String\"}]"`,
 	}, {
 		code: `
-			transaction {
-				prepare(s: AuthAccount) {} 
-			}`,
+            transaction {
+                prepare(s: &Account) {} 
+            }`,
 		title:   "💡 Send signed by Alice",
 		command: "cadence.server.flow.sendTransaction",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x1, Character: 0x3}, End: protocol.Position{Line: 0x1, Character: 0x4}},
-		args:    `"[]"`,
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 1, Character: 12},
+			End:   protocol.Position{Line: 1, Character: 13},
+		},
+		args: `"[]"`,
 	}, {
 		code: `
-			/// pragma signers Alice,Bob
-			transaction {
-				prepare(s1: AuthAccount, s2: AuthAccount) {} 
-			}`,
+            /// pragma signers Alice,Bob
+            transaction {
+                prepare(s1: &Account, s2: &Account) {} 
+            }`,
 		title:   "💡 Send signed by Alice and Bob",
 		command: "cadence.server.flow.sendTransaction",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x2, Character: 0x3}, End: protocol.Position{Line: 0x2, Character: 0x4}},
-		args:    `"[]"`,
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 12},
+			End:   protocol.Position{Line: 2, Character: 13},
+		},
+		args: `"[]"`,
 	}, {
 		code: `
-			/// pragma signers Alice
-			transaction {
-				prepare(s1: AuthAccount, s2: AuthAccount) {} 
-			}`,
+            /// pragma signers Alice
+            transaction {
+                prepare(s1: &Account, s2: &Account) {} 
+            }`,
 		title:   "🚫 Not enough signers. Required: 2, passed: 1",
 		command: "",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x2, Character: 0x3}, End: protocol.Position{Line: 0x2, Character: 0x4}},
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 12},
+			End:   protocol.Position{Line: 2, Character: 13},
+		},
 	}, {
 		code: `
-			/// pragma signers Invalid
-			transaction {
-				prepare(s1: AuthAccount) {} 
-			}`,
+            /// pragma signers Invalid
+            transaction {
+                prepare(s1: &Account) {} 
+            }`,
 		title:   "🚫 Specified account Invalid does not exist",
 		command: "",
-		ranges:  protocol.Range{Start: protocol.Position{Line: 0x2, Character: 0x3}, End: protocol.Position{Line: 0x2, Character: 0x4}},
+		ranges: protocol.Range{
+			Start: protocol.Position{Line: 2, Character: 12},
+			End:   protocol.Position{Line: 2, Character: 13},
+		},
 	}}
 
 	for i, test := range tests {
