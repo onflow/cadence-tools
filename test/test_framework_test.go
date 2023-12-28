@@ -3851,7 +3851,7 @@ func TestServiceAccount(t *testing.T) {
                 let tx = Test.Transaction(
                     code: code,
                     authorizers: [account.address],
-                    signers: [],
+                    signers: [account],
                     arguments: [receiver.address, 1500.0]
                 )
 

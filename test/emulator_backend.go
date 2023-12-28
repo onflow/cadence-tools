@@ -642,8 +642,15 @@ func (e *EmulatorBackend) signTransaction(
 	// Sign transaction with each signer
 	// Note: Following logic is borrowed from the flow-ft.
 
+	serviceKey := e.blockchain.ServiceKey()
+
 	for i := len(signerAccounts) - 1; i >= 0; i-- {
 		signerAccount := signerAccounts[i]
+		if signerAccount.Address == common.Address(serviceKey.Address) {
+			// skip payload signing for service account, since we always
+			// sign the envelope with the service account just below
+			continue
+		}
 
 		publicKey := signerAccount.PublicKey.PublicKey
 		accountKeys := e.accountKeys[signerAccount.Address]
@@ -655,7 +662,6 @@ func (e *EmulatorBackend) signTransaction(
 		}
 	}
 
-	serviceKey := e.blockchain.ServiceKey()
 	serviceSigner, err := serviceKey.Signer()
 	if err != nil {
 		return err
