@@ -640,6 +640,7 @@ func TestImportContract(t *testing.T) {
             import BlockchainHelpers
             import Crypto
             import "FlowToken"
+            import "RandomBeaconHistory"
             import BarContract from "./BarContract"
             import FooContract from "./FooContract"
             import BazContract from "./BazContract"
@@ -733,6 +734,19 @@ func TestImportContract(t *testing.T) {
 
                 mintFlow(to: admin, amount: 500.0)
                 Test.assertEqual(500.0, getFlowBalance(account: admin))
+
+                let lowestHeight = RandomBeaconHistory.getLowestHeight()
+                Test.assertEqual(UInt64(1), lowestHeight)
+
+                let randomSource = RandomBeaconHistory.sourceOfRandomness(atBlockHeight: lowestHeight)
+                let expectedSource = RandomBeaconHistory.RandomSource(
+                    blockHeight: lowestHeight,
+                    value: [
+                        7, 58, 231, 186, 127, 87, 155, 70, 128, 9, 11, 130, 196, 94, 144, 52, 140,
+                        71, 60, 164, 34, 100, 227, 42, 235, 244, 53, 223, 152, 116, 213, 241
+                    ] as [UInt8]
+                )
+                Test.assertEqual(expectedSource, randomSource)
             }
 		`
 
