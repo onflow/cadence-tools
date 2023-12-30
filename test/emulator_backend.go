@@ -149,7 +149,6 @@ var systemContracts = func() []common.AddressLocation {
 
 func NewEmulatorBackend(
 	logger zerolog.Logger,
-	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
