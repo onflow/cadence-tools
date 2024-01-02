@@ -4833,7 +4833,7 @@ func TestWithLogger(t *testing.T) {
 	const code = `
 				import Test
 
-				pub fun testWithLogger() {
+				access(all) fun testWithLogger() {
 						log("Hello, world!")
 				}
 	`
