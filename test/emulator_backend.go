@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -149,6 +148,7 @@ var systemContracts = func() []common.AddressLocation {
 }()
 
 func NewEmulatorBackend(
+	logger zerolog.Logger,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 ) *EmulatorBackend {
@@ -157,11 +157,13 @@ func NewEmulatorBackend(
 	if coverageReport != nil {
 		excludeCommonLocations(coverageReport)
 		blockchain = newBlockchain(
+			logger,
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
 		)
 	} else {
 		blockchain = newBlockchain(
+			logger,
 			logCollectionHook,
 		)
 	}
@@ -729,18 +731,18 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 // newBlockchain returns an emulator blockchain for testing.
 func newBlockchain(
+	logger zerolog.Logger,
 	hook *logCollectionHook,
 	opts ...emulator.Option,
 ) *emulator.Blockchain {
-	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	logger := zerolog.New(output).With().Timestamp().
+	testLogger := logger.With().Timestamp().
 		Logger().Hook(hook).Level(zerolog.InfoLevel)
 
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
 				emulator.WithStorageLimitEnabled(false),
-				emulator.WithServerLogger(logger),
+				emulator.WithServerLogger(testLogger),
 				emulator.Contracts(commonContracts),
 				emulator.WithChainID(chain.ChainID()),
 			},
