@@ -4831,11 +4831,11 @@ func TestWithLogger(t *testing.T) {
 	t.Parallel()
 
 	const code = `
-				import Test
+    import Test
 
-				access(all) fun testWithLogger() {
-						log("Hello, world!")
-				}
+    access(all) fun testWithLogger() {
+        log("Hello, world!")
+    }
 	`
 
 	var buf bytes.Buffer
@@ -4847,7 +4847,7 @@ func TestWithLogger(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	expectedPattern := `{"message":"{\\"level\\":\\"info\\",\\"time\\":\\"[0-9TZ:.-]+\\",\\"message\\":\\"\\\\u001b\[1;34mLOG:\\\\u001b\[0m \\\\\\\"Hello, world!\\\\\\\"\\"}"}`
+	expectedPattern := `{"level":"info","time":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-\d{2}:\d{2}","message":"\\u001b\[1;34mLOG:\\u001b\[0m \\"Hello, world!\\""}`
 	assert.Regexp(t, expectedPattern, buf.String())
 }
 

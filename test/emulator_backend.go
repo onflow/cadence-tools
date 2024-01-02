@@ -735,7 +735,7 @@ func newBlockchain(
 	hook *logCollectionHook,
 	opts ...emulator.Option,
 ) *emulator.Blockchain {
-	testLogger := zerolog.New(logger).With().Timestamp().
+	testLogger := logger.With().Timestamp().
 		Logger().Hook(hook).Level(zerolog.InfoLevel)
 
 	b, err := emulator.New(
