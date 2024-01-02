@@ -79,7 +79,6 @@ func NewTestFrameworkProvider(
 		coverageReport: coverageReport,
 		emulatorBackend: NewEmulatorBackend(
 			logger,
-			fileResolver,
 			stdlibHandler,
 			coverageReport,
 		),
