@@ -4831,8 +4831,6 @@ func TestWithLogger(t *testing.T) {
 	t.Parallel()
 
 	const code = `
-    import Test
-
     access(all) fun testWithLogger() {
         log("Hello, world!")
     }
