@@ -19,10 +19,12 @@
 package test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -3445,7 +3447,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
 	emulatorBackend.contracts = map[string]common.Address{
 		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
 		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
@@ -3696,7 +3698,7 @@ func TestServiceAccount(t *testing.T) {
 	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
-		emulatorBackend := NewEmulatorBackend(nil, nil, nil)
+		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
 
 		serviceAccount, err := emulatorBackend.ServiceAccount()
 
@@ -4703,6 +4705,28 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 	for _, result := range results {
 		require.NoError(t, result.Error)
 	}
+}
+
+func TestWithLogger(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+    access(all) fun testWithLogger() {
+        log("Hello, world!")
+    }
+	`
+
+	var buf bytes.Buffer
+	logger := zerolog.New(&buf)
+
+	runner := NewTestRunner().WithLogger(logger)
+
+	result, err := runner.RunTest(code, "testWithLogger")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+
+	expectedPattern := `{"level":"info","time":"[0-9TZ:.-]+","message":"\\u001b\[1;34mLOG:\\u001b\[0m \\"Hello, world!\\""}`
+	assert.Regexp(t, expectedPattern, buf.String())
 }
 
 func TestGetEventsFromIntegrationTests(t *testing.T) {

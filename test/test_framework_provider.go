@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/rs/zerolog"
 )
 
 var _ stdlib.TestFramework = &TestFrameworkProvider{}
@@ -67,6 +68,7 @@ func (tf *TestFrameworkProvider) EmulatorBackend() stdlib.Blockchain {
 }
 
 func NewTestFrameworkProvider(
+	logger zerolog.Logger,
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
@@ -76,6 +78,7 @@ func NewTestFrameworkProvider(
 		stdlibHandler:  stdlibHandler,
 		coverageReport: coverageReport,
 		emulatorBackend: NewEmulatorBackend(
+			logger,
 			fileResolver,
 			stdlibHandler,
 			coverageReport,

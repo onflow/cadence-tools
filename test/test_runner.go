@@ -120,6 +120,7 @@ type FileResolver func(path string) (string, error)
 
 // TestRunner runs tests.
 type TestRunner struct {
+	logger zerolog.Logger
 
 	// importResolver is used to resolve imports of the *test script*.
 	// Note: This doesn't resolve the imports for the code that is being tested.
@@ -146,8 +147,14 @@ type TestRunner struct {
 
 func NewTestRunner() *TestRunner {
 	return &TestRunner{
+		logger: zerolog.Nop(),
 		contracts: baseContracts(),
 	}
+}
+
+func (r *TestRunner) WithLogger(logger zerolog.Logger) *TestRunner {
+	r.logger = logger
+	return r
 }
 
 func (r *TestRunner) WithImportResolver(importResolver ImportResolver) *TestRunner {
@@ -455,6 +462,7 @@ func (r *TestRunner) initializeEnvironment() (
 	r.testRuntime = runtime.NewInterpreterRuntime(config)
 
 	r.testFramework = NewTestFrameworkProvider(
+		r.logger,
 		r.fileResolver,
 		env,
 		r.coverageReport,
