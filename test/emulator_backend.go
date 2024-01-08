@@ -741,7 +741,7 @@ func newBlockchain(
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
-				emulator.WithStorageLimitEnabled(false),
+				emulator.WithStorageLimitEnabled(true),
 				emulator.WithServerLogger(testLogger),
 				emulator.Contracts(commonContracts),
 				emulator.WithChainID(chain.ChainID()),
