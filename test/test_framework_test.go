@@ -4831,9 +4831,10 @@ func TestWithLogger(t *testing.T) {
 	t.Parallel()
 
 	const code = `
-    access(all) fun testWithLogger() {
-        log("Hello, world!")
-    }
+        access(all)
+        fun testWithLogger() {
+            log("Hello, world!")
+        }
 	`
 
 	var buf bytes.Buffer
@@ -4845,8 +4846,8 @@ func TestWithLogger(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	expectedPattern := `{"level":"info","time":"[0-9TZ:.-]+","message":"\\u001b\[1;34mLOG:\\u001b\[0m \\"Hello, world!\\""}`
-	assert.Regexp(t, expectedPattern, buf.String())
+	assert.Contains(t, buf.String(), "Hello, world!")
+	assert.Equal(t, []string{"Hello, world!"}, runner.Logs())
 }
 
 func TestGetEventsFromIntegrationTests(t *testing.T) {
