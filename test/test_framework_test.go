@@ -735,7 +735,7 @@ func TestImportContract(t *testing.T) {
                 Test.assert(blockHeight > 1)
 
                 mintFlow(to: admin, amount: 500.0)
-                Test.assertEqual(500.001, getFlowBalance(account: admin))
+                Test.assertEqual(500.0, getFlowBalance(account: admin))
 
                 let lowestHeight = RandomBeaconHistory.getLowestHeight()
                 Test.assertEqual(UInt64(1), lowestHeight)
@@ -1157,7 +1157,7 @@ func TestUsingEnv(t *testing.T) {
             access(all)
             fun test() {
                 let acc = getAccount(0x10)
-                Test.assertEqual(0.001, acc.balance)
+                Test.assertEqual(0.0, acc.balance)
             }
 		`
 
@@ -1188,7 +1188,7 @@ func TestUsingEnv(t *testing.T) {
 
             access(all)
             fun test() {
-                Test.assertEqual(0.001, FooContract.getBalance())
+                Test.assertEqual(0.0, FooContract.getBalance())
             }
 		`
 
@@ -3556,7 +3556,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil)
+	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, false)
 	emulatorBackend.contracts = map[string]common.Address{
 		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
 		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
@@ -3604,7 +3604,7 @@ func TestGetAccountFlowBalance(t *testing.T) {
             let balance = getFlowBalance(account: account)
 
             // Assert
-            Test.assertEqual(999999999.977, balance)
+            Test.assertEqual(1000000000.0, balance)
         }
 	`
 
@@ -3663,7 +3663,7 @@ func TestMintFlow(t *testing.T) {
 
             // Assert
             let balance = getFlowBalance(account: account)
-            Test.assertEqual(1500.001, balance)
+            Test.assertEqual(1500.0, balance)
         }
 	`
 
@@ -3691,14 +3691,14 @@ func TestBurnFlow(t *testing.T) {
 
             // Assert
             var balance = getFlowBalance(account: account)
-            Test.assertEqual(1500.001, balance)
+            Test.assertEqual(1500.0, balance)
 
             // Act
             burnFlow(from: account, amount: 500.0)
 
             // Assert
             balance = getFlowBalance(account: account)
-            Test.assertEqual(1000.001, balance)
+            Test.assertEqual(1000.0, balance)
         }
 	`
 
@@ -3801,7 +3801,7 @@ func TestServiceAccount(t *testing.T) {
 	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
-		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil)
+		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, false)
 
 		serviceAccount, err := emulatorBackend.ServiceAccount()
 
@@ -3854,7 +3854,7 @@ func TestServiceAccount(t *testing.T) {
                 let balance = getFlowBalance(account: account)
 
                 // Assert
-                Test.assertEqual(999999999.977, balance)
+                Test.assertEqual(1000000000.0, balance)
             }
 
             access(all)
@@ -3877,7 +3877,7 @@ func TestServiceAccount(t *testing.T) {
 
                 // Assert
                 let balance = getFlowBalance(account: receiver)
-                Test.assertEqual(1500.001, balance)
+                Test.assertEqual(1500.0, balance)
             }
 		`
 
@@ -5102,14 +5102,14 @@ func TestBlockchainReset(t *testing.T) {
             // Arrange
             let account = Test.createAccount()
             var balance = getFlowBalance(account: account)
-            Test.assertEqual(0.001, balance)
+            Test.assertEqual(0.0, balance)
 
             let height = getCurrentBlockHeight()
 
             mintFlow(to: account, amount: 1500.0)
 
             balance = getFlowBalance(account: account)
-            Test.assertEqual(1500.001, balance)
+            Test.assertEqual(1500.0, balance)
             Test.assertEqual(getCurrentBlockHeight(), height + 1)
 
             // Act
@@ -5117,7 +5117,7 @@ func TestBlockchainReset(t *testing.T) {
 
             // Assert
             balance = getFlowBalance(account: account)
-            Test.assertEqual(0.001, balance)
+            Test.assertEqual(0.0, balance)
             Test.assertEqual(getCurrentBlockHeight(), height)
         }
 	`
@@ -5622,17 +5622,17 @@ func TestEmulatorBlockchainSnapshotting(t *testing.T) {
             Test.createSnapshot(name: "adminFunded")
 
             var balance = getFlowBalance(account: admin)
-            Test.assertEqual(1000.001, balance)
+            Test.assertEqual(1000.0, balance)
 
             Test.loadSnapshot(name: "adminCreated")
 
             balance = getFlowBalance(account: admin)
-            Test.assertEqual(0.001, balance)
+            Test.assertEqual(0.0, balance)
 
             Test.loadSnapshot(name: "adminFunded")
 
             balance = getFlowBalance(account: admin)
-            Test.assertEqual(1000.001, balance)
+            Test.assertEqual(1000.0, balance)
         }
 	`
 
@@ -5799,4 +5799,48 @@ func TestGetTests(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []string{"test1", "test2", "test3"}, tests)
+}
+
+func TestWithStorageLimitEnabled(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        #storageLimitEnabled
+
+        import Test
+        import BlockchainHelpers
+
+        access(all)
+        fun test() {
+            let acc = getAccount(0x10)
+            Test.assertEqual(0.001, acc.balance)
+
+            let account = Test.serviceAccount()
+            var balance = getFlowBalance(account: account)
+            Test.assertEqual(999999999.977, balance)
+
+            let admin = Test.createAccount()
+
+            balance = getFlowBalance(account: admin)
+            Test.assertEqual(0.001, balance)
+
+            mintFlow(to: admin, amount: 1000.0)
+
+            balance = getFlowBalance(account: admin)
+            Test.assertEqual(1000.001, balance)
+
+            let txResult = burnFlow(from: admin, amount: 1000.001)
+            Test.expect(txResult, Test.beFailed())
+            Test.assertError(txResult, errorMessage: "storage limit check failed")
+
+            balance = getFlowBalance(account: admin)
+            Test.assertEqual(1000.001, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+	result, err := runner.RunTest(code, "test")
+
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
 }

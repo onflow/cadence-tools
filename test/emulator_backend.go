@@ -151,6 +151,7 @@ func NewEmulatorBackend(
 	logger zerolog.Logger,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
+	storageLimitEnabled bool,
 ) *EmulatorBackend {
 	logCollectionHook := newLogCollectionHook()
 	var blockchain *emulator.Blockchain
@@ -160,11 +161,13 @@ func NewEmulatorBackend(
 			logger,
 			logCollectionHook,
 			emulator.WithCoverageReport(coverageReport),
+			emulator.WithStorageLimitEnabled(storageLimitEnabled),
 		)
 	} else {
 		blockchain = newBlockchain(
 			logger,
 			logCollectionHook,
+			emulator.WithStorageLimitEnabled(storageLimitEnabled),
 		)
 	}
 	clock := newSystemClock()
@@ -741,7 +744,6 @@ func newBlockchain(
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
-				emulator.WithStorageLimitEnabled(true),
 				emulator.WithServerLogger(testLogger),
 				emulator.Contracts(commonContracts),
 				emulator.WithChainID(chain.ChainID()),
