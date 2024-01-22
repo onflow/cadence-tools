@@ -2164,20 +2164,20 @@ func TestPrettyPrintTestResults(t *testing.T) {
 	results, err := runner.RunTests(code)
 	require.NoError(t, err)
 
-	resultsStr := PrettyPrintResults(results, "test_script.cdc")
+	resultsStr := PrettyPrintResults(results, "tests/test_script.cdc")
 
-	const expected = `Test results: "test_script.cdc"
+	const expected = `Test results: "tests/test_script.cdc"
 - PASS: testFunc1
 - FAIL: testFunc2
 		Execution failed:
 			error: assertion failed: unexpected error occurred
-			 --> 7465737400000000000000000000000000000000000000000000000000000000:9:12
+			 --> tests/test_script.cdc:9:12
 			
 - PASS: testFunc3
 - FAIL: testFunc4
 		Execution failed:
 			error: panic: runtime error
-			  --> 7465737400000000000000000000000000000000000000000000000000000000:17:12
+			  --> tests/test_script.cdc:17:12
 			
 `
 
@@ -4831,9 +4831,10 @@ func TestWithLogger(t *testing.T) {
 	t.Parallel()
 
 	const code = `
-    access(all) fun testWithLogger() {
-        log("Hello, world!")
-    }
+        access(all)
+        fun testWithLogger() {
+            log("Hello, world!")
+        }
 	`
 
 	var buf bytes.Buffer
@@ -4845,8 +4846,8 @@ func TestWithLogger(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 
-	expectedPattern := `{"level":"info","time":"[0-9TZ:.-]+","message":"\\u001b\[1;34mLOG:\\u001b\[0m \\"Hello, world!\\""}`
-	assert.Regexp(t, expectedPattern, buf.String())
+	assert.Contains(t, buf.String(), "Hello, world!")
+	assert.Equal(t, []string{"Hello, world!"}, runner.Logs())
 }
 
 func TestGetEventsFromIntegrationTests(t *testing.T) {

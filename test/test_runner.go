@@ -148,7 +148,7 @@ type TestRunner struct {
 
 func NewTestRunner() *TestRunner {
 	return &TestRunner{
-		logger: zerolog.Nop(),
+		logger:    zerolog.Nop(),
 		contracts: baseContracts(),
 	}
 }
@@ -821,19 +821,28 @@ func PrettyPrintResults(results Results, scriptPath string) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Test results: %q\n", scriptPath)
 	for _, result := range results {
-		sb.WriteString(PrettyPrintResult(result.TestName, result.Error))
+		sb.WriteString(PrettyPrintResult(scriptPath, result.TestName, result.Error))
 		sb.WriteRune('\n')
 	}
 	return sb.String()
 }
 
-func PrettyPrintResult(funcName string, err error) string {
+func PrettyPrintResult(scriptPath, funcName string, err error) string {
 	if err == nil {
 		return fmt.Sprintf("- PASS: %s", funcName)
 	}
 
+	interErr := err.(interpreter.Error)
+
+	// Replace script ID with actual file path
+	errString := strings.ReplaceAll(
+		err.Error(),
+		interErr.Location.String(),
+		scriptPath,
+	)
+
 	// Indent the error messages
-	errString := strings.ReplaceAll(err.Error(), "\n", "\n\t\t\t")
+	errString = strings.ReplaceAll(errString, "\n", "\n\t\t\t")
 
 	return fmt.Sprintf("- FAIL: %s\n\t\t%s", funcName, errString)
 }
