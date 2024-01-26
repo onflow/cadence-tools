@@ -10,7 +10,7 @@ require (
 	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1
 	github.com/onflow/cadence-tools/lint v0.14.2-0.20231218234314-e73ac82193b0
 	github.com/onflow/cadence-tools/test v0.14.6-0.20231218234314-e73ac82193b0
-	github.com/onflow/flow-cli/flowkit v1.8.1-0.20231219002530-719e6b55f35a
+	github.com/onflow/flow-cli/flowkit v1.11.1-0.20240126012608-4c90a9ea28d9
 	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.9.4
@@ -124,8 +124,8 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231212203043-37cbe453d425 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a00dbf7c061f // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f // indirect
 	github.com/onflow/flow-emulator v0.59.1-0.20231218185945-9116c416533f // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596 // indirect
 	github.com/onflow/flow-go v0.32.4-0.20231214190912-4c4527a42fb0 // indirect
