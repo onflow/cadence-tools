@@ -1904,10 +1904,10 @@ func (s *Server) getDiagnostics(
 	}
 
 	analysisProgram := analysis.Program{
-		Program:     program,
-		Elaboration: checker.Elaboration,
-		Location:    checker.Location,
-		Code:        []byte(text),
+		Program:  program,
+		Checker:  checker,
+		Location: checker.Location,
+		Code:     []byte(text),
 	}
 
 	var reportLock sync.Mutex
