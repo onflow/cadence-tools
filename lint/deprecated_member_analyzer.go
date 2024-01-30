@@ -46,8 +46,9 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 		Run: func(pass *analysis.Pass) interface{} {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 
-			location := pass.Program.Location
-			elaboration := pass.Program.Elaboration
+			program := pass.Program
+			location := program.Location
+			elaboration := program.Checker.Elaboration
 			report := pass.Report
 
 			inspector.Preorder(
