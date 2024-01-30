@@ -1061,7 +1061,7 @@ func TestImportBuiltinContracts(t *testing.T) {
                 Type<NonFungibleToken>().identifier
             )
 
-            let vault <- FlowToken.createEmptyVault()
+            let vault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             Test.assertEqual(0.0, vault.balance)
             destroy <- vault
         }
@@ -2765,9 +2765,10 @@ func TestInterpretMatcher(t *testing.T) {
 		runner := NewTestRunner()
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
-		errs := checker.RequireCheckerErrors(t, err, 2)
-		assert.IsType(t, &sema.TypeParameterTypeMismatchError{}, errs[0])
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+
+		errs := checker.RequireCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
 	t.Run("combined matcher mismatching types", func(t *testing.T) {
@@ -2899,9 +2900,9 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 2)
-		assert.IsType(t, &sema.TypeParameterTypeMismatchError{}, errs[0])
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+		errs := checker.RequireCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
 	t.Run("matcher or", func(t *testing.T) {
@@ -3151,9 +3152,10 @@ func TestInterpretExpectFunction(t *testing.T) {
 		runner := NewTestRunner()
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
-		errs := checker.RequireCheckerErrors(t, err, 2)
-		assert.IsType(t, &sema.TypeParameterTypeMismatchError{}, errs[0])
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+
+		errs := checker.RequireCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
 	t.Run("resource with resource matcher", func(t *testing.T) {
@@ -3887,7 +3889,7 @@ func TestServiceAccount(t *testing.T) {
 
             transaction(receiver: Address, amount: UFix64) {
                 prepare(account: auth(BorrowValue) &Account) {
-                    let flowVault = account.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(
+                    let flowVault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
                         from: /storage/flowTokenVault
                     ) ?? panic("Could not borrow BlpToken.Vault reference")
 

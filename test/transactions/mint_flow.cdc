@@ -4,7 +4,7 @@ import "FlowToken"
 transaction(receiver: Address, amount: UFix64) {
 
     prepare(account: auth(BorrowValue) &Account) {
-        let flowVault = account.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(
+        let flowVault = account.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
             from: /storage/flowTokenVault
         ) ?? panic("Could not borrow FlowToken.Vault reference")
 
