@@ -133,6 +133,7 @@ var systemContracts = func() []common.AddressLocation {
 		"MetadataViews":              serviceAddress,
 		"ViewResolver":               serviceAddress,
 		"RandomBeaconHistory":        serviceAddress,
+		"EVM":                        serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
@@ -741,6 +742,7 @@ func newBlockchain(
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
+				emulator.WithEVMEnabled(true),
 				emulator.WithStorageLimitEnabled(false),
 				emulator.WithServerLogger(testLogger),
 				emulator.Contracts(commonContracts),
