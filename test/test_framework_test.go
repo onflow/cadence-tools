@@ -36,6 +36,10 @@ import (
 	"github.com/onflow/cadence/runtime/tests/checker"
 )
 
+var firstAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 6}
+var secondAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 7}
+var thirdAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 8}
+
 func TestRunningMultipleTests(t *testing.T) {
 	t.Parallel()
 
@@ -356,7 +360,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -436,7 +440,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -619,9 +623,9 @@ func TestImportContract(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
-			"BarContract": {0, 0, 0, 0, 0, 0, 0, 6},
-			"BazContract": {0, 0, 0, 0, 0, 0, 0, 7},
+			"FooContract": firstAccountAddress,
+			"BarContract": secondAccountAddress,
+			"BazContract": thirdAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -847,9 +851,9 @@ func TestImportContract(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"BazContract": {0, 0, 0, 0, 0, 0, 0, 8},
-			"BarContract": {0, 0, 0, 0, 0, 0, 0, 5},
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"BarContract": firstAccountAddress,
+			"FooContract": firstAccountAddress,
+			"BazContract": thirdAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -912,7 +916,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -925,7 +929,7 @@ func TestImportContract(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			result.Error,
-			"failed to load contract: 0000000000000005.FooContract",
+			"failed to load contract: 0000000000000006.FooContract",
 		)
 	})
 }
@@ -1003,7 +1007,7 @@ func TestImportCryptoContract(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		"FooContract": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -1065,6 +1069,15 @@ func TestImportBuiltinContracts(t *testing.T) {
             Test.assertEqual(0.0, vault.balance)
             destroy <- vault
         }
+
+        access(all)
+        fun testEVMContract() {
+            let script = Test.readFile("../scripts/test_evm_contract.cdc")
+            let result = Test.executeScript(script, [])
+
+            Test.expect(result, Test.beSucceeded())
+            Test.assertEqual(true, result.returnValue! as! Bool)
+        }
 	`
 
 	const testTransactionCode = `
@@ -1091,12 +1104,28 @@ func TestImportBuiltinContracts(t *testing.T) {
         }
 	`
 
+	const testEVMContract = `
+        import "EVM"
+
+        access(all) fun main(): Bool {
+            let bridgedAccount <- EVM.createBridgedAccount()
+            let address = bridgedAccount.address()
+            destroy bridgedAccount
+
+            let expected: [UInt8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1]
+            assert(expected == address.bytes)
+            return true
+        }
+	`
+
 	fileResolver := func(path string) (string, error) {
 		switch path {
 		case "../transactions/test_transaction.cdc":
 			return testTransactionCode, nil
 		case "../scripts/test_script.cdc":
 			return testScriptCode, nil
+		case "../scripts/test_evm_contract.cdc":
+			return testEVMContract, nil
 		default:
 			return "", fmt.Errorf("cannot find file path: %s", path)
 		}
@@ -1110,17 +1139,11 @@ func TestImportBuiltinContracts(t *testing.T) {
 		WithFileResolver(fileResolver).
 		WithImportResolver(importResolver)
 
-	result, err := runner.RunTest(testCode, "testTransaction")
+	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
-	require.NoError(t, result.Error)
-
-	result, err = runner.RunTest(testCode, "testScript")
-	require.NoError(t, err)
-	require.NoError(t, result.Error)
-
-	result, err = runner.RunTest(testCode, "testExampleNFT")
-	require.NoError(t, err)
-	require.NoError(t, result.Error)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }
 
 func TestUsingEnv(t *testing.T) {
@@ -1230,7 +1253,7 @@ func TestUsingEnv(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -2321,7 +2344,7 @@ func TestDeployingContracts(t *testing.T) {
 
             access(all)
             fun test() {
-                let account = Test.getAccount(0x0000000000000005)
+                let account = Test.getAccount(0x0000000000000006)
 
                 let err = Test.deployContract(
                     name: "Foo",
@@ -2354,7 +2377,7 @@ func TestDeployingContracts(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -2399,7 +2422,7 @@ func TestDeployingContracts(t *testing.T) {
 
             access(all)
             fun test() {
-                let account = Test.getAccount(0x0000000000000005)
+                let account = Test.getAccount(0x0000000000000006)
 
                 let err = Test.deployContract(
                     name: "Foo",
@@ -2432,7 +2455,7 @@ func TestDeployingContracts(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -2489,7 +2512,7 @@ func TestErrors(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -3241,7 +3264,7 @@ func TestReplacingImports(t *testing.T) {
             import Test
 
             access(all)
-            let account = Test.getAccount(0x0000000000000005)
+            let account = Test.getAccount(0x0000000000000006)
 
             access(all)
             fun setup() {
@@ -3297,7 +3320,7 @@ func TestReplacingImports(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -3316,7 +3339,7 @@ func TestReplacingImports(t *testing.T) {
             import Test
 
             access(all)
-            let account = Test.getAccount(0x0000000000000005)
+            let account = Test.getAccount(0x0000000000000006)
 
             access(all)
             fun setup() {
@@ -3374,7 +3397,7 @@ func TestReplacingImports(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -3458,7 +3481,7 @@ func TestReplacingImports(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -3477,7 +3500,7 @@ func TestReplacingImports(t *testing.T) {
             import Test
 
             access(all)
-            let account = Test.getAccount(0x0000000000000005)
+            let account = Test.getAccount(0x0000000000000006)
 
             access(all)
             fun setup() {
@@ -3537,7 +3560,7 @@ func TestReplacingImports(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"Foo": {0, 0, 0, 0, 0, 0, 0, 5},
+			"Foo": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -4039,7 +4062,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
+		"FooContract": secondAccountAddress,
 	}
 
 	coverageReport := runtime.NewCoverageReport()
@@ -4063,10 +4086,8 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 		assert.NoError(t, result.Error)
 	}
 
-	address, err := common.HexToAddress("0x0000000000000009")
-	require.NoError(t, err)
 	location := common.AddressLocation{
-		Address: address,
+		Address: secondAccountAddress,
 		Name:    "FooContract",
 	}
 	coverage := coverageReport.Coverage[location]
@@ -4105,6 +4126,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.NonFungibleToken",
 			"A.0000000000000001.ViewResolver",
 			"A.0000000000000001.RandomBeaconHistory",
+			"A.0000000000000001.EVM",
 			"I.Test",
 			"I.Crypto",
 			"I.BlockchainHelpers",
@@ -4259,7 +4281,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
+		"FooContract": secondAccountAddress,
 	}
 
 	coverageReport := runtime.NewCoverageReport()
@@ -4287,10 +4309,8 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	assert.Equal(t, result2.TestName, "testAddSpecialNumber")
 	require.NoError(t, result2.Error)
 
-	address, err := common.HexToAddress("0x0000000000000009")
-	require.NoError(t, err)
 	location := common.AddressLocation{
-		Address: address,
+		Address: secondAccountAddress,
 		Name:    "FooContract",
 	}
 	coverage := coverageReport.Coverage[location]
@@ -4333,6 +4353,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.NonFungibleToken",
 			"A.0000000000000001.ViewResolver",
 			"A.0000000000000001.RandomBeaconHistory",
+			"A.0000000000000001.EVM",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4434,7 +4455,7 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		"FooContract": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -4546,7 +4567,7 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		"FooContract": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -4610,7 +4631,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
         import Test
 
         access(all)
-        let account = Test.getAccount(0x0000000000000005)
+        let account = Test.getAccount(0x0000000000000006)
 
         access(all)
         fun setup() {
@@ -4687,7 +4708,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		"FooContract": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -4744,7 +4765,7 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
         import Test
 
         access(all)
-        let account = Test.getAccount(0x0000000000000005)
+        let account = Test.getAccount(0x0000000000000006)
 
         access(all)
         fun setup() {
@@ -4815,7 +4836,7 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		"FooContract": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -4900,7 +4921,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
         import FooContract from "../contracts/FooContract.cdc"
 
         access(all)
-        let account = Test.getAccount(0x0000000000000005)
+        let account = Test.getAccount(0x0000000000000006)
 
         access(all)
         fun setup() {
@@ -4996,7 +5017,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+		"FooContract": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -5218,7 +5239,7 @@ func TestBlockchainMoveTime(t *testing.T) {
         import Test
 
         access(all)
-        let account = Test.getAccount(0x0000000000000005)
+        let account = Test.getAccount(0x0000000000000006)
         access(all)
         var lockedAt: UFix64 = 0.0
 
@@ -5303,7 +5324,7 @@ func TestBlockchainMoveTime(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"TimeLocker": {0, 0, 0, 0, 0, 0, 0, 5},
+		"TimeLocker": firstAccountAddress,
 	}
 
 	runner := NewTestRunner().
@@ -5408,7 +5429,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
             import FooContract from "../contracts/FooContract.cdc"
 
             access(all)
-            let account = Test.getAccount(0x0000000000000005)
+            let account = Test.getAccount(0x0000000000000006)
 
             access(all)
             fun setup() {
@@ -5464,7 +5485,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -5536,7 +5557,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
             import FooContract from "../contracts/FooContract.cdc"
 
             access(all)
-            let account = Test.getAccount(0x0000000000000005)
+            let account = Test.getAccount(0x0000000000000006)
 
             access(all)
             fun setup() {
@@ -5592,7 +5613,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 		}
 
 		contracts := map[string]common.Address{
-			"FooContract": {0, 0, 0, 0, 0, 0, 0, 5},
+			"FooContract": firstAccountAddress,
 		}
 
 		runner := NewTestRunner().
@@ -5759,7 +5780,7 @@ func TestEnvironmentForUnitTests(t *testing.T) {
 	}
 
 	contracts := map[string]common.Address{
-		"FooContract": {0, 0, 0, 0, 0, 0, 0, 9},
+		"FooContract": thirdAccountAddress,
 	}
 
 	runner := NewTestRunner().
