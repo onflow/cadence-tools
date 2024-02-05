@@ -25,16 +25,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onflow/flow-cli/flowkit/accounts"
-	"github.com/onflow/flow-cli/flowkit/transactions"
+	"github.com/onflow/flowkit/accounts"
+	"github.com/onflow/flowkit/transactions"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-cli/flowkit"
-	"github.com/onflow/flow-cli/flowkit/config"
-	"github.com/onflow/flow-cli/flowkit/gateway"
-	"github.com/onflow/flow-cli/flowkit/output"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flowkit"
+	"github.com/onflow/flowkit/config"
+	"github.com/onflow/flowkit/gateway"
+	"github.com/onflow/flowkit/output"
 )
 
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowClient --filename mock_flow_test.go --inpkg

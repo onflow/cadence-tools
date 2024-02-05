@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/onflow/flow-cli/flowkit"
+	"github.com/onflow/flowkit"
 )
 
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowState --filename mock_state_test.go --inpkg

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/onflow/flow-cli/flowkit/arguments"
+	"github.com/onflow/flowkit/arguments"
 
 	"github.com/onflow/flow-go-sdk"
 
