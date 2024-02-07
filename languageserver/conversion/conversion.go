@@ -217,3 +217,15 @@ func SuggestedFixesToCodeActions(
 	}
 	return codeActions
 }
+
+func AnalysisToProtocolSeverity(severity analysis.Severity) protocol.DiagnosticSeverity {
+	switch severity {
+	case analysis.SeverityInfo:
+		return protocol.SeverityInformation
+	case analysis.SeverityError:
+		return protocol.SeverityError
+	case analysis.SeverityWarning:
+		return protocol.SeverityWarning
+	}
+	return protocol.SeverityWarning
+}
