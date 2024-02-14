@@ -1061,8 +1061,8 @@ func TestImportBuiltinContracts(t *testing.T) {
             Test.assertEqual(/storage/cadenceExampleNFTMinter, storagePath)
 
             Test.assertEqual(
-                "A.0000000000000001.NonFungibleToken",
-                Type<NonFungibleToken>().identifier
+                "{A.0000000000000001.NonFungibleToken}",
+                Type<{NonFungibleToken}>().identifier
             )
 
             let vault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
