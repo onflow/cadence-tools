@@ -25,16 +25,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onflow/flow-cli/flowkit/accounts"
-	"github.com/onflow/flow-cli/flowkit/transactions"
-
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-cli/flowkit"
-	"github.com/onflow/flow-cli/flowkit/config"
-	"github.com/onflow/flow-cli/flowkit/gateway"
-	"github.com/onflow/flow-cli/flowkit/output"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flowkit/v2"
+	"github.com/onflow/flowkit/v2/accounts"
+	"github.com/onflow/flowkit/v2/config"
+	"github.com/onflow/flowkit/v2/gateway"
+	"github.com/onflow/flowkit/v2/output"
+	"github.com/onflow/flowkit/v2/transactions"
 )
 
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowClient --filename mock_flow_test.go --inpkg
@@ -233,7 +232,7 @@ func (f *flowkitClient) DeployContract(
 	// Changes in https://github.com/onflow/flow-cli/pull/1247 add contracts
 	// to the state when AddContract is called, but this causes an error to
 	// be thrown here because LS-managed accounts are not in the state.
-	// 
+	//
 	// This code adds the account to the state before deploying the contract
 	f.state.getState().Accounts().AddOrUpdate(signer)
 
@@ -390,7 +389,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, e
 	return &accounts.Account{
 		Address: address,
 		Key:     accountKey,
-		Name: 	 fmt.Sprintf("%s [LS]", account.Name),
+		Name:    fmt.Sprintf("%s [LS]", account.Name),
 	}, nil
 }
 

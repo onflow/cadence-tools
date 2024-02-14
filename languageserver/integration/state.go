@@ -22,34 +22,34 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/onflow/flow-cli/flowkit"
+	"github.com/onflow/flowkit/v2"
 )
 
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowState --filename mock_state_test.go --inpkg
 type flowState interface {
-	Load(configPath string) (error)
-	Reload() (error)
+	Load(configPath string) error
+	Reload() error
 	GetCodeByName(name string) (string, error)
-	IsLoaded() (bool)
-	getConfigPath() (string)
-	getState() (*flowkit.State)
+	IsLoaded() bool
+	getConfigPath() string
+	getState() *flowkit.State
 }
 
 var _ flowState = &flowkitState{}
 
 type flowkitState struct {
-	loader        flowkit.ReaderWriter
-	state  				*flowkit.State
-	configPath    string
+	loader     flowkit.ReaderWriter
+	state      *flowkit.State
+	configPath string
 }
 
-func newFlowkitState(loader flowkit.ReaderWriter) (*flowkitState) {
+func newFlowkitState(loader flowkit.ReaderWriter) *flowkitState {
 	return &flowkitState{
 		loader: loader,
 	}
 }
 
-func (s *flowkitState) Load(configPath string) (error) {
+func (s *flowkitState) Load(configPath string) error {
 	state, err := flowkit.Load([]string{configPath}, s.loader)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (s *flowkitState) Load(configPath string) (error) {
 	return nil
 }
 
-func (s *flowkitState) Reload() (error) {
+func (s *flowkitState) Reload() error {
 	if !s.IsLoaded() {
 		return fmt.Errorf("state is not initialized")
 	}
@@ -92,15 +92,15 @@ func (s *flowkitState) GetCodeByName(name string) (string, error) {
 	return code, nil
 }
 
-func (s *flowkitState) IsLoaded() (bool) {
+func (s *flowkitState) IsLoaded() bool {
 	return s.state != nil && s.configPath != ""
 }
 
-func (s *flowkitState) getConfigPath() (string) {
+func (s *flowkitState) getConfigPath() string {
 	return s.configPath
 }
 
-func (s *flowkitState) getState() (*flowkit.State) {
+func (s *flowkitState) getState() *flowkit.State {
 	return s.state
 }
 
