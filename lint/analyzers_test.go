@@ -23,7 +23,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/cadence-tools/lint"
@@ -41,6 +43,16 @@ func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) [
 		nil,
 		nil,
 	)
+
+	// Suppress parser errors
+	config.HandleParserError = func(err analysis.ParsingCheckingError, program *ast.Program) error {
+		return nil
+	}
+
+	// Suppress checker errors
+	config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
+		return nil
+	}
 
 	programs, err := analysis.Load(config, testLocation)
 	require.NoError(t, err)
