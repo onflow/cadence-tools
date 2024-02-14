@@ -114,7 +114,7 @@ func Test_SimpleImport(t *testing.T) {
 	mock := &mockFlowState{}
 	resolver := resolvers{
 		loader: af,
-		state: mock,
+		state:  mock,
 	}
 
 	mock.On("GetCodeByName", "Test").Return(code, nil)

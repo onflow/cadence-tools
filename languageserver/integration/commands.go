@@ -23,9 +23,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/onflow/flowkit/arguments"
-
 	"github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flowkit/v2/arguments"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
 )
@@ -42,7 +41,7 @@ const (
 
 type commands struct {
 	client flowClient
-	state flowState
+	state  flowState
 }
 
 func (c *commands) getAll() []server.Command {
@@ -51,7 +50,7 @@ func (c *commands) getAll() []server.Command {
 		Name:    CommandReloadConfig,
 		Handler: c.reloadConfig,
 	}}
-	
+
 	// Commands only available when client is enabled
 	if c.client != nil {
 		commands = append(commands, []server.Command{

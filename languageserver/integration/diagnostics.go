@@ -31,7 +31,6 @@ import (
 //
 // For example, this function will return diagnostics for declarations that are
 // syntactically and semantically valid, but unsupported by the extension.
-//
 func diagnostics(
 	_ protocol.DocumentURI,
 	_ int32,
@@ -48,7 +47,6 @@ func diagnostics(
 
 // transactionDeclarationCountDiagnostics reports diagnostics
 // if there are more than 1 transaction declarations, as deployment will fail
-//
 func transactionDeclarationCountDiagnostics(checker *sema.Checker) []protocol.Diagnostic {
 	var diagnostics []protocol.Diagnostic
 
@@ -76,7 +74,6 @@ func transactionDeclarationCountDiagnostics(checker *sema.Checker) []protocol.Di
 
 // compositeOrInterfaceDeclarationCountDiagnostics reports diagnostics
 // if there are more than one composite or interface declaration, as deployment will fail
-//
 func compositeOrInterfaceDeclarationCountDiagnostics(checker *sema.Checker) []protocol.Diagnostic {
 	var diagnostics []protocol.Diagnostic
 

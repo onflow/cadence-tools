@@ -3,7 +3,7 @@
 package integration
 
 import (
-	flowkit "github.com/onflow/flowkit"
+	flowkit "github.com/onflow/flowkit/v2"
 	mock "github.com/stretchr/testify/mock"
 )
 

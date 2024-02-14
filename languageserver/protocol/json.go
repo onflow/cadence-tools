@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 
-
 // Code generated for LSP. DO NOT EDIT.
 
 package protocol
