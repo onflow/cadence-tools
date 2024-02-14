@@ -134,6 +134,7 @@ var systemContracts = func() []common.AddressLocation {
 		"ViewResolver":               serviceAddress,
 		"RandomBeaconHistory":        serviceAddress,
 		"EVM":                        serviceAddress,
+		"FungibleTokenSwitchboard":   chainContracts.FungibleToken.Address.HexWithPrefix(),
 	}
 
 	locations := make([]common.AddressLocation, 0)
