@@ -33,7 +33,7 @@ import (
 
 var testLocation = common.StringLocation("test")
 
-func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
+func testAnalyzers(t *testing.T, code string, suppressParsingCheckingErrors bool, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
 
 	config := analysis.NewSimpleConfig(
 		lint.LoadMode,
@@ -44,14 +44,16 @@ func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) [
 		nil,
 	)
 
-	// Suppress parser errors
-	config.HandleParserError = func(err analysis.ParsingCheckingError, program *ast.Program) error {
-		return nil
-	}
+	if suppressParsingCheckingErrors {
+		// Suppress parser errors
+		config.HandleParserError = func(err analysis.ParsingCheckingError, program *ast.Program) error {
+			return nil
+		}
 
-	// Suppress checker errors
-	config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
-		return nil
+		// Suppress checker errors
+		config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
+			return nil
+		}
 	}
 
 	programs, err := analysis.Load(config, testLocation)

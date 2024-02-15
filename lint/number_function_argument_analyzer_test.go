@@ -46,6 +46,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 					let x = Fix64(1)
 				}
 			}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -76,6 +77,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = UFix64(1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -106,6 +108,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Fix64(-1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -138,6 +141,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = UFix64(1.2)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -168,6 +172,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Fix64(-1.2)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -202,6 +207,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = UInt8(1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -232,6 +238,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int8(1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -263,6 +270,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int8(-1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -293,6 +301,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int(1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 
@@ -323,6 +332,7 @@ func TestCheckNumberConversionReplacementHint(t *testing.T) {
 				let x = Int(-1)
 			}
 		}`,
+			false,
 			lint.NumberFunctionArgumentAnalyzer,
 		)
 

@@ -52,6 +52,7 @@ func TestDeprecatedMemberAnalyzer(t *testing.T) {
               }
           }
         `,
+		false,
 		lint.DeprecatedMemberAnalyzer,
 	)
 

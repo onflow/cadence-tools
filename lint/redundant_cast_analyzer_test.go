@@ -44,6 +44,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 				}
 			}
 			`,
+			false,
 			lint.RedundantCastAnalyzer,
 		)
 
@@ -76,6 +77,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 				}
 			}
 			`,
+			false,
 			lint.RedundantCastAnalyzer,
 		)
 
@@ -108,6 +110,7 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 				}
 			}
 			`,
+			false,
 			lint.RedundantCastAnalyzer,
 		)
 

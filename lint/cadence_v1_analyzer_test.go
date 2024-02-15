@@ -45,6 +45,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -56,7 +57,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category: lint.CadenceV1Category,
 					Message:  "[Cadence 1.0] `save` has been replaced by the new Storage API.",
 					Code:     "C1.0-StorageAPI-Save",
-					URL:   "https://forum.flow.com/t/update-on-cadence-1-0/5197#account-access-got-improved-55",
+					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#account-access-got-improved-55",
 					SuggestedFixes: []analysis.SuggestedFix{
 						{
 							Message: "Replace with `storage.save`",
@@ -109,6 +110,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -120,7 +122,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category:       lint.CadenceV1Category,
 					Message:        "[Cadence 1.0] `linkAccount` has been replaced by the Capability Controller API.",
 					Code:           "C1.0-StorageAPI-LinkAccount",
-					URL:         "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
+					URL:            "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
 					SuggestedFixes: []analysis.SuggestedFix{},
 					Range: ast.Range{
 						StartPos: ast.Position{
@@ -151,6 +153,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -162,7 +165,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category:       lint.CadenceV1Category,
 					Message:        "[Cadence 1.0] `link` has been replaced by the Capability Controller API.",
 					Code:           "C1.0-StorageAPI-Link",
-					URL:         "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
+					URL:            "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
 					SuggestedFixes: []analysis.SuggestedFix{},
 					Range: ast.Range{
 						StartPos: ast.Position{
@@ -193,6 +196,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -204,7 +208,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category:       lint.CadenceV1Category,
 					Message:        "[Cadence 1.0] `unlink` has been replaced by the Capability Controller API.",
 					Code:           "C1.0-StorageAPI-Unlink",
-					URL:         "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
+					URL:            "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
 					SuggestedFixes: []analysis.SuggestedFix{},
 					Range: ast.Range{
 						StartPos: ast.Position{
@@ -235,6 +239,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -246,7 +251,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category: lint.CadenceV1Category,
 					Message:  "[Cadence 1.0] `getCapability` has been replaced by the Capability Controller API.",
 					Code:     "C1.0-CapabilityAPI-GetCapability",
-					URL:   "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
+					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
 					SuggestedFixes: []analysis.SuggestedFix{
 						{
 							Message: "Replace with `capabilities.get`",
@@ -299,6 +304,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -310,7 +316,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category:       lint.CadenceV1Category,
 					Message:        "[Cadence 1.0] `getLinkTarget` has been replaced by the Capability Controller API.",
 					Code:           "C1.0-CapabilityAPI-GetLinkTarget",
-					URL:         "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
+					URL:            "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
 					SuggestedFixes: []analysis.SuggestedFix{},
 					Range: ast.Range{
 						StartPos: ast.Position{
@@ -341,6 +347,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -352,7 +359,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category:       lint.CadenceV1Category,
 					Message:        "[Cadence 1.0] `addPublicKey` has been removed in favour of the new Key Management API. Please use `keys.add` instead.",
 					Code:           "C1.0-KeyAPI-AddPublicKey",
-					URL:         "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
+					URL:            "https://forum.flow.com/t/update-on-cadence-1-0/5197#capability-controller-api-replaced-existing-linking-based-capability-api-82",
 					SuggestedFixes: []analysis.SuggestedFix{},
 					Range: ast.Range{
 						StartPos: ast.Position{
@@ -382,6 +389,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -393,7 +401,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category: lint.CadenceV1Category,
 					Message:  "[Cadence 1.0] `removePublicKey` has been removed in favour of the new Key Management API.\nPlease use `keys.revoke` instead.",
 					Code:     "C1.0-KeyAPI-RemovePublicKey",
-					URL:   "https://forum.flow.com/t/update-on-cadence-1-0/5197#deprecated-key-management-api-got-removed-60",
+					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#deprecated-key-management-api-got-removed-60",
 					SuggestedFixes: []analysis.SuggestedFix{
 						{
 							Message: "Replace with `keys.revoke`",
@@ -449,6 +457,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				init() {}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -460,7 +469,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category: lint.CadenceV1Category,
 					Message:  "[Cadence 1.0] `destroy` keyword has been removed.  Sub-resources will now be implicitly destroyed with their parent.  A `ResourceDestroyed` event can be configured to be emitted to notify clients of the destruction.",
 					Code:     "C1.0-ResourceDestruction",
-					URL:   "https://forum.flow.com/t/update-on-cadence-1-0/5197#force-destruction-of-resources-101",
+					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#force-destruction-of-resources-101",
 					SuggestedFixes: []analysis.SuggestedFix{
 						{
 							Message: "Remove code",
@@ -511,6 +520,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				prepare(signer: AuthAccount) {}
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -522,7 +532,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category: lint.CadenceV1Category,
 					Message:  "[Cadence 1.0] `AuthAccount` has been removed in Cadence 1.0.  Please use an authorized `&Account` reference with necessary entitlements instead.",
 					Code:     "C1.0-AuthAccount",
-					URL:   "https://forum.flow.com/t/update-on-cadence-1-0/5197#account-access-got-improved-55",
+					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#account-access-got-improved-55",
 					SuggestedFixes: []analysis.SuggestedFix{
 						{
 							Message: "Replace with `&Account`",
@@ -573,6 +583,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				let account: PublicAccount = getAccount(addr)
 			}
 			`,
+			true,
 			lint.CadenceV1Analyzer,
 		)
 
@@ -584,7 +595,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					Category: lint.CadenceV1Category,
 					Message:  "[Cadence 1.0] `PublicAccount` has been removed in Cadence 1.0.  Please use an `&Account` reference instead.",
 					Code:     "C1.0-PublicAccount",
-					URL:   "https://forum.flow.com/t/update-on-cadence-1-0/5197#account-access-got-improved-55",
+					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#account-access-got-improved-55",
 					SuggestedFixes: []analysis.SuggestedFix{
 						{
 							Message: "Replace with `&Account`",

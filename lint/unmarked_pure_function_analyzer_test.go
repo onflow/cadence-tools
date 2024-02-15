@@ -23,70 +23,46 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/cadence-tools/lint"
 )
 
-func TestForceOperatorAnalyzer(t *testing.T) {
+func TestUnmarkedPureFunctionAnalyzer(t *testing.T) {
 
 	t.Parallel()
 
-	t.Run("unnecessary", func(t *testing.T) {
+	t.Run("unmarked", func(t *testing.T) {
 
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t,
 			`
-			access(all) contract Test {
-				access(all) fun test() {
-					let x = 3
-					let y = x!
-				}
-			}
-			`,
+			 access(all) contract Test {
+				access(all) var monkey: Int
+				 access(all) fun test() {
+					 let x = 3
+					 let y = x
+					 self.monkey = 1
+					 self.nice()
+				 }
+
+				 access(all) fun nice() {
+					 self.monkey = 3
+				 }
+
+				 init() {
+					 self.monkey = 3
+				 }
+			 }
+			 `,
 			false,
-			lint.UnnecessaryForceAnalyzer,
+			lint.UnmarkedPureFunction,
 		)
 
 		require.Equal(
 			t,
-			[]analysis.Diagnostic{
-				{
-					Range: ast.Range{
-						StartPos: ast.Position{Offset: 89, Line: 5, Column: 13},
-						EndPos:   ast.Position{Offset: 90, Line: 5, Column: 14},
-					},
-					Location: testLocation,
-					Category: lint.RemovalCategory,
-					Message:  "unnecessary force operator",
-				},
-			},
-			diagnostics,
-		)
-	})
-
-	t.Run("valid", func(t *testing.T) {
-
-		t.Parallel()
-
-		diagnostics := testAnalyzers(t,
-			`
-			access(all) contract Test {
-				access(all) fun test() {
-					let x: Int? = 3
-					let y = x!
-				}
-			}
-			`,
-			false,
-			lint.UnnecessaryForceAnalyzer,
-		)
-
-		require.Equal(
-			t,
-			[]analysis.Diagnostic(nil),
+			[]analysis.Diagnostic{},
 			diagnostics,
 		)
 	})

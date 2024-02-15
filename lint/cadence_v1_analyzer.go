@@ -261,10 +261,21 @@ func (v *cadenceV1Analyzer) reportRemovedResourceDestructor(
 // Type annotations are not part of traversal, so we need to inspect them separately
 func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.TypeAnnotation)) {
 	// Filter out nil type annotations
-	processAnnotation := func(t *ast.TypeAnnotation) {
-		if t != nil {
-			f(t)
+	var processAnnotation func(annotation *ast.TypeAnnotation)
+	processAnnotation = func(annotation *ast.TypeAnnotation) {
+		if annotation == nil {
+			return
 		}
+
+		switch t := annotation.Type.(type) {
+		case *ast.InstantiationType:
+			// We need to process the type arguments of an instantiation type
+			for _, typeArgument := range t.TypeArguments {
+				processAnnotation(typeArgument)
+			}
+		}
+
+		f(annotation)
 	}
 
 	// Helper function to process a parameter list
@@ -283,6 +294,7 @@ func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.Ty
 			(*ast.TransactionDeclaration)(nil),
 			(*ast.VariableDeclaration)(nil),
 			(*ast.SpecialFunctionDeclaration)(nil),
+			(*ast.InvocationExpression)(nil),
 		},
 		func(element ast.Element) {
 			switch declaration := element.(type) {
@@ -302,6 +314,10 @@ func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.Ty
 				processAnnotation(declaration.TypeAnnotation)
 			case *ast.SpecialFunctionDeclaration:
 				processParameterList(declaration.FunctionDeclaration.ParameterList)
+			case *ast.InvocationExpression:
+				for _, argument := range declaration.TypeArguments {
+					processAnnotation(argument)
+				}
 			}
 		},
 	)
