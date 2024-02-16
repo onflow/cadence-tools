@@ -23,7 +23,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/tools/analysis"
@@ -33,7 +32,28 @@ import (
 
 var testLocation = common.StringLocation("test")
 
-func testAnalyzers(t *testing.T, code string, suppressParsingCheckingErrors bool, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
+func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
+	return testAnalyzersAdvanced(t, code, nil, analyzers...)
+}
+
+func testAnalyzersWithCheckerError(t *testing.T, code string, analyzers ...*analysis.Analyzer) ([]analysis.Diagnostic, *sema.CheckerError) {
+	var checkerErr *sema.CheckerError
+	diagnostics := testAnalyzersAdvanced(t, code, func(config *analysis.Config) {
+		config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
+			require.NotNil(t, checker)
+			require.Equal(t, err.ImportLocation(), testLocation)
+
+			require.ErrorAs(t, err, &checkerErr)
+			require.Len(t, checkerErr.Errors, 1)
+			return nil
+		}
+	}, analyzers...)
+
+	require.NotNil(t, checkerErr)
+	return diagnostics, checkerErr
+}
+
+func testAnalyzersAdvanced(t *testing.T, code string, setCustomConfigOptions func(config *analysis.Config), analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
 
 	config := analysis.NewSimpleConfig(
 		lint.LoadMode,
@@ -44,16 +64,8 @@ func testAnalyzers(t *testing.T, code string, suppressParsingCheckingErrors bool
 		nil,
 	)
 
-	if suppressParsingCheckingErrors {
-		// Suppress parser errors
-		config.HandleParserError = func(err analysis.ParsingCheckingError, program *ast.Program) error {
-			return nil
-		}
-
-		// Suppress checker errors
-		config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
-			return nil
-		}
+	if setCustomConfigOptions != nil {
+		setCustomConfigOptions(config)
 	}
 
 	programs, err := analysis.Load(config, testLocation)

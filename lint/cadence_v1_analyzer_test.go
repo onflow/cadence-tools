@@ -24,6 +24,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/errors"
+	"github.com/onflow/cadence/runtime/parser"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/cadence-tools/lint"
@@ -37,7 +40,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -45,9 +48,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -102,7 +107,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -110,9 +115,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -145,7 +152,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -153,9 +160,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -188,7 +197,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("account.unlink()", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -196,9 +205,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -231,7 +242,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("account.getCapability()", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -239,9 +250,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -296,7 +309,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("account.getLinkTarget()", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -304,9 +317,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -339,7 +354,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("account.addPublicKey()", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -347,9 +362,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -381,7 +398,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("account.removePublicKey()", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
 			access(all) contract Test {
 				init() {
@@ -389,9 +406,11 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredMemberError *sema.NotDeclaredMemberError
+		require.ErrorAs(t, err, &notDeclaredMemberError)
 
 		require.Equal(
 			t,
@@ -445,7 +464,9 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("resource destruction", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		var checkerErr *sema.CheckerError
+		var parserError errors.ParentError
+		diagnostics := testAnalyzersAdvanced(t,
 			`
 			access(all) contract Test {
 				access(all) resource R {
@@ -457,9 +478,35 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				init() {}
 			}
 			`,
-			true,
+			func(config *analysis.Config) {
+				config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
+					require.Equal(t, err.ImportLocation(), testLocation)
+					require.NotNil(t, checker)
+					require.ErrorAs(t, err, &checkerErr)
+					return nil
+				}
+				config.HandleParserError = func(err analysis.ParsingCheckingError, program *ast.Program) error {
+					require.Equal(t, err.ImportLocation(), testLocation)
+					require.ErrorAs(t, err, &parserError)
+					return nil
+				}
+			},
 			lint.CadenceV1Analyzer,
 		)
+
+		// Ensure that the checker error and parser error exist
+		require.NotNil(t, checkerErr)
+		require.NotNil(t, parserError)
+
+		// Ensure that the checker error is of the correct type
+		var unknownSpecialFunctionError *sema.UnknownSpecialFunctionError
+		require.Len(t, checkerErr.ChildErrors(), 1)
+		require.ErrorAs(t, checkerErr, &unknownSpecialFunctionError)
+
+		// Ensure that the parser error is of the correct type
+		var invalidDestructorError *parser.CustomDestructorError
+		require.Len(t, parserError.ChildErrors(), 1)
+		require.ErrorAs(t, parserError, &invalidDestructorError)
 
 		require.Equal(
 			t,
@@ -467,7 +514,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 				{
 					Location: testLocation,
 					Category: lint.CadenceV1Category,
-					Message:  "[Cadence 1.0] `destroy` keyword has been removed.  Sub-resources will now be implicitly destroyed with their parent.  A `ResourceDestroyed` event can be configured to be emitted to notify clients of the destruction.",
+					Message:  "[Cadence 1.0] `destroy` keyword has been removed.  Nested resources will now be implicitly destroyed with their parent.  A `ResourceDestroyed` event can be configured to be emitted to notify clients of the destruction.",
 					Code:     "C1.0-ResourceDestruction",
 					URL:      "https://forum.flow.com/t/update-on-cadence-1-0/5197#force-destruction-of-resources-101",
 					SuggestedFixes: []analysis.SuggestedFix{
@@ -514,15 +561,16 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("AuthAccount type", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		var notDeclaredError *sema.NotDeclaredError
+		diagnostics, checkerErr := testAnalyzersWithCheckerError(t,
 			`
 			transaction () {
 				prepare(signer: AuthAccount) {}
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+		require.ErrorAs(t, checkerErr, &notDeclaredError)
 
 		require.Equal(
 			t,
@@ -577,15 +625,17 @@ func TestCadenceV1Analyzer(t *testing.T) {
 	t.Run("PublicAccount type", func(t *testing.T) {
 		t.Parallel()
 
-		diagnostics := testAnalyzers(t,
+		diagnostics, err := testAnalyzersWithCheckerError(t,
 			`
-			pub fun main(addr: Address) {
+			access(all) fun main(addr: Address) {
 				let account: PublicAccount = getAccount(addr)
 			}
 			`,
-			true,
 			lint.CadenceV1Analyzer,
 		)
+
+		var notDeclaredError *sema.NotDeclaredError
+		require.ErrorAs(t, err, &notDeclaredError)
 
 		require.Equal(
 			t,
@@ -605,12 +655,12 @@ func TestCadenceV1Analyzer(t *testing.T) {
 									Insertion:   "",
 									Range: ast.Range{
 										StartPos: ast.Position{
-											Offset: 51,
+											Offset: 59,
 											Line:   3,
 											Column: 17,
 										},
 										EndPos: ast.Position{
-											Offset: 63,
+											Offset: 71,
 											Line:   3,
 											Column: 29,
 										},
@@ -621,12 +671,12 @@ func TestCadenceV1Analyzer(t *testing.T) {
 					},
 					Range: ast.Range{
 						StartPos: ast.Position{
-							Offset: 51,
+							Offset: 59,
 							Line:   3,
 							Column: 17,
 						},
 						EndPos: ast.Position{
-							Offset: 63,
+							Offset: 71,
 							Line:   3,
 							Column: 29,
 						},

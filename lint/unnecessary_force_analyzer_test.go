@@ -46,7 +46,6 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			false,
 			lint.UnnecessaryForceAnalyzer,
 		)
 
@@ -80,7 +79,6 @@ func TestForceOperatorAnalyzer(t *testing.T) {
 				}
 			}
 			`,
-			false,
 			lint.UnnecessaryForceAnalyzer,
 		)
 
