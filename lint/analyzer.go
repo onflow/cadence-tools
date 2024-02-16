@@ -31,6 +31,7 @@ const (
 	UpdateCategory          = "update recommended"
 	UnnecessaryCastCategory = "unnecessary-cast-hint"
 	DeprecatedCategory      = "deprecated"
+	CadenceV1Category       = "cadence-v1"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
