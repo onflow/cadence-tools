@@ -56,13 +56,12 @@ func init() {
 }
 
 func newCadenceV1Analyzer(pass *analysis.Pass) *cadenceV1Analyzer {
-	visitor := &cadenceV1Analyzer{
+	return &cadenceV1Analyzer{
 		program:     pass.Program,
 		elaboration: pass.Program.Checker.Elaboration,
 		report:      pass.Report,
 		inspector:   pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector),
 	}
-	return visitor
 }
 
 func (v *cadenceV1Analyzer) AnalyzeAll() {
@@ -207,6 +206,10 @@ func (v *cadenceV1Analyzer) analyzeResourceDestructors() {
 				return true
 			}
 
+			if len(stack) < 2 {
+				return true
+			}
+
 			parent, ok := stack[len(stack)-2].(*ast.CompositeDeclaration)
 			if !ok {
 				return true
@@ -247,7 +250,7 @@ func (v *cadenceV1Analyzer) reportRemovedResourceDestructor(
 
 	diagnostic := v.newDiagnostic(
 		declaration,
-		"`destroy` keyword has been removed.  Sub-resources will now be implicitly destroyed with their parent.  A `ResourceDestroyed` event can be configured to be emitted to notify clients of the destruction.",
+		"`destroy` keyword has been removed.  Nested resources will now be implicitly destroyed with their parent.  A `ResourceDestroyed` event can be configured to be emitted to notify clients of the destruction.",
 		"C1.0-ResourceDestruction",
 		"https://forum.flow.com/t/update-on-cadence-1-0/5197#force-destruction-of-resources-101",
 	)
