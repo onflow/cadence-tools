@@ -3211,8 +3211,7 @@ func convertDiagnostic(
 
 	var codeActionsResolver CodeActionResolver
 	var tags []protocol.DiagnosticTag
-
-	var severity protocol.DiagnosticSeverity
+	severity := protocol.SeverityWarning
 
 	switch linterDiagnostic.Category {
 	case linter.ReplacementCategory:
@@ -3272,6 +3271,7 @@ func convertDiagnostic(
 				linterDiagnostic.SecondaryMessage,
 			)
 		}
+		severity = protocol.SeverityHint
 		tags = append(tags, protocol.Deprecated)
 	case linter.CadenceV1Category:
 		severity = protocol.SeverityError
