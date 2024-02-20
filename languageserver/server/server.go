@@ -3296,13 +3296,16 @@ func convertDiagnostic(
 		Severity: severity,
 		Range:    protocolRange,
 		Tags:     tags,
-		CodeDescription: &protocol.CodeDescription{
-			Href: linterDiagnostic.URL,
-		},
 	}
 
 	if linterDiagnostic.Code != "" {
 		protocolDiagnostic.Code = linterDiagnostic.Code
+
+		if linterDiagnostic.URL != "" {
+			protocolDiagnostic.CodeDescription = &protocol.CodeDescription{
+				Href: linterDiagnostic.URL,
+			}
+		}
 	}
 
 	return protocolDiagnostic, codeActionsResolver
