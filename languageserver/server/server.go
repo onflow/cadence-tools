@@ -3277,7 +3277,7 @@ func convertDiagnostic(
 		severity = protocol.SeverityError
 	}
 
-	if codeActionsResolver == nil {
+	if codeActionsResolver == nil && len(linterDiagnostic.SuggestedFixes) > 0 {
 		codeActionsResolver = func() []*protocol.CodeAction {
 			return conversion.SuggestedFixesToCodeActions(
 				linterDiagnostic.SuggestedFixes,
