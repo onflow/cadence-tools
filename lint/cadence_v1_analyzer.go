@@ -283,6 +283,9 @@ func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.Ty
 
 	// Helper function to process a parameter list
 	processParameterList := func(parameterList *ast.ParameterList) {
+		if parameterList == nil {
+			return
+		}
 		for _, parameter := range parameterList.Parameters {
 			processAnnotation(parameter.TypeAnnotation)
 		}
@@ -318,6 +321,9 @@ func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.Ty
 			case *ast.SpecialFunctionDeclaration:
 				processParameterList(declaration.FunctionDeclaration.ParameterList)
 			case *ast.InvocationExpression:
+				if declaration.TypeArguments == nil {
+					return
+				}
 				for _, argument := range declaration.TypeArguments {
 					processAnnotation(argument)
 				}
