@@ -3211,10 +3211,8 @@ func convertDiagnostic(
 
 	var codeActionsResolver CodeActionResolver
 	var tags []protocol.DiagnosticTag
-	severity := protocol.SeverityWarning
-	if linterDiagnostic.Severity != analysis.SeverityUnknown {
-		severity = conversion.AnalysisToProtocolSeverity(linterDiagnostic.Severity)
-	}
+
+	var severity protocol.DiagnosticSeverity
 
 	switch linterDiagnostic.Category {
 	case linter.ReplacementCategory:
@@ -3274,8 +3272,9 @@ func convertDiagnostic(
 				linterDiagnostic.SecondaryMessage,
 			)
 		}
-		severity = protocol.SeverityHint
 		tags = append(tags, protocol.Deprecated)
+	case linter.CadenceV1Category:
+		severity = protocol.SeverityError
 	}
 
 	if codeActionsResolver == nil {
@@ -3299,7 +3298,7 @@ func convertDiagnostic(
 		Tags:     tags,
 		Code:     linterDiagnostic.Code,
 		CodeDescription: &protocol.CodeDescription{
-			Href: linterDiagnostic.DocURL,
+			Href: linterDiagnostic.URL,
 		},
 	}
 
