@@ -1108,9 +1108,9 @@ func TestImportBuiltinContracts(t *testing.T) {
         import "EVM"
 
         access(all) fun main(): Bool {
-            let bridgedAccount <- EVM.createBridgedAccount()
-            let address = bridgedAccount.address()
-            destroy bridgedAccount
+            let account <- EVM.createCadenceOwnedAccount()
+            let address = account.address()
+            destroy account
 
             assert(address.bytes != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
             return true
