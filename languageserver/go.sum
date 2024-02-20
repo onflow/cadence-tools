@@ -1837,8 +1837,6 @@ github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs
 github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
 github.com/onflow/cadence v1.0.0-M7 h1:hb4LK9lUbFdnDdfU8oqJGSVJtmkOzxwKomhmDcP/Faw=
 github.com/onflow/cadence v1.0.0-M7/go.mod h1:a4mccDU90hmuxCLUFzs9J/ANG/rYbFa36h4Z0bBAqNU=
-github.com/onflow/cadence-tools/lint v1.0.0-M4.0.20240216203721-dff8cfad1b82 h1:W2kEoJWLd5ITWTuJUDlLO0UvobLlxDbRmV8bBOw8sVo=
-github.com/onflow/cadence-tools/lint v1.0.0-M4.0.20240216203721-dff8cfad1b82/go.mod h1:vgKOF14/NwWktjsRKHlWEz8z/3uQu5nuqDzQOm+u2qY=
 github.com/onflow/cadence-tools/lint v1.0.0-M4.0.20240220183749-b5b01d783f2f h1:FiYFU8IBZVsqYkofnisyJmu3d5alGwiZyJ4d6B8typY=
 github.com/onflow/cadence-tools/lint v1.0.0-M4.0.20240220183749-b5b01d783f2f/go.mod h1:vgKOF14/NwWktjsRKHlWEz8z/3uQu5nuqDzQOm+u2qY=
 github.com/onflow/cadence-tools/test v1.0.0-M3 h1:ZbKoMhXsvafJIOO/MVE7lV5INXfq2IL0Z+W2MsJnKwY=
