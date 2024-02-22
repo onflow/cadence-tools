@@ -1835,14 +1835,8 @@ github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
-github.com/onflow/cadence v1.0.0-M7 h1:hb4LK9lUbFdnDdfU8oqJGSVJtmkOzxwKomhmDcP/Faw=
-github.com/onflow/cadence v1.0.0-M7/go.mod h1:a4mccDU90hmuxCLUFzs9J/ANG/rYbFa36h4Z0bBAqNU=
 github.com/onflow/cadence v1.0.0-M8 h1:ioQ7TyhpsIaImAC7Xn2r8kIgIBdimvyuWeKlGfRxWB8=
 github.com/onflow/cadence v1.0.0-M8/go.mod h1:a4mccDU90hmuxCLUFzs9J/ANG/rYbFa36h4Z0bBAqNU=
-github.com/onflow/cadence-tools/lint v1.0.0-M4 h1:XeBX+/2TKbe04nyMjUbSD9aHcF5+H6UOAgsuLTmo1DA=
-github.com/onflow/cadence-tools/lint v1.0.0-M4/go.mod h1:vgKOF14/NwWktjsRKHlWEz8z/3uQu5nuqDzQOm+u2qY=
-github.com/onflow/cadence-tools/lint v1.0.0-M4.0.20240222200858-c93e93f8fbf9 h1:oSTr5kBQ+17Eje8tsbevfkOF07VmCE9fry4Cxd6Z3ac=
-github.com/onflow/cadence-tools/lint v1.0.0-M4.0.20240222200858-c93e93f8fbf9/go.mod h1:5WMsRbV8h6hymo/+Gu5CY7MEEC781+2t6k/dzvdm7dg=
 github.com/onflow/cadence-tools/lint v1.0.0-M5 h1:LE297dzYhKn80QS5EGh0YaqEwuHTP3rmtgNIM3T9v5Y=
 github.com/onflow/cadence-tools/lint v1.0.0-M5/go.mod h1:5WMsRbV8h6hymo/+Gu5CY7MEEC781+2t6k/dzvdm7dg=
 github.com/onflow/cadence-tools/test v1.0.0-M4 h1:KyfDTBvFWGfuoxdzUDxVw1MadPo+OPiuXoJo+2si7pM=
@@ -1860,8 +1854,6 @@ github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20240205224107-320aa3cf09e0/
 github.com/onflow/flow-go v0.34.0-crescendo-preview.1 h1:fjl5hzpgxQWqCtpAohtdIV5enF9L/Oh407HpeS4vjnk=
 github.com/onflow/flow-go v0.34.0-crescendo-preview.1/go.mod h1:ClmIYh0WtY5Ait0en/F4p/Ha9s3DyFryu7AdpN0aoM0=
 github.com/onflow/flow-go-sdk v1.0.0-M1/go.mod h1:TDW0MNuCs4SvqYRUzkbRnRmHQL1h4X8wURsCw9P9beo=
-github.com/onflow/flow-go-sdk v1.0.0-M4 h1:dGtgZvaIfBR5/9I9nm5nLm69V5pLcSz9vXmzCb1lyzM=
-github.com/onflow/flow-go-sdk v1.0.0-M4/go.mod h1:HIGOKJVR47QNs81sPHmZDVcLr+syNkmbgEMLQGDmmEo=
 github.com/onflow/flow-go-sdk v1.0.0-M5 h1:R86DQQfXS3z8O6AShAaUNbkPOM7lOwcTk06cofdVEsk=
 github.com/onflow/flow-go-sdk v1.0.0-M5/go.mod h1:aXSavLzoRlz5FiMjcI7p5QhihWScGctxydzf4dv/avo=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240205233530-86ee8c352fa6 h1:/2vvjKkWG/3cKP3IpgiGNqXi0yskn4GmNTjmeCwMoz8=
