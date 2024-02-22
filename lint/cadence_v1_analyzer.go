@@ -324,9 +324,6 @@ func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.Ty
 			case *ast.SpecialFunctionDeclaration:
 				processParameterList(declaration.FunctionDeclaration.ParameterList)
 			case *ast.InvocationExpression:
-				if declaration.TypeArguments == nil {
-					return
-				}
 				for _, argument := range declaration.TypeArguments {
 					processAnnotation(argument)
 				}
