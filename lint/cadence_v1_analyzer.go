@@ -263,9 +263,9 @@ func (v *cadenceV1Analyzer) reportRemovedResourceDestructor(
 
 // Type annotations are not part of traversal, so we need to inspect them separately
 func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.TypeAnnotation)) {
-	// Filter out nil type annotations
 	var processAnnotation func(annotation *ast.TypeAnnotation)
 	processAnnotation = func(annotation *ast.TypeAnnotation) {
+		// Filter out nil type annotations
 		if annotation == nil {
 			return
 		}
@@ -283,6 +283,9 @@ func (v *cadenceV1Analyzer) inspectTypeAnnotations(f func(typeAnnotation *ast.Ty
 
 	// Helper function to process a parameter list
 	processParameterList := func(parameterList *ast.ParameterList) {
+		// Filter out nil parameter lists
+		// This can happen for example in a function declaration with no parameters
+		// (i.e. transaction declaration with no arguments)
 		if parameterList == nil {
 			return
 		}
