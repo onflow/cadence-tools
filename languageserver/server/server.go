@@ -3273,7 +3273,11 @@ func convertDiagnostic(
 		}
 		severity = protocol.SeverityHint
 		tags = append(tags, protocol.Deprecated)
+	case linter.CadenceV1Category:
+		severity = protocol.SeverityError
+	}
 
+	if codeActionsResolver == nil && len(linterDiagnostic.SuggestedFixes) > 0 {
 		codeActionsResolver = func() []*protocol.CodeAction {
 			return conversion.SuggestedFixesToCodeActions(
 				linterDiagnostic.SuggestedFixes,
@@ -3292,6 +3296,16 @@ func convertDiagnostic(
 		Severity: severity,
 		Range:    protocolRange,
 		Tags:     tags,
+	}
+
+	if linterDiagnostic.Code != "" {
+		protocolDiagnostic.Code = linterDiagnostic.Code
+
+		if linterDiagnostic.URL != "" {
+			protocolDiagnostic.CodeDescription = &protocol.CodeDescription{
+				Href: linterDiagnostic.URL,
+			}
+		}
 	}
 
 	return protocolDiagnostic, codeActionsResolver
