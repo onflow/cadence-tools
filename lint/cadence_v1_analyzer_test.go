@@ -686,4 +686,39 @@ func TestCadenceV1Analyzer(t *testing.T) {
 			diagnostics,
 		)
 	})
+
+	t.Run("no error with empty transaction", func(t *testing.T) {
+		t.Parallel()
+
+		// Ensure that no error is reported/no panic for an empty transaction
+		// I.e. does not throw with an empty function parameter list
+		diagnostics := testAnalyzers(t,
+			`
+			transaction {
+				prepare(signer: &Account) {}
+				execute {}
+			}
+			`,
+			lint.CadenceV1Analyzer,
+		)
+
+		require.Len(t, diagnostics, 0)
+	})
+
+	t.Run("no error when no type annotation", func(t *testing.T) {
+		t.Parallel()
+
+		// Ensure that no error is reported/no panic when there is no type annotation
+		// I.e. does not throw when type for delcaration is inferred
+		diagnostics := testAnalyzers(t,
+			`
+			access(all) fun main() {
+				let foo = 1
+			}
+			`,
+			lint.CadenceV1Analyzer,
+		)
+
+		require.Len(t, diagnostics, 0)
+	})
 }
