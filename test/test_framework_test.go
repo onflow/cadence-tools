@@ -1106,11 +1106,12 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	const testEVMContract = `
         import "EVM"
+        import "Burner"
 
         access(all) fun main(): Bool {
-            let account <- EVM.createCadenceOwnedAccount()
-            let address = account.address()
-            destroy account
+            let coa <- EVM.createCadenceOwnedAccount()
+            let address = coa.address()
+            Burner.burn(<- coa)
 
             assert(address.bytes != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
             return true
@@ -4137,6 +4138,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"I.BlockchainHelpers",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"A.0000000000000002.FungibleTokenSwitchboard",
+			"A.0000000000000001.Burner",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4361,6 +4363,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.RandomBeaconHistory",
 			"A.0000000000000001.EVM",
 			"A.0000000000000002.FungibleTokenSwitchboard",
+			"A.0000000000000001.Burner",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
