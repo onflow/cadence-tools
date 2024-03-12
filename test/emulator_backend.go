@@ -743,7 +743,6 @@ func newBlockchain(
 	b, err := emulator.New(
 		append(
 			[]emulator.Option{
-				emulator.WithEVMEnabled(true),
 				emulator.WithStorageLimitEnabled(false),
 				emulator.WithServerLogger(testLogger),
 				emulator.Contracts(commonContracts),
