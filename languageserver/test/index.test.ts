@@ -465,8 +465,24 @@ describe("accounts", () => {
     await withConnection(async (connection) => {
       let result = await getAccounts(connection)
 
-      expect(result.map(r => r.Name).sort()).toEqual(["Alice", "Bob", "Charlie", "Dave", "Eve", "emulator-account [flow.json]", "moose [flow.json]"])
-      expect(result.map(r => r.Address)).toEqual(["01cf0e2f2f715450", "179b6b1cb6755e31", "f3fcd2c1a78f5eee", "e03daebed8ca0615", "045a1763c93006ca", "f8d6e0586b0a20c7", "f8d6e0586b0a20c7"])
+      expect(result.map(r => r.Name).sort()).toEqual([
+        "Alice",
+        "Bob",
+        "Charlie",
+        "Dave",
+        "Eve",
+        "emulator-account [flow.json]",
+        "moose [flow.json]"
+      ])
+      expect(result.map(r => r.Address)).toEqual([
+        "179b6b1cb6755e31",
+        "f3fcd2c1a78f5eee",
+        "e03daebed8ca0615",
+        "045a1763c93006ca",
+        "120e725050340cab",
+        "f8d6e0586b0a20c7",
+        "f8d6e0586b0a20c7"
+      ])
       expect(result.map(r => r.Active)).toEqual([true, false, false, false, false, false, false])
     }, true)
   })
