@@ -571,7 +571,7 @@ func contractValueHandler(
 }
 
 func (r *TestRunner) interpreterContractValueHandler(
-	stdlibHandler stdlib.StandardLibraryHandler,
+	_ stdlib.StandardLibraryHandler,
 ) interpreter.ContractValueHandlerFunc {
 	return func(
 		inter *interpreter.Interpreter,
