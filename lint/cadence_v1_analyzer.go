@@ -19,8 +19,6 @@
 package lint
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
@@ -341,7 +339,7 @@ func (v *cadenceV1Analyzer) newDiagnostic(
 	return newDiagnostic(
 		v.program.Location,
 		v.report,
-		fmt.Sprintf("[Cadence 1.0] %s", message),
+		message,
 		ast.NewRangeFromPositioned(nil, position),
 	).WithCode(code).WithURL(docURL).WithCategory(CadenceV1Category)
 }
