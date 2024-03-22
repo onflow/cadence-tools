@@ -3869,6 +3869,31 @@ func TestServiceAccount(t *testing.T) {
 		require.NoError(t, result.Error)
 	})
 
+	t.Run("retrieve from Test.getAccount() function", func(t *testing.T) {
+		t.Parallel()
+
+		const testCode = `
+            import Test
+
+            access(all)
+            fun testGetServiceAccount() {
+                // Act
+                let account = Test.getAccount(0x0000000000000001)
+
+                // Assert
+                Test.assertEqual(Type<Address>(), account.address.getType())
+                Test.assertEqual(Type<PublicKey>(), account.publicKey.getType())
+                Test.assertEqual(Address(0x0000000000000001), account.address)
+            }
+		`
+
+		runner := NewTestRunner()
+
+		result, err := runner.RunTest(testCode, "testGetServiceAccount")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
 	t.Run("run scripts and transactions with service account", func(t *testing.T) {
 		t.Parallel()
 
@@ -3948,6 +3973,80 @@ func TestServiceAccount(t *testing.T) {
 		require.NoError(t, result.Error)
 
 		result, err = runner.RunTest(testCode, "testTransferFlowTokens")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
+
+	t.Run("deploy contract to service account", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+            import Test
+            import "FooContract"
+
+            access(all)
+            fun setup() {
+                let err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: []
+                )
+
+                Test.expect(err, Test.beNil())
+            }
+
+            access(all)
+            fun test() {
+                Test.assertEqual("hello from Foo", FooContract.sayHello())
+            }
+		`
+
+		const fooContract = `
+            access(all)
+            contract FooContract {
+                init() {}
+
+                access(all)
+                fun sayHello(): String {
+                    return "hello from Foo"
+                }
+            }
+		`
+
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "./FooContract":
+				return fooContract, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("cannot find import location: %s", location.ID())
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": {0, 0, 0, 0, 0, 0, 0, 1},
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(importResolver).
+			WithFileResolver(fileResolver).
+			WithContracts(contracts)
+
+		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
 	})

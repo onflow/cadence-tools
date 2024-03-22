@@ -614,6 +614,12 @@ func (e *EmulatorBackend) LoadSnapshot(name string) error {
 // Creates the number of predefined accounts that will be used
 // for deploying the contracts under testing.
 func (e *EmulatorBackend) bootstrapAccounts() {
+	serviceAcc, err := e.ServiceAccount()
+	if err != nil {
+		panic(err)
+	}
+	e.accounts[serviceAcc.Address] = serviceAcc
+
 	for i := 0; i < initialAccountsNumber; i++ {
 		_, err := e.CreateAccount()
 		if err != nil {
