@@ -1058,7 +1058,7 @@ func TestImportBuiltinContracts(t *testing.T) {
         access(all)
         fun testExampleNFT() {
             let storagePath = ExampleNFT.MinterStoragePath
-            Test.assertEqual(/storage/cadenceExampleNFTMinter, storagePath)
+            Test.assertEqual(/storage/exampleNFTMinter, storagePath)
 
             Test.assertEqual(
                 "{A.0000000000000001.NonFungibleToken}",
