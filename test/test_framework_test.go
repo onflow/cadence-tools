@@ -3587,7 +3587,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil)
+	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, false)
 	emulatorBackend.contracts = map[string]common.Address{
 		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
 		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
@@ -3832,7 +3832,7 @@ func TestServiceAccount(t *testing.T) {
 	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
-		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil)
+		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, false)
 
 		serviceAccount, err := emulatorBackend.ServiceAccount()
 
@@ -5931,4 +5931,48 @@ func TestGetTests(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []string{"test1", "test2", "test3"}, tests)
+}
+
+func TestWithStorageLimitEnabled(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        #storageLimitEnabled
+
+        import Test
+        import BlockchainHelpers
+
+        access(all)
+        fun test() {
+            let acc = getAccount(0x10)
+            Test.assertEqual(0.001, acc.balance)
+
+            let account = Test.serviceAccount()
+            var balance = getFlowBalance(account: account)
+            Test.assertEqual(999999999.977, balance)
+
+            let admin = Test.createAccount()
+
+            balance = getFlowBalance(account: admin)
+            Test.assertEqual(0.001, balance)
+
+            mintFlow(to: admin, amount: 1000.0)
+
+            balance = getFlowBalance(account: admin)
+            Test.assertEqual(1000.001, balance)
+
+            let txResult = burnFlow(from: admin, amount: 1000.001)
+            Test.expect(txResult, Test.beFailed())
+            Test.assertError(txResult, errorMessage: "storage limit check failed")
+
+            balance = getFlowBalance(account: admin)
+            Test.assertEqual(1000.001, balance)
+        }
+	`
+
+	runner := NewTestRunner()
+	result, err := runner.RunTest(code, "test")
+
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
 }

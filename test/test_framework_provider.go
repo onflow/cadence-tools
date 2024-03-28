@@ -72,6 +72,7 @@ func NewTestFrameworkProvider(
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
+	storageLimitEnabled bool,
 ) stdlib.TestFramework {
 	return &TestFrameworkProvider{
 		fileResolver:   fileResolver,
@@ -81,6 +82,7 @@ func NewTestFrameworkProvider(
 			logger,
 			stdlibHandler,
 			coverageReport,
+			storageLimitEnabled,
 		),
 	}
 }

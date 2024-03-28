@@ -60,6 +60,8 @@ const beforeEachFunctionName = "beforeEach"
 
 const afterEachFunctionName = "afterEach"
 
+const storageLimitEnabledPragmaIdentifier = "#storageLimitEnabled"
+
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
 var quotedLog = regexp.MustCompile("\"(.*)\"")
@@ -403,9 +405,6 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	*interpreter.Interpreter,
 	error,
 ) {
-	// TODO: move this eventually to the `NewTestRunner`
-	env, ctx := r.initializeEnvironment()
-
 	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
 		return nil, nil, err
@@ -427,6 +426,19 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 		}
 	}
 
+	storageLimitEnabled := false
+	for _, pragmaDecl := range astProgram.PragmaDeclarations() {
+		pragmaIdentifier := pragmaDecl.String()
+
+		if pragmaIdentifier == storageLimitEnabledPragmaIdentifier {
+			storageLimitEnabled = true
+			break
+		}
+	}
+
+	// TODO: move this eventually to the `NewTestRunner`
+	env, ctx := r.initializeEnvironment(storageLimitEnabled)
+
 	script = r.replaceImports(script)
 
 	program, err := env.ParseAndCheckProgram([]byte(script), ctx.Location, false)
@@ -447,7 +459,7 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	return program, inter, nil
 }
 
-func (r *TestRunner) initializeEnvironment() (
+func (r *TestRunner) initializeEnvironment(storageLimitEnabled bool) (
 	runtime.Environment,
 	runtime.Context,
 ) {
@@ -465,6 +477,7 @@ func (r *TestRunner) initializeEnvironment() (
 		r.fileResolver,
 		env,
 		r.coverageReport,
+		storageLimitEnabled,
 	)
 	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
 	if !ok {
