@@ -27,6 +27,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
@@ -38,6 +40,7 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/cadence-tools/test/core_events"
 	"github.com/onflow/cadence-tools/test/helpers"
 )
 
@@ -474,8 +477,9 @@ func (r *TestRunner) initializeEnvironment() (
 	backend.contracts = r.contracts
 	r.backend = backend
 
+	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
 	ctx := runtime.Context{
-		Interface:   r.backend.blockchain.NewScriptEnvironment(),
+		Interface:   fvmEnv,
 		Location:    testScriptLocation,
 		Environment: env,
 	}
@@ -483,6 +487,7 @@ func (r *TestRunner) initializeEnvironment() (
 		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
 		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
 		r.coverageReport.ExcludeLocation(helpers.BlockchainHelpersLocation)
+		r.coverageReport.ExcludeLocation(core_events.CoreEventsLocation)
 		r.coverageReport.ExcludeLocation(testScriptLocation)
 		ctx.CoverageReport = r.coverageReport
 	}
@@ -499,6 +504,25 @@ func (r *TestRunner) initializeEnvironment() (
 	// returned from blockchain to the test script)
 	env.InterpreterConfig.ContractValueHandler = r.interpreterContractValueHandler(env)
 
+	stdlibHandler := env.InterpreterConfig.CompositeTypeHandler
+	testHandler := func(location common.Location, typeID common.TypeID) *sema.CompositeType {
+		if typeID == "evm.BlockExecuted" {
+			fmt.Println("Event Types: ", EVMEventTypes)
+			typeID := common.TypeID("I.CoreEvents.CoreEvents.BlockExecuted")
+			fmt.Println("TypeID: ", typeID)
+			fmt.Println("Returning: ", EVMEventTypes[typeID])
+			return EVMEventTypes[typeID]
+		} else if typeID == "evm.TransactionExecuted" {
+			typeID := common.TypeID("I.CoreEvents.CoreEvents.TransactionExecuted")
+			return EVMEventTypes[typeID]
+		} else if typeID == "flow.AccountCreated" {
+			typeID := common.TypeID("I.CoreEvents.CoreEvents.AccountCreated")
+			return EVMEventTypes[typeID]
+		}
+		return stdlibHandler(location, typeID)
+	}
+	env.InterpreterConfig.CompositeTypeHandler = testHandler
+
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
@@ -506,8 +530,42 @@ func (r *TestRunner) initializeEnvironment() (
 		r.coverageReport,
 	)
 
+	chain := flow.MonotonicEmulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	err := evm.SetupEnvironment(
+		chain.ChainID(),
+		fvmEnv,
+		env,
+		chain.ServiceAddress(),
+		sc.FlowToken.Address,
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	return env, ctx
 }
+
+var EVMEventTypes = map[common.TypeID]*sema.CompositeType{}
+
+func newEVMEventType(identifier string) *sema.CompositeType {
+	eventType := &sema.CompositeType{
+		Kind:       common.CompositeKindEvent,
+		Location:   core_events.CoreEventsLocation,
+		Identifier: identifier,
+		Fields:     []string{},
+		Members:    &sema.StringMemberOrderedMap{},
+	}
+	EVMEventTypes[eventType.ID()] = eventType
+
+	return eventType
+}
+
+var BlockExecutedEventType = newEVMEventType("CoreEvents.BlockExecuted")
+
+var TransactionExecutedEventType = newEVMEventType("CoreEvents.TransactionExecuted")
+
+var AccountCreatedEventType = newEVMEventType("CoreEvents.AccountCreated")
 
 func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandlerFunc {
 	return func(
@@ -528,6 +586,10 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 		case helpers.BlockchainHelpersLocation:
 			helpersChecker := helpers.BlockchainHelpersChecker()
 			elaboration = helpersChecker.Elaboration
+
+		case core_events.CoreEventsLocation:
+			coreEventsChecker := core_events.CoreEventsChecker()
+			elaboration = coreEventsChecker.Elaboration
 
 		default:
 			_, importedElaboration, err := r.parseAndCheckImport(importedLocation, ctx)
@@ -685,6 +747,10 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 			helpersChecker := helpers.BlockchainHelpersChecker()
 			program = interpreter.ProgramFromChecker(helpersChecker)
 
+		case core_events.CoreEventsLocation:
+			coreEventsChecker := core_events.CoreEventsChecker()
+			program = interpreter.ProgramFromChecker(coreEventsChecker)
+
 		default:
 			importedProgram, importedElaboration, err := r.parseAndCheckImport(location, ctx)
 			if err != nil {
@@ -785,6 +851,19 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
+
+	chain := flow.MonotonicEmulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	err = evm.SetupEnvironment(
+		chain.ChainID(),
+		r.backend.blockchain.NewScriptEnvironment(),
+		env,
+		chain.ServiceAddress(),
+		sc.FlowToken.Address,
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	code = r.replaceImports(code)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
