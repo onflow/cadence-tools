@@ -22,7 +22,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -1352,14 +1354,21 @@ func TestCreateAccount(t *testing.T) {
 
 	const code = `
         import Test
+        import CoreEvents
 
         access(all)
         fun test() {
             let account = Test.createAccount()
 
-            let typ = CompositeType("flow.AccountCreated")!
+            let typ = Type<CoreEvents.AccountCreated>()
             let events = Test.eventsOfType(typ)
             Test.expect(events.length, Test.beGreaterThan(1))
+
+            let accountCreatedEvent = events[0] as! CoreEvents.AccountCreated
+            Test.assertEqual(
+                Address(0x0000000000000006),
+                accountCreatedEvent.address
+            )
         }
 	`
 
@@ -4235,6 +4244,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"I.Test",
 			"I.Crypto",
 			"I.BlockchainHelpers",
+			"I.CoreEvents",
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"A.0000000000000002.FungibleTokenSwitchboard",
 			"A.0000000000000001.Burner",
@@ -4455,6 +4465,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"I.Crypto",
 			"I.Test",
 			"I.BlockchainHelpers",
+			"I.CoreEvents",
 			"A.0000000000000001.ExampleNFT",
 			"A.0000000000000001.MetadataViews",
 			"A.0000000000000001.NonFungibleToken",
@@ -5931,4 +5942,116 @@ func TestGetTests(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []string{"test1", "test2", "test3"}, tests)
+}
+
+func TestEVMContractEvents(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import "EVM"
+        import CoreEvents
+
+        access(all)
+        let account = Test.createAccount()
+
+        access(all)
+        fun testEVMContractEvents() {
+            let code = Test.readFile("../transactions/test_transaction.cdc")
+            let tx = Test.Transaction(
+                code: code,
+                authorizers: [account.address],
+                signers: [account],
+                arguments: []
+            )
+
+            let result = Test.executeTransaction(tx)
+            Test.expect(result, Test.beSucceeded())
+
+            let blockEventType = Type<CoreEvents.BlockExecuted>()
+            let blockEvents = Test.eventsOfType(blockEventType)
+            Test.assertEqual(1, blockEvents.length)
+
+            let blockEvent = blockEvents[0] as! CoreEvents.BlockExecuted
+            Test.assertEqual(UInt64(1), blockEvent.height)
+            Test.assertEqual(
+                66,
+                blockEvent.hash.length
+            )
+            Test.assertEqual(0, blockEvent.totalSupply)
+            Test.assertEqual(
+                "0x716d10fd2eb72b01e876580d348d8a9069e4a3395ab7cc27196971f04e9280f4",
+                blockEvent.parentHash
+            )
+            Test.assertEqual(
+                "0x0000000000000000000000000000000000000000000000000000000000000000",
+                blockEvent.receiptRoot
+            )
+            Test.assertEqual(
+                1,
+                blockEvent.transactionHashes.length
+            )
+
+            let txEventType = Type<CoreEvents.TransactionExecuted>()
+            let txEvents = Test.eventsOfType(txEventType)
+            Test.assertEqual(1, txEvents.length)
+
+            let txEvent = txEvents[0] as! CoreEvents.TransactionExecuted
+
+            Test.assertEqual(UInt64(1), txEvent.blockHeight)
+            Test.assertEqual(66, txEvent.blockHash.length)
+            Test.assertEqual(66, txEvent.transactionHash.length)
+            Test.assertEqual(7200, txEvent.encodedTransaction.length)
+            Test.assertEqual(false, txEvent.failed)
+            Test.assertEqual("", txEvent.vmError)
+            Test.assertEqual(UInt8(255), txEvent.transactionType)
+            Test.assertEqual(UInt64(702600), txEvent.gasConsumed)
+            Test.assertEqual(42, txEvent.deployedContractAddress.length)
+            Test.assertEqual("", txEvent.returnedValue)
+            Test.assertEqual("", txEvent.logs)
+        }
+	`
+
+	const testTransactionCode = `
+        import "EVM"
+
+        transaction {
+            prepare(signer: auth(SaveValue) &Account) {
+                let coa <- EVM.createCadenceOwnedAccount()
+                let address = coa.address()
+
+                assert(address.bytes != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                signer.storage.save<@EVM.CadenceOwnedAccount>(
+                    <-coa,
+                    to: StoragePath(identifier: "evm")!
+                )
+            }
+        }
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "../transactions/test_transaction.cdc":
+			return testTransactionCode, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", fmt.Errorf("cannot find import location: %s", location)
+	}
+
+	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	log := zerolog.New(output).With().Timestamp().Logger()
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver).
+		WithLogger(log)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }

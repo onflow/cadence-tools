@@ -537,6 +537,13 @@ func (e *EmulatorBackend) Events(
 		eventTypeString = ""
 	case *interpreter.CompositeStaticType:
 		eventTypeString = eventType.String()
+		if eventTypeString == "I.CoreEvents.CoreEvents.BlockExecuted" {
+			eventTypeString = "evm.BlockExecuted"
+		} else if eventTypeString == "I.CoreEvents.CoreEvents.TransactionExecuted" {
+			eventTypeString = "evm.TransactionExecuted"
+		} else if eventTypeString == "I.CoreEvents.CoreEvents.AccountCreated" {
+			eventTypeString = "flow.AccountCreated"
+		}
 	default:
 		panic(errors.NewUnreachableError())
 	}
