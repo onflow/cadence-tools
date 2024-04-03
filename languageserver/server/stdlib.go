@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
-	evmstdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 )
 
 type standardLibrary struct {
@@ -286,12 +285,12 @@ func (standardLibrary) IsContractBeingAdded(_ common.AddressLocation) bool {
 	panic(errors.NewUnreachableError())
 }
 
-func newStandardLibrary() (result standardLibrary) {
+func newStandardLibrary(additionalValues ...stdlib.StandardLibraryValue) (result standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
 
 	values := []stdlib.StandardLibraryValue{}
 	values = append(values, stdlib.DefaultStandardLibraryValues(result)...)
-	values = append(values, fvmStandardLibraryValues()...)
+	values = append(values, additionalValues...)
 
 	for _, valueDeclaration := range values {
 		result.baseValueActivation.DeclareValue(valueDeclaration)
@@ -299,29 +298,15 @@ func newStandardLibrary() (result standardLibrary) {
 	return
 }
 
-func newScriptStandardLibrary() (result standardLibrary) {
+func newScriptStandardLibrary(additionalValues ...stdlib.StandardLibraryValue) (result standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
 
 	values := []stdlib.StandardLibraryValue{}
 	values = append(values, stdlib.DefaultScriptStandardLibraryValues(result)...)
-	values = append(values, fvmStandardLibraryValues()...)
+	values = append(values, additionalValues...)
 
 	for _, declaration := range values {
 		result.baseValueActivation.DeclareValue(declaration)
 	}
 	return
-}
-
-// fvmStandardLibraryValues returns the standard library values which are provided by the FVM
-// these are not part of the Cadence standard library
-func fvmStandardLibraryValues() []stdlib.StandardLibraryValue {
-	return []stdlib.StandardLibraryValue{
-		// InternalEVM contract
-		{
-			Name:  evmstdlib.InternalEVMContractName,
-			Type:  evmstdlib.InternalEVMContractType,
-			Value: evmstdlib.NewInternalEVMContractValue(nil, nil, common.AddressLocation{}),
-			Kind:  common.DeclarationKindContract,
-		},
-	}
 }
