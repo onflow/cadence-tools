@@ -6,9 +6,9 @@ import (
 	evmstdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 )
 
-// fvmStandardLibraryValues returns the standard library values which are provided by the FVM
+// FVMtandardLibraryValues returns the standard library values which are provided by the FVM
 // these are not part of the Cadence standard library
-func fvmStandardLibraryValues() []stdlib.StandardLibraryValue {
+func FVMStandardLibraryValues() []stdlib.StandardLibraryValue {
 	return []stdlib.StandardLibraryValue{
 		// InternalEVM contract
 		{
