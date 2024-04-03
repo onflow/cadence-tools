@@ -30,7 +30,6 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/cadence-tools/languageserver/integration"
 	"github.com/onflow/cadence-tools/languageserver/server"
 )
 
@@ -194,7 +193,6 @@ func start(id int) {
 	err = languageServer.SetOptions(
 		server.WithAddressImportResolver(addressImportResolver),
 		server.WithStringImportResolver(stringImportResolver),
-		server.WithExtendedStandardLibraryValues(integration.FVMStandardLibraryValues),
 	)
 	if err != nil {
 		panic(err)
