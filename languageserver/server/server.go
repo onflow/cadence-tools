@@ -184,14 +184,16 @@ type Server struct {
 	// initializationOptionsHandlers are the functions that are used to handle initialization options sent by the client
 	initializationOptionsHandlers []InitializationOptionsHandler
 	accessCheckMode               sema.AccessCheckMode
-	// extendedStandardLibraryValues are the standard library values that are provided in addition to the default standard library
-	extendedStandardLibraryValues []stdlib.StandardLibraryValue
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
 	// checkerStandardConfig is a config used to check contracts and transactions
 	checkerStandardConfig *sema.Config
 	// checkerScriptConfig is a config used to check scripts
 	checkerScriptConfig *sema.Config
+	// standardLibrary is the default standard library
+	standardLibrary *standardLibrary
+	// scriptStandardLibrary is the standard library for scripts
+	scriptStandardLibrary *standardLibrary
 }
 
 type Option func(*Server) error
@@ -285,11 +287,14 @@ func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc)
 // WithStandardLibraryValues returns a server option that adds the given function
 // as a function that is used to resolve standard library values (in addition to the default standard library)
 //
-// This is used to provide parts of the standard library that are present in an environment,
+// This is used to provide parts of the standard library that are present in some given environment
 // but are not native to the language.
 func WithExtendedStandardLibraryValues(values ...stdlib.StandardLibraryValue) Option {
 	return func(server *Server) error {
-		server.extendedStandardLibraryValues = append(server.extendedStandardLibraryValues, values...)
+		for _, value := range values {
+			server.standardLibrary.baseValueActivation.DeclareValue(value)
+			server.scriptStandardLibrary.baseValueActivation.DeclareValue(value)
+		}
 		return nil
 	}
 }
@@ -323,15 +328,19 @@ func NewServer() (*Server, error) {
 		}
 	}
 
+	// create standard libraries
+	server.standardLibrary = newStandardLibrary()
+	server.scriptStandardLibrary = newScriptStandardLibrary()
+
 	// create checker configurations
-	server.checkerStandardConfig = newCheckerConfig(server, newStandardLibrary())
-	server.checkerScriptConfig = newCheckerConfig(server, newScriptStandardLibrary())
+	server.checkerStandardConfig = newCheckerConfig(server, server.standardLibrary)
+	server.checkerScriptConfig = newCheckerConfig(server, server.scriptStandardLibrary)
 
 	return server, nil
 }
 
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
-func newCheckerConfig(s *Server, lib standardLibrary) *sema.Config {
+func newCheckerConfig(s *Server, lib *standardLibrary) *sema.Config {
 	return &sema.Config{
 		BaseValueActivationHandler: func(_ common.Location) *sema.VariableActivation {
 			return lib.baseValueActivation

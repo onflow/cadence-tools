@@ -285,27 +285,17 @@ func (standardLibrary) IsContractBeingAdded(_ common.AddressLocation) bool {
 	panic(errors.NewUnreachableError())
 }
 
-func newStandardLibrary(additionalValues ...stdlib.StandardLibraryValue) (result standardLibrary) {
+func newStandardLibrary() (result *standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
-
-	values := []stdlib.StandardLibraryValue{}
-	values = append(values, stdlib.DefaultStandardLibraryValues(result)...)
-	values = append(values, additionalValues...)
-
-	for _, valueDeclaration := range values {
+	for _, valueDeclaration := range stdlib.DefaultStandardLibraryValues(result) {
 		result.baseValueActivation.DeclareValue(valueDeclaration)
 	}
 	return
 }
 
-func newScriptStandardLibrary(additionalValues ...stdlib.StandardLibraryValue) (result standardLibrary) {
+func newScriptStandardLibrary() (result *standardLibrary) {
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
-
-	values := []stdlib.StandardLibraryValue{}
-	values = append(values, stdlib.DefaultScriptStandardLibraryValues(result)...)
-	values = append(values, additionalValues...)
-
-	for _, declaration := range values {
+	for _, declaration := range stdlib.DefaultScriptStandardLibraryValues(result) {
 		result.baseValueActivation.DeclareValue(declaration)
 	}
 	return
