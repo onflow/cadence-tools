@@ -22,7 +22,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -5931,4 +5933,37 @@ func TestGetTests(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []string{"test1", "test2", "test3"}, tests)
+}
+
+func TestEVMContract(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import "EVM"
+
+        access(all)
+        fun testCOACreation() {
+            let coa <- EVM.createCadenceOwnedAccount()
+            Test.assertEqual(UInt(0), coa.address().balance().inAttoFLOW())
+
+            destroy <- coa
+        }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", fmt.Errorf("cannot find import location: %s", location)
+	}
+
+	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	log := zerolog.New(output).With().Timestamp().Logger()
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithLogger(log)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }

@@ -27,6 +27,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
@@ -474,8 +477,9 @@ func (r *TestRunner) initializeEnvironment() (
 	backend.contracts = r.contracts
 	r.backend = backend
 
+	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
 	ctx := runtime.Context{
-		Interface:   r.backend.blockchain.NewScriptEnvironment(),
+		Interface:   fvmEnv,
 		Location:    testScriptLocation,
 		Environment: env,
 	}
@@ -505,6 +509,11 @@ func (r *TestRunner) initializeEnvironment() (
 		runtime.NewStorage(ctx.Interface, nil),
 		r.coverageReport,
 	)
+
+	err := setupEVMEnvironment(fvmEnv, env)
+	if err != nil {
+		panic(err)
+	}
 
 	return env, ctx
 }
@@ -786,6 +795,11 @@ func (r *TestRunner) parseAndCheckImport(
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
 
+	err = setupEVMEnvironment(r.backend.blockchain.NewScriptEnvironment(), env)
+	if err != nil {
+		panic(err)
+	}
+
 	code = r.replaceImports(code)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
@@ -794,6 +808,20 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	return program.Program, program.Elaboration, nil
+}
+
+func setupEVMEnvironment(
+	fvmEnv environment.Environment,
+	runtimeEnv runtime.Environment,
+) error {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	return evm.SetupEnvironment(
+		chain.ChainID(),
+		fvmEnv,
+		runtimeEnv,
+		chain.ServiceAddress(),
+		sc.FlowToken.Address,
+	)
 }
 
 func baseContracts() map[string]common.Address {
