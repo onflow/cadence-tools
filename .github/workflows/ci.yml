@@ -6,13 +6,13 @@ on:
       - master
       - 'feature/**'
       - 'v**'
-      - 'lint/v**'
+      - 'test/v**'
   pull_request:
     branches:
       - master
       - 'feature/**'
       - 'v**'
-      - 'lint/v**'
+      - 'test/v**'
 
 jobs:
   test-test:
