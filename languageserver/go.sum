@@ -705,8 +705,8 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
 github.com/onflow/cadence v0.42.10 h1:3oC5ceeXhdCrhHcf9H0yYXQKW3Tw/vkSXLe+PUZa4i0=
 github.com/onflow/cadence v0.42.10/go.mod h1:1wFd+LiNiN6qoZXof3MBdpM6d8BsxbVIxOA77LbIYmE=
-github.com/onflow/cadence-tools/lint v0.14.2-0.20240412191500-4001820751bd h1:zyviEpI7f4kez9WLe65lSHdVIciAIO3SfBBzIHoNmWU=
-github.com/onflow/cadence-tools/lint v0.14.2-0.20240412191500-4001820751bd/go.mod h1:/emOzYCT1gBs2uWjSTLU/B1rpyPxOK33psJfaxmtmVg=
+github.com/onflow/cadence-tools/lint v0.14.2 h1:WGh6ARN9MRVeYID3OnlalPtDTeYkliteHHR+ITCh/J4=
+github.com/onflow/cadence-tools/lint v0.14.2/go.mod h1:PlYwSF4wwpCtQJKs1cQAb80AG90a4rhADTitCogQ4UE=
 github.com/onflow/cadence-tools/test v0.14.7-0.20240412191133-4d5808f59bda h1:tUmaiXSiUc2AkZXuaqeOAUmHbAXlfcG4uejgr6xqjXE=
 github.com/onflow/cadence-tools/test v0.14.7-0.20240412191133-4d5808f59bda/go.mod h1:CBq9lk7Dpqz8kPkUYLOD3AgrjzBjKCZhLgDjvJYokQs=
 github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=

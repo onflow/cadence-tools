@@ -6,11 +6,13 @@ on:
       - master
       - 'feature/**'
       - 'v**'
+      - 'languageserver/**'
   pull_request:
     branches:
       - master
       - 'feature/**'
       - 'v**'
+      - 'languageserver/**'
 
 jobs:
   paths-filter:
