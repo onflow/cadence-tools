@@ -25,9 +25,9 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/flow-cli/flowkit"
-	"github.com/onflow/flow-cli/flowkit/config"
 	"github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flowkit"
+	"github.com/onflow/flowkit/config"
 )
 
 type resolvers struct {
