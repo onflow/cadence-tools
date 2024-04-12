@@ -12,7 +12,7 @@ on:
       - master
       - 'feature/**'
       - 'v**'
-      - 'lint/v**''
+      - 'lint/v**'
 
 jobs:
   test-test:
