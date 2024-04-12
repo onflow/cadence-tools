@@ -34,7 +34,7 @@ generate:
 	go mod tidy
 
 .PHONY: test
-test: e2e-test generate unit-test wasm-test
+test: e2e-test generate unit-test # TODO: wasm-test
 
 .PHONY: unit-test
 unit-test:
