@@ -15,7 +15,31 @@ on:
       - 'test/v**'
 
 jobs:
+  paths-filter:
+    runs-on: ubuntu-20.04
+    outputs:
+      test: ${{ steps.filter.outputs.test }}
+      lint: ${{ steps.filter.outputs.lint }}
+      languageserver: ${{ steps.filter.outputs.languageserver }}
+      docgen: ${{ steps.filter.outputs.docgen }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          test:
+            - 'test/**'
+          lint:
+            - 'lint/**'
+          languageserver:
+            - 'languageserver/**'
+          docgen:
+            - 'docgen/**'
+
   test-test:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.test == 'true' }}
     name: Test (Test Framework)
     runs-on: ubuntu-20.04
     steps:
@@ -40,6 +64,8 @@ jobs:
       run: make check-tidy-test
 
   test-lint:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.lint == 'true' }}
     name: Test (Lint)
     runs-on: ubuntu-20.04
     steps:
@@ -61,6 +87,8 @@ jobs:
         run: make check-tidy-lint
 
   test-languageserver:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
     name: Test (Language Server)
     runs-on: ubuntu-20.04
     steps:
@@ -81,12 +109,17 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Build
+        working-directory: languageserver
+        run: make build
       - name: Test
         run: make test-languageserver
       - name: Check tidy
         run: make check-tidy-languageserver
 
   test-docgen:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
     name: Test (Docgen)
     runs-on: ubuntu-20.04
     steps:
