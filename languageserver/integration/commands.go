@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/onflow/flow-cli/flowkit/arguments"
+	"github.com/onflow/flowkit/arguments"
 
 	"github.com/onflow/flow-go-sdk"
 
@@ -42,7 +42,7 @@ const (
 
 type commands struct {
 	client flowClient
-	state flowState
+	state  flowState
 }
 
 func (c *commands) getAll() []server.Command {
@@ -51,7 +51,7 @@ func (c *commands) getAll() []server.Command {
 		Name:    CommandReloadConfig,
 		Handler: c.reloadConfig,
 	}}
-	
+
 	// Commands only available when client is enabled
 	if c.client != nil {
 		commands = append(commands, []server.Command{

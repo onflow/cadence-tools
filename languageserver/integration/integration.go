@@ -24,7 +24,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/sema"
 
-	"github.com/onflow/flow-cli/flowkit"
+	"github.com/onflow/flowkit"
 	"github.com/spf13/afero"
 
 	"github.com/onflow/cadence-tools/languageserver/protocol"
@@ -36,16 +36,16 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 	state := newFlowkitState(loader)
 
 	integration := &FlowIntegration{
-		entryPointInfo:		map[protocol.DocumentURI]*entryPointInfo{},
-		contractInfo:			map[protocol.DocumentURI]*contractInfo{},
-		enableFlowClient:	enableFlowClient,
-		loader:						loader,
-		state:						state,
+		entryPointInfo:   map[protocol.DocumentURI]*entryPointInfo{},
+		contractInfo:     map[protocol.DocumentURI]*contractInfo{},
+		enableFlowClient: enableFlowClient,
+		loader:           loader,
+		state:            state,
 	}
 
 	resolve := resolvers{
 		loader: loader,
-		state: state,
+		state:  state,
 	}
 
 	options := []server.Option{
@@ -81,13 +81,13 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 }
 
 type FlowIntegration struct {
-	entryPointInfo 		map[protocol.DocumentURI]*entryPointInfo
-	contractInfo   		map[protocol.DocumentURI]*contractInfo
+	entryPointInfo map[protocol.DocumentURI]*entryPointInfo
+	contractInfo   map[protocol.DocumentURI]*contractInfo
 
-	enableFlowClient 	bool
-	client  					flowClient
-	state   					*flowkitState
-	loader  					flowkit.ReaderWriter
+	enableFlowClient bool
+	client           flowClient
+	state            *flowkitState
+	loader           flowkit.ReaderWriter
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {
@@ -117,7 +117,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	}
 
 	// If client is enabled, initialize the client
-	if (i.enableFlowClient) {
+	if i.enableFlowClient {
 		numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
 		if !ok || numberOfAccountsString == "" {
 			return errors.New("initialization options: invalid account number value, should be passed as a string")
