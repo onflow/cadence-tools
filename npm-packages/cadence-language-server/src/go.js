@@ -1,80 +1,97 @@
+// Adapted from https://github.com/golang/go/blob/go1.20.14/misc/wasm/wasm_exec.js
+
 // Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+const enosys = () => {
+	const err = new Error("not implemented");
+	err.code = "ENOSYS";
+	return err;
+};
+
+if (!globalThis.fs) {
+	let outputBuf = "";
+	globalThis.fs = {
+		constants: { O_WRONLY: -1, O_RDWR: -1, O_CREAT: -1, O_TRUNC: -1, O_APPEND: -1, O_EXCL: -1 }, // unused
+		writeSync(fd, buf) {
+			outputBuf += decoder.decode(buf);
+			const nl = outputBuf.lastIndexOf("\n");
+			if (nl != -1) {
+				console.log(outputBuf.substring(0, nl));
+				outputBuf = outputBuf.substring(nl + 1);
+			}
+			return buf.length;
+		},
+		write(fd, buf, offset, length, position, callback) {
+			if (offset !== 0 || length !== buf.length || position !== null) {
+				callback(enosys());
+				return;
+			}
+			const n = this.writeSync(fd, buf);
+			callback(null, n);
+		},
+		chmod(path, mode, callback) { callback(enosys()); },
+		chown(path, uid, gid, callback) { callback(enosys()); },
+		close(fd, callback) { callback(enosys()); },
+		fchmod(fd, mode, callback) { callback(enosys()); },
+		fchown(fd, uid, gid, callback) { callback(enosys()); },
+		fstat(fd, callback) { callback(enosys()); },
+		fsync(fd, callback) { callback(null); },
+		ftruncate(fd, length, callback) { callback(enosys()); },
+		lchown(path, uid, gid, callback) { callback(enosys()); },
+		link(path, link, callback) { callback(enosys()); },
+		lstat(path, callback) { callback(enosys()); },
+		mkdir(path, perm, callback) { callback(enosys()); },
+		open(path, flags, mode, callback) { callback(enosys()); },
+		read(fd, buffer, offset, length, position, callback) { callback(enosys()); },
+		readdir(path, callback) { callback(enosys()); },
+		readlink(path, callback) { callback(enosys()); },
+		rename(from, to, callback) { callback(enosys()); },
+		rmdir(path, callback) { callback(enosys()); },
+		stat(path, callback) { callback(enosys()); },
+		symlink(path, link, callback) { callback(enosys()); },
+		truncate(path, length, callback) { callback(enosys()); },
+		unlink(path, callback) { callback(enosys()); },
+		utimes(path, atime, mtime, callback) { callback(enosys()); },
+	};
+}
+
+if (!globalThis.process) {
+	globalThis.process = {
+		getuid() { return -1; },
+		getgid() { return -1; },
+		geteuid() { return -1; },
+		getegid() { return -1; },
+		getgroups() { throw enosys(); },
+		pid: -1,
+		ppid: -1,
+		umask() { throw enosys(); },
+		cwd() { throw enosys(); },
+		chdir() { throw enosys(); },
+	}
+}
+
+if (!globalThis.crypto) {
+	throw new Error("globalThis.crypto is not available, polyfill required (crypto.getRandomValues only)");
+}
+
+if (!globalThis.performance) {
+	throw new Error("globalThis.performance is not available, polyfill required (performance.now only)");
+}
+
+if (!globalThis.TextEncoder) {
+	throw new Error("globalThis.TextEncoder is not available, polyfill required");
+}
+
+if (!globalThis.TextDecoder) {
+	throw new Error("globalThis.TextDecoder is not available, polyfill required");
+}
+
 const encoder = new TextEncoder("utf-8");
 const decoder = new TextDecoder("utf-8");
 
-const enosys = () => {
-  const err = new Error("not implemented");
-  err.code = "ENOSYS";
-  return err;
-};
-
-// NOTE: required and used by the WASM binary
-let outputBuf = "";
-global.fs = {
-	constants: { O_WRONLY: -1, O_RDWR: -1, O_CREAT: -1, O_TRUNC: -1, O_APPEND: -1, O_EXCL: -1 }, // unused
-	writeSync(fd, buf) {
-		outputBuf += decoder.decode(buf);
-		const nl = outputBuf.lastIndexOf("\n");
-		if (nl != -1) {
-			console.log(outputBuf.substr(0, nl));
-			outputBuf = outputBuf.substr(nl + 1);
-		}
-		return buf.length;
-	},
-	write(fd, buf, offset, length, position, callback) {
-		if (offset !== 0 || length !== buf.length || position !== null) {
-			callback(enosys());
-			return;
-		}
-		const n = this.writeSync(fd, buf);
-		callback(null, n);
-	},
-	chmod(path, mode, callback) { callback(enosys()); },
-	chown(path, uid, gid, callback) { callback(enosys()); },
-	close(fd, callback) { callback(enosys()); },
-	fchmod(fd, mode, callback) { callback(enosys()); },
-	fchown(fd, uid, gid, callback) { callback(enosys()); },
-	fstat(fd, callback) { callback(enosys()); },
-	fsync(fd, callback) { callback(null); },
-	ftruncate(fd, length, callback) { callback(enosys()); },
-	lchown(path, uid, gid, callback) { callback(enosys()); },
-	link(path, link, callback) { callback(enosys()); },
-	lstat(path, callback) { callback(enosys()); },
-	mkdir(path, perm, callback) { callback(enosys()); },
-	open(path, flags, mode, callback) { callback(enosys()); },
-	read(fd, buffer, offset, length, position, callback) { callback(enosys()); },
-	readdir(path, callback) { callback(enosys()); },
-	readlink(path, callback) { callback(enosys()); },
-	rename(from, to, callback) { callback(enosys()); },
-	rmdir(path, callback) { callback(enosys()); },
-	stat(path, callback) { callback(enosys()); },
-	symlink(path, link, callback) { callback(enosys()); },
-	truncate(path, length, callback) { callback(enosys()); },
-	unlink(path, callback) { callback(enosys()); },
-	utimes(path, atime, mtime, callback) { callback(enosys()); },
-};
-
-// NOTE: required and used by the WASM binary
-if (!global.process) {
-  global.process = {
-    getuid() { return -1; },
-    getgid() { return -1; },
-    geteuid() { return -1; },
-    getegid() { return -1; },
-    getgroups() { throw enosys(); },
-    pid: -1,
-    ppid: -1,
-    umask() { throw enosys(); },
-    cwd() { throw enosys(); },
-    chdir() { throw enosys(); },
-  }
-}
-
 class Go {
-
 	constructor() {
 		this.argv = ["js"];
 		this.env = {};
@@ -449,7 +466,7 @@ class Go {
 			null,
 			true,
 			false,
-			global,
+			globalThis,
 			this,
 		];
 		this._goRefCounts = new Array(this._values.length).fill(Infinity); // number of references that Go has to a JS value, indexed by reference id
@@ -458,7 +475,7 @@ class Go {
 			[null, 2],
 			[true, 3],
 			[false, 4],
-			[global, 5],
+			[globalThis, 5],
 			[this, 6],
 		]);
 		this._idPool = [];   // unused ids that have been garbage collected
@@ -534,4 +551,4 @@ class Go {
 	}
 }
 
-export const go = new Go()
+export const go = new Go();
