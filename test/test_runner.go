@@ -795,7 +795,11 @@ func (r *TestRunner) parseAndCheckImport(
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
 
-	err = setupEVMEnvironment(r.backend.blockchain.NewScriptEnvironment(), env)
+	fvmEnv, ok := startCtx.Interface.(environment.Environment)
+	if !ok {
+		panic(fmt.Errorf("failed to retrieve FVM Environment"))
+	}
+	err = setupEVMEnvironment(fvmEnv, env)
 	if err != nil {
 		panic(err)
 	}
