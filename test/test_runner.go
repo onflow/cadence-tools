@@ -823,7 +823,6 @@ func setupEVMEnvironment(
 		chain.ChainID(),
 		fvmEnv,
 		runtimeEnv,
-		chain.ServiceAddress(),
 		sc.FlowToken.Address,
 	)
 }
