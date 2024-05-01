@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.0.0-preview.24
+	github.com/onflow/cadence v1.0.0-preview.23
 	github.com/onflow/flow-go-sdk v1.0.0-preview.23
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc
