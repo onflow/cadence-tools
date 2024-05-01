@@ -1,11 +1,11 @@
 module github.com/onflow/cadence-tools/lint
 
-go 1.20
+go 1.21
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.0.0-preview.22
-	github.com/onflow/flow-go-sdk v1.0.0-preview.21
+	github.com/onflow/cadence v1.0.0-preview.23
+	github.com/onflow/flow-go-sdk v1.0.0-preview.23
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc
 	google.golang.org/grpc v1.63.2
@@ -28,7 +28,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/onflow/atree v0.6.1-0.20240416233652-f4568c0c03df // indirect
+	github.com/onflow/atree v0.6.1-0.20240429171449-cb486ceb1f9c // indirect
 	github.com/onflow/crypto v0.25.1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.0 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect

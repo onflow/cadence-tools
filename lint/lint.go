@@ -22,15 +22,16 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"golang.org/x/exp/maps"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"log"
 	"os"
 	"path"
 	"strings"
 	"sync"
+
+	"golang.org/x/exp/maps"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/pretty"
@@ -175,8 +176,10 @@ func newFlowAccess(networkName string) (*grpcAccess.Client, error) {
 
 	return grpcAccess.NewClient(
 		network,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(),
+		grpcAccess.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(),
+		),
 	)
 }
 
