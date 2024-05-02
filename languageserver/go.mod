@@ -1,8 +1,6 @@
 module github.com/onflow/cadence-tools/languageserver
 
-go 1.21
-
-toolchain go1.21.9
+go 1.20
 
 require (
 	github.com/getsentry/sentry-go v0.18.0
@@ -10,10 +8,10 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v1.0.0-preview.25
-	github.com/onflow/cadence-tools/lint v1.0.0-preview.16
+	github.com/onflow/cadence-tools/lint v1.0.0-preview.17
 	github.com/onflow/cadence-tools/test v1.0.0-preview.15
 	github.com/onflow/flow-go-sdk v1.0.0-preview.25
-	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.17
+	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.18
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/pflag v1.0.5
@@ -100,7 +98,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.7.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
-	github.com/ipfs/boxo v0.19.0 // indirect
+	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1 // indirect
 	github.com/ipfs/go-block-format v0.2.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

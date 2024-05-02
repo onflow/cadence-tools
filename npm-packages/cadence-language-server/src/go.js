@@ -1,10 +1,8 @@
-// Adapted from https://github.com/golang/go/blob/go1.21.9/misc/wasm/wasm_exec.js
+// Adapted from https://github.com/golang/go/blob/go1.20.14/misc/wasm/wasm_exec.js
 
 // Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-
-"use strict";
 
 const enosys = () => {
   const err = new Error("not implemented");
@@ -145,13 +143,13 @@ if (!globalThis.process) {
 
 if (!globalThis.crypto) {
   throw new Error(
-    "globalThis.crypto is not available, polyfill required (crypto.getRandomValues only)",
+    "globalThis.crypto is not available, polyfill required (crypto.getRandomValues only)"
   );
 }
 
 if (!globalThis.performance) {
   throw new Error(
-    "globalThis.performance is not available, polyfill required (performance.now only)",
+    "globalThis.performance is not available, polyfill required (performance.now only)"
   );
 }
 
@@ -185,10 +183,6 @@ class Go {
     const setInt64 = (addr, v) => {
       this.mem.setUint32(addr + 0, v, true);
       this.mem.setUint32(addr + 4, Math.floor(v / 4294967296), true);
-    };
-
-    const setInt32 = (addr, v) => {
-      this.mem.setUint32(addr + 0, v, true);
     };
 
     const getInt64 = (addr) => {
@@ -280,16 +274,13 @@ class Go {
       const saddr = getInt64(addr + 0);
       const len = getInt64(addr + 8);
       return decoder.decode(
-        new DataView(this._inst.exports.mem.buffer, saddr, len),
+        new DataView(this._inst.exports.mem.buffer, saddr, len)
       );
     };
 
     const timeOrigin = Date.now() - performance.now();
     this.importObject = {
-      _gotest: {
-        add: (a, b) => a + b,
-      },
-      gojs: {
+      go: {
         // Go's SP does not change as long as no Go code is running. Some operations (e.g. calls, getters and setters)
         // may synchronously trigger a Go event handler. This makes Go code get executed in the middle of the imported
         // function. A goroutine can switch to a new stack if the current stack is too small (see morestack function).
@@ -354,8 +345,8 @@ class Go {
                   this._resume();
                 }
               },
-              getInt64(sp + 8),
-            ),
+              getInt64(sp + 8) + 1 // setTimeout has been seen to fire up to 1 millisecond early
+            )
           );
           this.mem.setInt32(sp + 16, id, true);
         },
@@ -407,7 +398,7 @@ class Go {
           Reflect.set(
             loadValue(sp + 8),
             loadString(sp + 16),
-            loadValue(sp + 32),
+            loadValue(sp + 32)
           );
         },
 
@@ -422,7 +413,7 @@ class Go {
           sp >>>= 0;
           storeValue(
             sp + 24,
-            Reflect.get(loadValue(sp + 8), getInt64(sp + 16)),
+            Reflect.get(loadValue(sp + 8), getInt64(sp + 16))
           );
         },
 
@@ -510,7 +501,7 @@ class Go {
           sp >>>= 0;
           this.mem.setUint8(
             sp + 24,
-            loadValue(sp + 8) instanceof loadValue(sp + 16) ? 1 : 0,
+            loadValue(sp + 8) instanceof loadValue(sp + 16) ? 1 : 0
           );
         },
 
@@ -624,7 +615,7 @@ class Go {
     const wasmMinDataAddr = 4096 + 8192;
     if (offset >= wasmMinDataAddr) {
       throw new Error(
-        "total length of command line and environment variables exceeds limit",
+        "total length of command line and environment variables exceeds limit"
       );
     }
 
@@ -654,6 +645,6 @@ class Go {
       return event.result;
     };
   }
-};
+}
 
 export const go = new Go();

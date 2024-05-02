@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - master
-      - "feature/**"
-      - "v**"
+      - 'feature/**'
+      - 'v**'
   pull_request:
     branches:
       - master
-      - "feature/**"
-      - "v**"
+      - 'feature/**'
+      - 'v**'
 
 jobs:
   paths-filter:
@@ -21,19 +21,19 @@ jobs:
       languageserver: ${{ steps.filter.outputs.languageserver }}
       docgen: ${{ steps.filter.outputs.docgen }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            test:
-              - 'test/**'
-            lint:
-              - 'lint/**'
-            languageserver:
-              - 'languageserver/**'
-            docgen:
-              - 'docgen/**'
+    - uses: actions/checkout@v3
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          test:
+            - 'test/**'
+          lint:
+            - 'lint/**'
+          languageserver:
+            - 'languageserver/**'
+          docgen:
+            - 'docgen/**'
 
   test-test:
     needs: paths-filter
@@ -41,22 +41,22 @@ jobs:
     name: Test (Test Framework)
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v3
-        with:
-          go-version: "1.21"
-      - uses: actions/cache@v1
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Test
-        run: make test-test
-      - name: Check tidy
-        run: make check-tidy-test
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-go@v3
+      with:
+        go-version: '1.20'
+    - uses: actions/cache@v1
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Test
+      run: make test-test
+    - name: Check tidy
+      run: make check-tidy-test
 
   test-lint:
     needs: paths-filter
@@ -69,7 +69,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.21"
+          go-version: '1.20'
       - uses: actions/cache@v1
         with:
           path: ~/go/pkg/mod
@@ -94,10 +94,10 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.21"
+          go-version: '1.20'
       - uses: actions/setup-node@v2
         with:
-          node-version: "15"
+          node-version: '15'
       - uses: actions/cache@v1
         with:
           path: ~/go/pkg/mod
@@ -125,7 +125,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.21"
+          go-version: '1.20'
       - uses: actions/cache@v1
         with:
           path: ~/go/pkg/mod
@@ -141,17 +141,17 @@ jobs:
     name: Lint
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v3
-        with:
-          go-version: "1.21"
-      - uses: actions/cache@v1
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Check license headers
-        run: make check-headers
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-go@v3
+      with:
+        go-version: '1.20'
+    - uses: actions/cache@v1
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Check license headers
+      run: make check-headers
