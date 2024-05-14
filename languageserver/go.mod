@@ -11,7 +11,7 @@ require (
 	github.com/onflow/cadence-tools/lint v0.14.2
 	github.com/onflow/cadence-tools/test v0.14.7
 	github.com/onflow/flow-go-sdk v0.46.2
-	github.com/onflow/flowkit v1.17.3
+	github.com/onflow/flowkit v1.18.0
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/pflag v1.0.5
