@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
@@ -818,12 +817,10 @@ func setupEVMEnvironment(
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
 ) error {
-	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return evm.SetupEnvironment(
 		chain.ChainID(),
 		fvmEnv,
 		runtimeEnv,
-		sc.FlowToken.Address,
 	)
 }
 
