@@ -5,10 +5,10 @@ go 1.20
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.7.0-rc.2
-	github.com/onflow/cadence v1.0.0-preview.30
-	github.com/onflow/flow-emulator v1.0.0-preview.25
-	github.com/onflow/flow-go v0.35.10-crescendo-preview.25.0.20240530124823-b968034713f6
-	github.com/onflow/flow-go-sdk v1.0.0-preview.31
+	github.com/onflow/cadence v1.0.0-preview.32
+	github.com/onflow/flow-emulator v1.0.0-preview.31
+	github.com/onflow/flow-go v0.35.10-crescendo-preview.25.0.20240604172940-c504b454e576
+	github.com/onflow/flow-go-sdk v1.0.0-preview.34
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.9.0
 )
