@@ -28,8 +28,8 @@ import (
 const (
 	ReplacementCategory     = "replacement-hint"
 	RemovalCategory         = "removal-hint"
-	UpdateCategory          = "update recommended"
 	UnnecessaryCastCategory = "unnecessary-cast-hint"
+	UnusedResultCategory    = "unused-result-hint"
 	DeprecatedCategory      = "deprecated"
 	CadenceV1Category       = "cadence-v1"
 )
