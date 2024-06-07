@@ -36,24 +36,38 @@ func testAnalyzers(t *testing.T, code string, analyzers ...*analysis.Analyzer) [
 	return testAnalyzersAdvanced(t, code, nil, analyzers...)
 }
 
-func testAnalyzersWithCheckerError(t *testing.T, code string, analyzers ...*analysis.Analyzer) ([]analysis.Diagnostic, *sema.CheckerError) {
+func testAnalyzersWithCheckerError(
+	t *testing.T,
+	code string,
+	analyzers ...*analysis.Analyzer,
+) ([]analysis.Diagnostic, *sema.CheckerError) {
 	var checkerErr *sema.CheckerError
-	diagnostics := testAnalyzersAdvanced(t, code, func(config *analysis.Config) {
-		config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
-			require.NotNil(t, checker)
-			require.Equal(t, err.ImportLocation(), testLocation)
+	diagnostics := testAnalyzersAdvanced(
+		t,
+		code,
+		func(config *analysis.Config) {
+			config.HandleCheckerError = func(err analysis.ParsingCheckingError, checker *sema.Checker) error {
+				require.NotNil(t, checker)
+				require.Equal(t, err.ImportLocation(), testLocation)
 
-			require.ErrorAs(t, err, &checkerErr)
-			require.Len(t, checkerErr.Errors, 1)
-			return nil
-		}
-	}, analyzers...)
+				require.ErrorAs(t, err, &checkerErr)
+				require.Len(t, checkerErr.Errors, 1)
+				return nil
+			}
+		},
+		analyzers...,
+	)
 
 	require.NotNil(t, checkerErr)
 	return diagnostics, checkerErr
 }
 
-func testAnalyzersAdvanced(t *testing.T, code string, setCustomConfigOptions func(config *analysis.Config), analyzers ...*analysis.Analyzer) []analysis.Diagnostic {
+func testAnalyzersAdvanced(
+	t *testing.T,
+	code string,
+	setCustomConfigOptions func(config *analysis.Config),
+	analyzers ...*analysis.Analyzer,
+) []analysis.Diagnostic {
 
 	config := analysis.NewSimpleConfig(
 		lint.LoadMode,
