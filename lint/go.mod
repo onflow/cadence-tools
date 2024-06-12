@@ -1,6 +1,6 @@
 module github.com/onflow/cadence-tools/lint
 
-go 1.20
+go 1.22
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible

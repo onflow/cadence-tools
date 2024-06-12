@@ -1,6 +1,6 @@
 module github.com/onflow/cadence-tools/languageserver
 
-go 1.20
+go 1.22
 
 require (
 	github.com/getsentry/sentry-go v0.18.0
