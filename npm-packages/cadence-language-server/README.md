@@ -14,8 +14,8 @@ That newly build NPM package using the WebAssembly will be published and can be 
 ### Updating `src/go.js`
 
 - Copy `misc/wasm/wasm_exec.js` of appropriate Go version into `src/go.js`.
-  Keep the last line (`export const go = new Go();`)
+- Run `npx prettier -w src/go.js`
+- Restore the first line (adopted from header) and last line (`export const go = new Go();`)
 - Update the version in the header
 - Remove the anonymous function wrapper
 - Change `globalThis.Go = class {` to `class Go {`
-- Run `npx prettier -w src/go.js`
