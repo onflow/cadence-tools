@@ -7,11 +7,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/cadence v1.0.0-preview.32
-	github.com/onflow/cadence-tools/lint v1.0.0-preview.31
-	github.com/onflow/cadence-tools/test v1.0.0-preview.31
-	github.com/onflow/flow-go-sdk v1.0.0-preview.34
-	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.23
+	github.com/onflow/cadence v1.0.0-preview.34
+	github.com/onflow/cadence-tools/lint v1.0.0-preview.32
+	github.com/onflow/cadence-tools/test v1.0.0-preview.32
+	github.com/onflow/flow-go-sdk v1.0.0-preview.36
+	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.24
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/pflag v1.0.5
@@ -25,10 +25,12 @@ require (
 )
 
 require (
+	cloud.google.com/go v0.112.0 // indirect
 	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.6 // indirect
 	cloud.google.com/go/kms v1.15.7 // indirect
+	cloud.google.com/go/storage v1.36.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
@@ -68,6 +70,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.4.1-0.20230228173756-c0c9f774e40c // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
+	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -96,6 +99,7 @@ require (
 	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/huandu/go-clone v1.6.0 // indirect
 	github.com/huandu/go-clone/generic v1.7.2 // indirect
+	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.0.0-20190318233801-ac98e3ecb4b0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.7.0 // indirect
@@ -108,6 +112,7 @@ require (
 	github.com/ipfs/go-ipld-format v0.6.0 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
+	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/k0kubun/pp v3.0.1+incompatible // indirect
@@ -139,10 +144,10 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.7.0-rc.2 // indirect
 	github.com/onflow/crypto v0.25.1 // indirect
-	github.com/onflow/flow-emulator v1.0.0-preview.31 // indirect
+	github.com/onflow/flow-emulator v1.0.0-preview.32 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-go v0.35.10-crescendo-preview.25.0.20240604172940-c504b454e576 // indirect
+	github.com/onflow/flow-go v0.35.14-crescendo-preview.27 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.4 // indirect
@@ -171,6 +176,7 @@ require (
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
+	github.com/status-im/keycard-go v0.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
