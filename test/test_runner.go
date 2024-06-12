@@ -24,13 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/atree"
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
@@ -39,6 +33,11 @@ import (
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/debug"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence-tools/test/helpers"
 )
@@ -821,6 +820,7 @@ func setupEVMEnvironment(
 		chain.ChainID(),
 		fvmEnv,
 		runtimeEnv,
+		debug.NopTracer,
 	)
 }
 
