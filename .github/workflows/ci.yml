@@ -57,9 +57,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     - name: Test
-      run: make test-test
+      working-directory: test
+      run: make test
     - name: Check tidy
-      run: make check-tidy-test
+      working-directory: test
+      run: make check-tidy
 
   test-lint:
     needs: paths-filter
@@ -80,9 +82,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Test
-        run: make test-lint
+        working-directory: lint
+        run: make test
       - name: Check tidy
-        run: make check-tidy-lint
+        working-directory: lint
+        run: make check-tidy
 
   test-languageserver:
     needs: paths-filter
@@ -111,9 +115,11 @@ jobs:
         working-directory: languageserver
         run: make build
       - name: Test
-        run: make test-languageserver
+        working-directory: languageserver
+        run: make test
       - name: Check tidy
-        run: make check-tidy-languageserver
+        working-directory: languageserver
+        run: make check-tidy
 
   test-docgen:
     needs: paths-filter
@@ -136,9 +142,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Test
-        run: make test-docgen
+        working-directory: docgen
+        run: make test
       - name: Check tidy
-        run: make check-tidy-docgen
+        working-directory: docgen
+        run: make check-tidy
 
   lint:
     name: Lint
@@ -158,3 +166,11 @@ jobs:
           ${{ runner.os }}-go-
     - name: Check license headers
       run: make check-headers
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+        version: v1.54
+        args: -v
+        # https://github.com/golangci/golangci-lint-action/issues/244
+        skip-cache: true
