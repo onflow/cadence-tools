@@ -127,7 +127,10 @@ func main() {
 		linter.AnalyzeTransaction(transactionID, network)
 
 	default:
-		println("Nothing to do. Please provide -address, -transaction, -directory, or -csv. See -help")
+		_, _ = fmt.Fprintln(
+			os.Stdout,
+			"Nothing to do. Please provide -address, -transaction, -directory, or -csv. See -help",
+		)
 	}
 }
 
