@@ -79,7 +79,7 @@ jobs:
         working-directory: test
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: ${{ env.GOLANGCI_LINT_VERSION }}
-        args: -v
+        args: -v --timeout=5m
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-cache: true
 
@@ -123,7 +123,7 @@ jobs:
           working-directory: lint
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: -v
+          args: -v --timeout=5m
           # https://github.com/golangci/golangci-lint-action/issues/244
           skip-cache: true
 
@@ -175,7 +175,7 @@ jobs:
           working-directory: languageserver
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: -v
+          args: -v --timeout=5m
           # https://github.com/golangci/golangci-lint-action/issues/244
           skip-cache: true
 
@@ -221,7 +221,7 @@ jobs:
           working-directory: docgen
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: -v
+          args: -v --timeout=5m
           # https://github.com/golangci/golangci-lint-action/issues/244
           skip-cache: true
 
