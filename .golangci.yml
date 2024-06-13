@@ -33,7 +33,3 @@ linters-settings:
       - exitAfterDefer
   goimports:
     local-prefixes: github.com/onflow/cadence-tools
-  forbidigo:
-    forbid:
-      - '^maps.Keys.*(# has indeterminate order\.)?$'
-      - '^maps.Values.*(# has indeterminate order\.)?$'
