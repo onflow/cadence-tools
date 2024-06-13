@@ -66,7 +66,7 @@ jobs:
 
   lint-test:
     needs: paths-filter
-    # TODO: if: ${{ needs.paths-filter.outputs.test == 'true' }}
+    if: ${{ needs.paths-filter.outputs.test == 'true' }}
     name: Lint (Test Framework)
     runs-on: ubuntu-20.04
     steps:
@@ -110,7 +110,7 @@ jobs:
 
   lint-lint:
     needs: paths-filter
-    # TODO: if: ${{ needs.paths-filter.outputs.lint == 'true' }}
+    if: ${{ needs.paths-filter.outputs.lint == 'true' }}
     name: Lint (Lint)
     runs-on: ubuntu-20.04
     steps:
@@ -162,7 +162,7 @@ jobs:
 
   lint-languageserver:
     needs: paths-filter
-    # TODO: if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
+    if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
     name: Lint (Language Server)
     runs-on: ubuntu-20.04
     steps:
@@ -208,7 +208,7 @@ jobs:
 
   lint-docgen:
     needs: paths-filter
-    # TODO: if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
+    if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
     name: Lint (Docgen)
     runs-on: ubuntu-20.04
     steps:
