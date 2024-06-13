@@ -21,7 +21,6 @@ package test
 
 // ImportResolverNotProvidedError is thrown if the import resolver is not
 // set in the TestRunner, when running tests.
-//
 type ImportResolverNotProvidedError struct {
 	Err error
 }
@@ -38,7 +37,6 @@ func (e ImportResolverNotProvidedError) Error() string {
 
 // FileResolverNotProvidedError is thrown if the file resolver is not
 // set in the TestRunner, when running tests.
-//
 type FileResolverNotProvidedError struct {
 	Err error
 }

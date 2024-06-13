@@ -709,7 +709,7 @@ func TestCadenceV1Analyzer(t *testing.T) {
 		t.Parallel()
 
 		// Ensure that no error is reported/no panic when there is no type annotation
-		// I.e. does not throw when type for delcaration is inferred
+		// I.e. does not throw when type for declaration is inferred
 		diagnostics := testAnalyzers(t,
 			`
 			access(all) fun main() {

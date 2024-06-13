@@ -31,6 +31,8 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/parser"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/onflow/cadence-tools/docgen/templates"
 )
@@ -316,7 +318,8 @@ func (ASTDeclarationTemplateFunctions) DeclKeywords(declaration ast.Declaration)
 }
 
 func (ASTDeclarationTemplateFunctions) DeclTypeTitle(declaration ast.Declaration) string {
-	return strings.Title(declaration.DeclarationKind().Keywords())
+	return cases.Title(language.English).
+		String(declaration.DeclarationKind().Keywords())
 }
 
 func (ASTDeclarationTemplateFunctions) GenInitializer(declaration ast.Declaration) bool {

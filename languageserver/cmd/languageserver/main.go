@@ -22,8 +22,9 @@
 package main
 
 import (
-	"github.com/onflow/cadence-tools/languageserver"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/cadence-tools/languageserver"
 )
 
 var enableFlowClientFlag = pflag.Bool("enable-flow-client", true, "enable Flow client functionality")
