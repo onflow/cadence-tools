@@ -26,10 +26,10 @@ import (
 	"log"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 
-	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -171,7 +171,16 @@ func newFlowAccess(networkName string) (*grpcAccess.Client, error) {
 
 	network := networkMap[networkName]
 	if network == "" {
-		return nil, fmt.Errorf("invalid network name provided, only valid %s", maps.Keys(networkMap))
+		var names []string
+		for name := range networkMap {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		return nil, fmt.Errorf(
+			"missing network name. expected one of: %s",
+			strings.Join(names, ","),
+		)
 	}
 
 	return grpcAccess.NewClient(

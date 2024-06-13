@@ -14,6 +14,7 @@ on:
 
 env:
   GO_VERSION: '1.22'
+  GOLANGCI_LINT_VERSION: 'v1.59'
 
 jobs:
   paths-filter:
@@ -57,9 +58,30 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     - name: Test
-      run: make test-test
+      working-directory: test
+      run: make test
     - name: Check tidy
-      run: make check-tidy-test
+      working-directory: test
+      run: make check-tidy
+
+  lint-test:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.test == 'true' }}
+    name: Lint (Test Framework)
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        working-directory: test
+        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
+        args: -v --timeout=5m
+        # https://github.com/golangci/golangci-lint-action/issues/244
+        skip-cache: true
 
   test-lint:
     needs: paths-filter
@@ -80,9 +102,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Test
-        run: make test-lint
+        working-directory: lint
+        run: make test
       - name: Check tidy
-        run: make check-tidy-lint
+        working-directory: lint
+        run: make check-tidy
+
+  lint-lint:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.lint == 'true' }}
+    name: Lint (Lint)
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: lint
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+          # https://github.com/golangci/golangci-lint-action/issues/244
+          skip-cache: true
 
   test-languageserver:
     needs: paths-filter
@@ -111,9 +154,30 @@ jobs:
         working-directory: languageserver
         run: make build
       - name: Test
-        run: make test-languageserver
+        working-directory: languageserver
+        run: make test
       - name: Check tidy
-        run: make check-tidy-languageserver
+        working-directory: languageserver
+        run: make check-tidy
+
+  lint-languageserver:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
+    name: Lint (Language Server)
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: languageserver
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+          # https://github.com/golangci/golangci-lint-action/issues/244
+          skip-cache: true
 
   test-docgen:
     needs: paths-filter
@@ -136,12 +200,33 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Test
-        run: make test-docgen
+        working-directory: docgen
+        run: make test
       - name: Check tidy
-        run: make check-tidy-docgen
+        working-directory: docgen
+        run: make check-tidy
 
-  lint:
-    name: Lint
+  lint-docgen:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
+    name: Lint (Docgen)
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: docgen
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+          # https://github.com/golangci/golangci-lint-action/issues/244
+          skip-cache: true
+
+  check-license-headers:
+    name: Check license headers
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3

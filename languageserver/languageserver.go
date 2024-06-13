@@ -22,6 +22,7 @@
 package languageserver
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/mattn/go-isatty"
@@ -33,9 +34,10 @@ import (
 
 func RunWithStdio(enableFlowClient bool) {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		print(
-			"This program implements the Language Server Protocol for Cadence.\n" +
-				"Please check the documentation on how to run it.\n" +
+		_, _ = fmt.Fprint(
+			os.Stdout,
+			"This program implements the Language Server Protocol for Cadence.\n"+
+				"Please check the documentation on how to run it.\n"+
 				"It does nothing in a terminal, it should be run with an editor/IDE.\n",
 		)
 		os.Exit(1)

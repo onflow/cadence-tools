@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/onflow/cadence v0.28.0
 	github.com/stretchr/testify v1.7.3
+	golang.org/x/text v0.3.7
 )
 
 require (

@@ -65,5 +65,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(fmt.Sprintf("Docs generated at: %s", outputDir))
+	_, _ = fmt.Fprintf(os.Stdout, "Docs generated at: %s\n", outputDir)
 }

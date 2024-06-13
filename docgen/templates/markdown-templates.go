@@ -27,7 +27,6 @@ import (
 var mdTemplateFiles embed.FS
 
 // MarkdownTemplateProvider is a provider for the markdown template files.
-//
 type MarkdownTemplateProvider struct {
 }
 

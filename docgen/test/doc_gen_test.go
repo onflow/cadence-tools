@@ -126,9 +126,9 @@ func TestFunctionDocFormatting(t *testing.T) {
 
 	docFiles, err := docGen.GenerateInMemory(string(content))
 	require.NoError(t, err)
-	require.Len(t, docFiles, 1)
+	assert.Len(t, docFiles, 1)
 
 	expectedContent, err := os.ReadFile(path.Join("outputs", "sample3_output.md"))
-
+	require.NoError(t, err)
 	assert.Equal(t, string(expectedContent), string(docFiles["index.md"]))
 }

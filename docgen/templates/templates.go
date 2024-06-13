@@ -21,7 +21,6 @@ package templates
 // TemplateProvider is a template provider interface that has to be
 // implemented by all the template providers of the document generator.
 // e.g: Markdown templates.
-//
 type TemplateProvider interface {
 	Get(templateName string) (string, error)
 }

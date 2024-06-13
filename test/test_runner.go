@@ -832,7 +832,7 @@ func baseContracts() map[string]common.Address {
 	contracts["ViewResolver"] = serviceAddress
 	for _, addressLocation := range systemContracts {
 		contract := addressLocation.Name
-		address := common.Address(addressLocation.Address)
+		address := addressLocation.Address
 		contracts[contract] = address
 	}
 	for _, contractDescription := range commonContracts {
