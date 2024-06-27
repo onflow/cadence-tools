@@ -437,7 +437,7 @@ describe("diagnostics", () => {
     let script = await docNotifications.find(n => n.name == scriptName).notification
     expect(script.uri).toEqual(`file://${scriptName}.cdc`)
     expect(script.diagnostics).toHaveLength(1)
-    expect(script.diagnostics[0].message).toEqual("value of type `Foo` has no member `zoo`. unknown member")
+    expect(script.diagnostics[0].message).toEqual("value of type `&Foo` has no member `zoo`. unknown member")
   })
 
 })

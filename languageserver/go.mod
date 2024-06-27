@@ -7,11 +7,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/cadence v1.0.0-preview.34
-	github.com/onflow/cadence-tools/lint v1.0.0-preview.32
-	github.com/onflow/cadence-tools/test v1.0.0-preview.32
-	github.com/onflow/flow-go-sdk v1.0.0-preview.36
-	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.24
+	github.com/onflow/cadence v1.0.0-preview.35
+	github.com/onflow/cadence-tools/lint v1.0.0-preview.33
+	github.com/onflow/cadence-tools/test v1.0.0-preview.33
+	github.com/onflow/flow-go-sdk v1.0.0-preview.37
+	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.25
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/pflag v1.0.5
@@ -20,8 +20,8 @@ require (
 )
 
 require (
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.0.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.0 // indirect
 )
 
 require (
@@ -144,15 +144,15 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.7.0-rc.2 // indirect
 	github.com/onflow/crypto v0.25.1 // indirect
-	github.com/onflow/flow-emulator v1.0.0-preview.32 // indirect
+	github.com/onflow/flow-emulator v1.0.0-preview.33 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-go v0.35.14-crescendo-preview.27 // indirect
+	github.com/onflow/flow-go v0.35.14-crescendo-preview.27.0.20240626210601-604590f19db9 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.4 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
-	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
+	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
