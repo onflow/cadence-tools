@@ -6,8 +6,8 @@ toolchain go1.22.3
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.0.0-preview.34
-	github.com/onflow/flow-go-sdk v1.0.0-preview.36
+	github.com/onflow/cadence v1.0.0-preview.35
+	github.com/onflow/flow-go-sdk v1.0.0-preview.37
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.63.2
 )
