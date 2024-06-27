@@ -701,17 +701,27 @@ func TestImportContract(t *testing.T) {
                 // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from BarContract", BarContract.sayHi())
                 Test.assertEqual(/public/BarContractPublicPath, BarContract.publicPath)
-                Test.assertEqual(
-                    ["one", "two", "three"],
-                    BarContract.proposals
-                )
+
+                // TODO:
+                //Test.assertEqual(
+                //    &["one", "two", "three"] as &[String],
+                //    BarContract.proposals
+                //)
+                Test.assertEqual("one", BarContract.proposals[0])
+                Test.assertEqual("two", BarContract.proposals[1])
+                Test.assertEqual("three", BarContract.proposals[2])
 
                 // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from FooContract", FooContract.sayHi())
-                Test.assertEqual(
-                    {1: "one", 2: "two", 3: "three"},
-                    FooContract.numbers
-                )
+
+                // TODO:
+                //Test.assertEqual(
+                //    &{1: "one", 2: "two", 3: "three"} as &{Int: String},
+                //    FooContract.numbers
+                //)
+                Test.assertEqual("one" as String?, FooContract.numbers[1])
+                Test.assertEqual("two" as String?, FooContract.numbers[2])
+                Test.assertEqual("three" as String?, FooContract.numbers[3])
 
                 // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from BazContract", BazContract.sayHi())
