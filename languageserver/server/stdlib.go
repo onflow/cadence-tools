@@ -106,9 +106,9 @@ func (standardLibrary) GetAccountContractCode(_ common.AddressLocation) ([]byte,
 
 func (standardLibrary) EmitEvent(
 	_ *interpreter.Interpreter,
+	_ interpreter.LocationRange,
 	_ *sema.CompositeType,
 	_ []interpreter.Value,
-	_ interpreter.LocationRange,
 ) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
