@@ -115,18 +115,6 @@ func (standardLibrary) EmitEvent(
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) AddEncodedAccountKey(_ common.Address, _ []byte) error {
-	// Implementation should never be called,
-	// only its definition is used for type-checking
-	panic(errors.NewUnreachableError())
-}
-
-func (standardLibrary) RevokeEncodedAccountKey(_ common.Address, _ int) ([]byte, error) {
-	// Implementation should never be called,
-	// only its definition is used for type-checking
-	panic(errors.NewUnreachableError())
-}
-
 func (standardLibrary) AddAccountKey(
 	_ common.Address,
 	_ *stdlib.PublicKey,
