@@ -86,7 +86,7 @@ func (standardLibrary) GetStorageCapacity(_ common.Address) (uint64, error) {
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) GetAccountKey(_ common.Address, _ int) (*stdlib.AccountKey, error) {
+func (standardLibrary) GetAccountKey(_ common.Address, _ uint32) (*stdlib.AccountKey, error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -106,22 +106,10 @@ func (standardLibrary) GetAccountContractCode(_ common.AddressLocation) ([]byte,
 
 func (standardLibrary) EmitEvent(
 	_ *interpreter.Interpreter,
+	_ interpreter.LocationRange,
 	_ *sema.CompositeType,
 	_ []interpreter.Value,
-	_ interpreter.LocationRange,
 ) {
-	// Implementation should never be called,
-	// only its definition is used for type-checking
-	panic(errors.NewUnreachableError())
-}
-
-func (standardLibrary) AddEncodedAccountKey(_ common.Address, _ []byte) error {
-	// Implementation should never be called,
-	// only its definition is used for type-checking
-	panic(errors.NewUnreachableError())
-}
-
-func (standardLibrary) RevokeEncodedAccountKey(_ common.Address, _ int) ([]byte, error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -141,7 +129,7 @@ func (standardLibrary) AddAccountKey(
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) RevokeAccountKey(_ common.Address, _ int) (*stdlib.AccountKey, error) {
+func (standardLibrary) RevokeAccountKey(_ common.Address, _ uint32) (*stdlib.AccountKey, error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -237,7 +225,7 @@ func (standardLibrary) Hash(_ []byte, _ string, _ sema.HashAlgorithm) ([]byte, e
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) AccountKeysCount(_ common.Address) (uint64, error) {
+func (standardLibrary) AccountKeysCount(_ common.Address) (uint32, error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
