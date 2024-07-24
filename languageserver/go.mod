@@ -7,11 +7,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/cadence v1.0.0-preview.38
-	github.com/onflow/cadence-tools/lint v1.0.0-preview.34
-	github.com/onflow/cadence-tools/test v1.0.0-preview.34
-	github.com/onflow/flow-go-sdk v1.0.0-preview.41
-	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.26
+	github.com/onflow/cadence v1.0.0-preview.39
+	github.com/onflow/cadence-tools/lint v1.0.0-preview.35
+	github.com/onflow/cadence-tools/test v1.0.0-preview.35
+	github.com/onflow/flow-go-sdk v1.0.0-preview.42
+	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.27
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/pflag v1.0.5
@@ -20,8 +20,8 @@ require (
 )
 
 require (
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.0 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1 // indirect
 )
 
 require (
@@ -64,6 +64,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ef-ds/deque v1.0.4 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
@@ -75,6 +76,9 @@ require (
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
+	github.com/go-kit/kit v0.12.0 // indirect
+	github.com/go-kit/log v0.2.1 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -125,6 +129,8 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.32.2 // indirect
+	github.com/libp2p/go-libp2p-pubsub v0.10.0 // indirect
+	github.com/libp2p/go-msgio v0.3.0 // indirect
 	github.com/lmars/go-slip10 v0.0.0-20190606092855-400ba44fee12 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
@@ -146,15 +152,16 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.7.0-rc.2 // indirect
 	github.com/onflow/crypto v0.25.1 // indirect
-	github.com/onflow/flow-emulator v1.0.0-preview.35 // indirect
+	github.com/onflow/flow-emulator v1.0.0-preview.36 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-go v0.36.2-0.20240717214129-9ea6faeee3e7 // indirect
+	github.com/onflow/flow-go v0.36.4-0.20240724205438-14f9fddeda2b // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.5 // indirect
 	github.com/onflow/go-ethereum v1.14.7 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
+	github.com/onflow/wal v1.0.2 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
