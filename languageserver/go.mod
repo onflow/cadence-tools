@@ -10,6 +10,7 @@ require (
 	github.com/onflow/cadence v1.0.0-preview.39
 	github.com/onflow/cadence-tools/lint v1.0.0-preview.35
 	github.com/onflow/cadence-tools/test v1.0.0-preview.35
+	github.com/onflow/flow-go v0.36.4-0.20240724205438-14f9fddeda2b
 	github.com/onflow/flow-go-sdk v1.0.0-preview.42
 	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.27
 	github.com/sourcegraph/jsonrpc2 v0.1.0
@@ -155,7 +156,6 @@ require (
 	github.com/onflow/flow-emulator v1.0.0-preview.36 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-go v0.36.4-0.20240724205438-14f9fddeda2b // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.5 // indirect

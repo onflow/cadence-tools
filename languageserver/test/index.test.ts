@@ -319,6 +319,20 @@ describe("diagnostics", () => {
           ["unused result"]
       )
   )
+  
+  test("InternalEVM contract exists", async() =>
+      testCode(
+          `
+            access(all)
+            fun main() {
+                // Checks that the InternalEVM contract exists
+                // Also that it has the correct value (i.e. the run function exists)
+                log(InternalEVM.run)
+            }
+          `,
+          []
+      )
+  )
 
   type TestDoc = {
     name: string
