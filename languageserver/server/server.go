@@ -1,7 +1,7 @@
 /*
- * Cadence - The resource-oriented smart contract programming language
+ * Cadence languageserver - The Cadence language server
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -179,8 +179,6 @@ type Server struct {
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
 	diagnosticProviders []DiagnosticProvider
-	// documentSymbolProviders are the functions that are used to provide information about document symbols for a checker
-	documentSymbolProviders []DocumentSymbolProvider
 	// initializationOptionsHandlers are the functions that are used to handle initialization options sent by the client
 	initializationOptionsHandlers []InitializationOptionsHandler
 	accessCheckMode               sema.AccessCheckMode
@@ -1528,13 +1526,11 @@ func (s *Server) ResolveCompletionItem(
 		return
 	}
 
-	resolved := s.maybeResolveMember(data.URI, data.ID, result)
-	if resolved {
+	if s.maybeResolveMember(data.URI, data.ID, result) {
 		return
 	}
 
-	resolved = s.maybeResolveRange(data.URI, data.ID, result)
-	if resolved {
+	if s.maybeResolveRange(data.URI, data.ID, result) {
 		return
 	}
 
@@ -2007,10 +2003,17 @@ func (s *Server) getDiagnosticsForParentError(
 	return
 }
 
+type sentryContextKey string
+
+const (
+	sentryContextKeyCode     sentryContextKey = "code"
+	sentryContextKeyLocation sentryContextKey = "location"
+)
+
 // parse the given code and returns the resultant program.
 func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Program, error) {
-	ctx := context.WithValue(context.Background(), "code", code)
-	ctx = context.WithValue(ctx, "location", location)
+	ctx := context.WithValue(context.Background(), sentryContextKeyCode, code)
+	ctx = context.WithValue(ctx, sentryContextKeyLocation, location)
 	defer sentry.RecoverWithContext(ctx)
 
 	start := time.Now()
@@ -2683,6 +2686,7 @@ func (s *Server) maybeAddDeclarationActionsResolver(
 
 					if memberInsertionPosGetter == nil {
 
+					loop:
 						// Find the containing function declaration, if any
 						for i := len(stack) - 2; i > 0; i-- {
 							element := stack[i]
@@ -2690,12 +2694,12 @@ func (s *Server) maybeAddDeclarationActionsResolver(
 							case *ast.FunctionDeclaration:
 								position := element.EndPosition(nil)
 								parentFunctionEndPos = &position
-								break
+								break loop
 
 							case *ast.SpecialFunctionDeclaration:
 								position := element.FunctionDeclaration.EndPosition(nil)
 								parentFunctionEndPos = &position
-								break
+								break loop
 							}
 						}
 					}
@@ -3065,15 +3069,16 @@ func insertionPrefixSuffix(
 ) {
 	if insertionPos.before {
 
+	loop:
 		for offset := insertionPos.Offset - 1; offset >= insertionPos.Offset-insertionPos.Column; offset-- {
 			switch document.Text[offset] {
 			case ' ', '\t':
 				continue
 			case '{':
 				prefix = "\n" + indentation
-				break
+				break loop
 			default:
-				break
+				break loop
 			}
 		}
 

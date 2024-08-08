@@ -1,7 +1,7 @@
 /*
- * Cadence - The resource-oriented smart contract programming language
+ * Cadence test - The Cadence test framework
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -699,17 +701,27 @@ func TestImportContract(t *testing.T) {
                 // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from BarContract", BarContract.sayHi())
                 Test.assertEqual(/public/BarContractPublicPath, BarContract.publicPath)
-                Test.assertEqual(
-                    ["one", "two", "three"],
-                    BarContract.proposals
-                )
+
+                // TODO:
+                //Test.assertEqual(
+                //    &["one", "two", "three"] as &[String],
+                //    BarContract.proposals
+                //)
+                Test.assertEqual("one", BarContract.proposals[0])
+                Test.assertEqual("two", BarContract.proposals[1])
+                Test.assertEqual("three", BarContract.proposals[2])
 
                 // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from FooContract", FooContract.sayHi())
-                Test.assertEqual(
-                    {1: "one", 2: "two", 3: "three"},
-                    FooContract.numbers
-                )
+
+                // TODO:
+                //Test.assertEqual(
+                //    &{1: "one", 2: "two", 3: "three"} as &{Int: String},
+                //    FooContract.numbers
+                //)
+                Test.assertEqual("one" as String?, FooContract.numbers[1])
+                Test.assertEqual("two" as String?, FooContract.numbers[2])
+                Test.assertEqual("three" as String?, FooContract.numbers[3])
 
                 // Test access of methods & fields from deployed contract
                 Test.assertEqual("Hi from BazContract", BazContract.sayHi())
@@ -5931,4 +5943,37 @@ func TestGetTests(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.ElementsMatch(t, []string{"test1", "test2", "test3"}, tests)
+}
+
+func TestEVMContract(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import "EVM"
+
+        access(all)
+        fun testCOACreation() {
+            let coa <- EVM.createCadenceOwnedAccount()
+            Test.assertEqual(UInt(0), coa.address().balance().inAttoFLOW())
+
+            destroy <- coa
+        }
+	`
+
+	importResolver := func(location common.Location) (string, error) {
+		return "", fmt.Errorf("cannot find import location: %s", location)
+	}
+
+	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	log := zerolog.New(output).With().Timestamp().Logger()
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithLogger(log)
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }

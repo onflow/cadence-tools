@@ -1,7 +1,7 @@
 /*
- * Cadence-lint - The Cadence linter
+ * Cadence lint - The Cadence linter
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,15 +22,16 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"golang.org/x/exp/maps"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"log"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/pretty"
@@ -170,13 +171,24 @@ func newFlowAccess(networkName string) (*grpcAccess.Client, error) {
 
 	network := networkMap[networkName]
 	if network == "" {
-		return nil, fmt.Errorf("invalid network name provided, only valid %s", maps.Keys(networkMap))
+		var names []string
+		for name := range networkMap {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		return nil, fmt.Errorf(
+			"missing network name. expected one of: %s",
+			strings.Join(names, ","),
+		)
 	}
 
 	return grpcAccess.NewClient(
 		network,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(),
+		grpcAccess.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(),
+		),
 	)
 }
 

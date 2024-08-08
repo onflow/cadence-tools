@@ -1,7 +1,7 @@
 /*
- * Cadence - The resource-oriented smart contract programming language
+ * Cadence docgen - The Cadence documentation generator
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ package templates
 // TemplateProvider is a template provider interface that has to be
 // implemented by all the template providers of the document generator.
 // e.g: Markdown templates.
-//
 type TemplateProvider interface {
 	Get(templateName string) (string, error)
 }

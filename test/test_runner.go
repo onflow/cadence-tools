@@ -1,7 +1,7 @@
 /*
- * Cadence - The resource-oriented smart contract programming language
+ * Cadence test - The Cadence test framework
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,11 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/atree"
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
@@ -37,6 +33,11 @@ import (
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/debug"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence-tools/test/helpers"
 )
@@ -474,8 +475,9 @@ func (r *TestRunner) initializeEnvironment() (
 	backend.contracts = r.contracts
 	r.backend = backend
 
+	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
 	ctx := runtime.Context{
-		Interface:   r.backend.blockchain.NewScriptEnvironment(),
+		Interface:   fvmEnv,
 		Location:    testScriptLocation,
 		Environment: env,
 	}
@@ -505,6 +507,11 @@ func (r *TestRunner) initializeEnvironment() (
 		runtime.NewStorage(ctx.Interface, nil),
 		r.coverageReport,
 	)
+
+	err := setupEVMEnvironment(fvmEnv, env)
+	if err != nil {
+		panic(err)
+	}
 
 	return env, ctx
 }
@@ -786,6 +793,15 @@ func (r *TestRunner) parseAndCheckImport(
 
 	env.CheckerConfig.ContractValueHandler = contractValueHandler
 
+	fvmEnv, ok := startCtx.Interface.(environment.Environment)
+	if !ok {
+		panic(fmt.Errorf("failed to retrieve FVM Environment"))
+	}
+	err = setupEVMEnvironment(fvmEnv, env)
+	if err != nil {
+		panic(err)
+	}
+
 	code = r.replaceImports(code)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
@@ -796,6 +812,18 @@ func (r *TestRunner) parseAndCheckImport(
 	return program.Program, program.Elaboration, nil
 }
 
+func setupEVMEnvironment(
+	fvmEnv environment.Environment,
+	runtimeEnv runtime.Environment,
+) error {
+	return evm.SetupEnvironment(
+		chain.ChainID(),
+		fvmEnv,
+		runtimeEnv,
+		debug.NopTracer,
+	)
+}
+
 func baseContracts() map[string]common.Address {
 	contracts := make(map[string]common.Address, 0)
 	serviceAddress := common.Address(chain.ServiceAddress())
@@ -804,7 +832,7 @@ func baseContracts() map[string]common.Address {
 	contracts["ViewResolver"] = serviceAddress
 	for _, addressLocation := range systemContracts {
 		contract := addressLocation.Name
-		address := common.Address(addressLocation.Address)
+		address := addressLocation.Address
 		contracts[contract] = address
 	}
 	for _, contractDescription := range commonContracts {

@@ -19,27 +19,19 @@
 package lint
 
 import (
-	"fmt"
-	"regexp"
-
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
-var docStringDeprecationWarningPattern = regexp.MustCompile(`(?i)[\t *_]*deprecated\b(?:[*_]*: (.*))?`)
-
-func MemberIsDeprecated(docString string) bool {
-	return docStringDeprecationWarningPattern.MatchString(docString)
-}
-
-var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
+var UnusedResultAnalyzer = (func() *analysis.Analyzer {
 
 	elementFilter := []ast.Element{
-		(*ast.MemberExpression)(nil),
+		(*ast.ExpressionStatement)(nil),
 	}
 
 	return &analysis.Analyzer{
-		Description: "Detects uses of deprecated members",
+		Description: "Detects unused results of expressions",
 		Requires: []*analysis.Analyzer{
 			analysis.InspectorAnalyzer,
 		},
@@ -54,39 +46,26 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 			inspector.Preorder(
 				elementFilter,
 				func(element ast.Element) {
-					memberExpression, ok := element.(*ast.MemberExpression)
+
+					expressionStatement, ok := element.(*ast.ExpressionStatement)
 					if !ok {
 						return
 					}
 
-					memberInfo, _ := elaboration.MemberExpressionMemberAccessInfo(memberExpression)
-					member := memberInfo.Member
-					if member == nil {
-						return
+					ty := elaboration.ExpressionTypes(expressionStatement.Expression).ActualType
+					switch ty {
+					case nil, sema.VoidType, sema.NeverType:
+						// NO-OP
+					default:
+						report(
+							analysis.Diagnostic{
+								Location: location,
+								Range:    ast.NewRangeFromPositioned(nil, element),
+								Category: UnusedResultCategory,
+								Message:  "unused result",
+							},
+						)
 					}
-
-					docStringMatch := docStringDeprecationWarningPattern.FindStringSubmatch(member.DocString)
-					if docStringMatch == nil {
-						return
-					}
-
-					memberName := memberInfo.Member.Identifier.Identifier
-
-					identifierRange := ast.NewRangeFromPositioned(nil, memberExpression.Identifier)
-
-					report(
-						analysis.Diagnostic{
-							Location: location,
-							Range:    identifierRange,
-							Category: DeprecatedCategory,
-							Message: fmt.Sprintf(
-								"%s '%s' is deprecated",
-								member.DeclarationKind.Name(),
-								memberName,
-							),
-							SecondaryMessage: docStringMatch[1],
-						},
-					)
 				},
 			)
 
@@ -97,7 +76,7 @@ var DeprecatedMemberAnalyzer = (func() *analysis.Analyzer {
 
 func init() {
 	RegisterAnalyzer(
-		"deprecated-member",
-		DeprecatedMemberAnalyzer,
+		"unused-result",
+		UnusedResultAnalyzer,
 	)
 }

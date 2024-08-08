@@ -116,7 +116,7 @@ describe("import", () => {
     await withConnection({
       getStringCode(location: string) {
         if (location === "Test") {
-          return "pub contract Test {}"
+          return "access(all) contract Test {}"
         }
         return undefined
       }
@@ -170,7 +170,7 @@ describe("import", () => {
     await withConnection({
       getAddressCode(address: string) {
         if (address === "0000000000000001.Test") {
-          return "pub contract Test {}"
+          return "access(all) contract Test {}"
         }
         return undefined
       }

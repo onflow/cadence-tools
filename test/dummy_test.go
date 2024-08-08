@@ -1,7 +1,7 @@
 /*
- * Flow Emulator
+ * Cadence test - The Cadence test framework
  *
- * Copyright 2023 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,4 +22,4 @@ import "github.com/btcsuite/btcd/chaincfg/chainhash"
 // this is added to resolve the issue with chainhash ambiguous import,
 // the code is not used, but it's needed to force go.mod specify and retain chainhash version
 // workaround for issue: https://github.com/golang/go/issues/27899
- var _ = chainhash.Hash{}
+var _ = chainhash.Hash{}

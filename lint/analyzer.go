@@ -1,7 +1,7 @@
 /*
- * Cadence-lint - The Cadence linter
+ * Cadence lint - The Cadence linter
  *
- * Copyright 2019-2022 Dapper Labs, Inc.
+ * Copyright Flow Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 const (
 	ReplacementCategory     = "replacement-hint"
 	RemovalCategory         = "removal-hint"
-	UpdateCategory          = "update recommended"
 	UnnecessaryCastCategory = "unnecessary-cast-hint"
+	UnusedResultCategory    = "unused-result-hint"
 	DeprecatedCategory      = "deprecated"
 	CadenceV1Category       = "cadence-v1"
 )

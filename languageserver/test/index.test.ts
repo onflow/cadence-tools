@@ -250,28 +250,28 @@ describe("diagnostics", () => {
 
   test("script", async() =>
     testCode(
-      `access(all) fun main() { X }`,
+      `access(all) fun main() { let x = X }`,
       ["cannot find variable in this scope: `X`. not found in this scope"]
     )
   )
 
   test("script auth account", async() =>
     testCode(
-      `access(all) fun main() { getAuthAccount<&Account>(0x01) }`,
+      `access(all) fun main() { let account = getAuthAccount<&Account>(0x01) }`,
       [],
     )
   )
 
   test("transaction", async() =>
     testCode(
-      `transaction() { execute { X } }`,
+      `transaction() { execute { let x = X } }`,
       ["cannot find variable in this scope: `X`. not found in this scope"]
     )
   )
 
   test("transaction auth account", async() =>
     testCode(
-      `transaction() { execute { getAuthAccount<&Account>(0x01) } }`,
+      `transaction() { execute { let account = getAuthAccount<&Account>(0x01) } }`,
       ["cannot find variable in this scope: `getAuthAccount`. not found in this scope"],
     )
   )
@@ -288,7 +288,7 @@ describe("diagnostics", () => {
             access(all)
             fun main() {
                 let r <- create R()
-                r[A]
+                let a = r[A]
                 destroy r
             }
           `,
@@ -301,13 +301,25 @@ describe("diagnostics", () => {
           `
             access(all)
             fun main() {
-                getAccount(0x1).capabilities.get
+                let get = getAccount(0x1).capabilities.get
             }
           `,
           []
       )
   )
 
+  test("unused result", async() =>
+      testCode(
+          `
+            access(all)
+            fun main() {
+                getAccount(0x1)
+            }
+          `,
+          ["unused result"]
+      )
+  )
+  
   test("InternalEVM contract exists", async() =>
       testCode(
           `
@@ -439,7 +451,7 @@ describe("diagnostics", () => {
     let script = await docNotifications.find(n => n.name == scriptName).notification
     expect(script.uri).toEqual(`file://${scriptName}.cdc`)
     expect(script.diagnostics).toHaveLength(1)
-    expect(script.diagnostics[0].message).toEqual("value of type `Foo` has no member `zoo`. unknown member")
+    expect(script.diagnostics[0].message).toEqual("value of type `&Foo` has no member `zoo`. unknown member")
   })
 
 })
