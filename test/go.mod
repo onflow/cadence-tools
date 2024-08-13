@@ -4,11 +4,11 @@ go 1.22
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
-	github.com/onflow/atree v0.7.0-rc.2
-	github.com/onflow/cadence v1.0.0-preview.39
-	github.com/onflow/flow-emulator v1.0.0-preview.36
-	github.com/onflow/flow-go v0.36.4-0.20240724205438-14f9fddeda2b
-	github.com/onflow/flow-go-sdk v1.0.0-preview.42
+	github.com/onflow/atree v0.8.0-rc.5
+	github.com/onflow/cadence v1.0.0-preview.48
+	github.com/onflow/flow-emulator v1.0.0-preview.39
+	github.com/onflow/flow-go v0.37.1
+	github.com/onflow/flow-go-sdk v1.0.0-preview.50
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.9.0
 )
@@ -215,7 +215,7 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	lukechampine.com/blake3 v1.2.1 // indirect
+	lukechampine.com/blake3 v1.3.0 // indirect
 	modernc.org/libc v1.37.6 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect
