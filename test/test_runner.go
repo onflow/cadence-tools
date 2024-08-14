@@ -65,8 +65,6 @@ var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
 var quotedLog = regexp.MustCompile("\"(.*)\"")
 
-var StorageIDUndefined = atree.StorageID{}
-
 type Results []Result
 
 type Result struct {
@@ -647,7 +645,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 
 				for {
 					id, slab := iterator()
-					if id == StorageIDUndefined {
+					if id == atree.SlabIDUndefined {
 						break
 					}
 					err := storage.Store(id, slab)
