@@ -2549,7 +2549,7 @@ func maybeAddMissingMembersCodeActionResolver(
 
 			builder.WriteRune('\n')
 			builder.WriteString(indentation)
-			builder.WriteString(missingMember.Access.String())
+			builder.WriteString(missingMember.Access.QualifiedKeyword())
 			builder.WriteRune(' ')
 			builder.WriteString(newMemberSource)
 			builder.WriteRune('\n')
