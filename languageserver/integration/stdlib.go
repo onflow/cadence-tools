@@ -24,16 +24,17 @@ import (
 	evmstdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 )
 
-// FVMtandardLibraryValues returns the standard library values which are provided by the FVM
+// FVMStandardLibraryValues returns the standard library values which are provided by the FVM
 // these are not part of the Cadence standard library
 func FVMStandardLibraryValues() []stdlib.StandardLibraryValue {
 	return []stdlib.StandardLibraryValue{
 		// InternalEVM contract
 		{
-			Name:  evmstdlib.InternalEVMContractName,
-			Type:  evmstdlib.InternalEVMContractType,
-			Value: evmstdlib.NewInternalEVMContractValue(nil, nil, common.AddressLocation{}),
-			Kind:  common.DeclarationKindContract,
+			Name: evmstdlib.InternalEVMContractName,
+			Type: evmstdlib.InternalEVMContractType,
+			Kind: common.DeclarationKindContract,
+			// Not needed for checking
+			Value: nil,
 		},
 	}
 }
