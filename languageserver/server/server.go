@@ -2549,7 +2549,7 @@ func maybeAddMissingMembersCodeActionResolver(
 
 			builder.WriteRune('\n')
 			builder.WriteString(indentation)
-			builder.WriteString(missingMember.Access.String())
+			builder.WriteString(missingMember.Access.QualifiedKeyword())
 			builder.WriteRune(' ')
 			builder.WriteString(newMemberSource)
 			builder.WriteRune('\n')
@@ -2614,8 +2614,14 @@ func formatNewMember(member *sema.Member, indentation string) string {
 
 		innerIndentation := strings.Repeat(" ", indentationCount)
 
+		var viewModifier string
+		if functionType.Purity == sema.FunctionPurityView {
+			viewModifier = "view "
+		}
+
 		return fmt.Sprintf(
-			"fun %s(%s)%s {\n%[4]s%[5]spanic(\"TODO\")\n%[4]s}",
+			"%sfun %s(%s)%s {\n%[5]s%[6]spanic(\"TODO\")\n%[5]s}",
+			viewModifier,
 			member.Identifier.Identifier,
 			parametersBuilder.String(),
 			returnType,
