@@ -5,10 +5,10 @@ go 1.22
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.8.0-rc.6
-	github.com/onflow/cadence v1.0.0-preview.51
-	github.com/onflow/flow-emulator v1.0.0-preview.42
-	github.com/onflow/flow-go v0.37.7-0.20240830182756-9ac9e1889c34
-	github.com/onflow/flow-go-sdk v1.0.0-preview.54
+	github.com/onflow/cadence v1.0.0
+	github.com/onflow/flow-emulator v1.0.1
+	github.com/onflow/flow-go v0.38.0-preview.0.0.20241002124048-21cfe5aea5a8
+	github.com/onflow/flow-go-sdk v1.0.0
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.9.0
 )
@@ -140,7 +140,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.6 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.7 // indirect
 	github.com/onflow/go-ethereum v1.14.7 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
