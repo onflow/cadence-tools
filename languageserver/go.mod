@@ -7,12 +7,12 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/cadence v1.0.0-preview.51
-	github.com/onflow/cadence-tools/lint v1.0.0-preview.39
-	github.com/onflow/cadence-tools/test v1.0.0-preview.39
-	github.com/onflow/flow-go v0.37.7-0.20240830182756-9ac9e1889c34
-	github.com/onflow/flow-go-sdk v1.0.0-preview.54
-	github.com/onflow/flowkit/v2 v2.0.0-stable-cadence-alpha.33
+	github.com/onflow/cadence v1.0.0
+	github.com/onflow/cadence-tools/lint v1.0.0
+	github.com/onflow/cadence-tools/test v1.0.0
+	github.com/onflow/flow-go v0.38.0-preview.0.0.20241002124048-21cfe5aea5a8
+	github.com/onflow/flow-go-sdk v1.0.0
+	github.com/onflow/flowkit/v2 v2.0.1
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.10.0
 	github.com/spf13/pflag v1.0.5
@@ -153,12 +153,12 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.8.0-rc.6 // indirect
 	github.com/onflow/crypto v0.25.2 // indirect
-	github.com/onflow/flow-emulator v1.0.0-preview.42 // indirect
+	github.com/onflow/flow-emulator v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.6 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.7 // indirect
 	github.com/onflow/go-ethereum v1.14.7 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
