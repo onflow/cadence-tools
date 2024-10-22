@@ -33,8 +33,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/pretty"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/pretty"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/onflow/flow-go-sdk"
 	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
@@ -285,7 +285,10 @@ func (l *Linter) analyze(
 	config *analysis.Config,
 	locations []common.Location,
 ) {
-	programs := make(analysis.Programs, len(locations))
+	programs := analysis.Programs{
+		Programs: make(map[common.Location]*analysis.Program, len(locations)),
+		// TODO: crypto contract elaboration
+	}
 
 	log.Println("Loading ...")
 
@@ -320,7 +323,7 @@ func (l *Linter) analyze(
 	analyzers := l.Config.Analyzers
 	if len(analyzers) > 0 {
 		for _, location := range locations {
-			program := programs[location]
+			program := programs.Get(location)
 			if program == nil {
 				continue
 			}

@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/cadence-tools/lint"

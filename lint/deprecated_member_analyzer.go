@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 )
 

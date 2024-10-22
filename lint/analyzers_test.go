@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/tools/analysis"
 
 	"github.com/onflow/cadence-tools/lint"
@@ -87,7 +87,7 @@ func testAnalyzersAdvanced(
 
 	var diagnostics []analysis.Diagnostic
 
-	programs[testLocation].Run(
+	programs.Get(testLocation).Run(
 		analyzers,
 		func(diagnostic analysis.Diagnostic) {
 			diagnostics = append(diagnostics, diagnostic)

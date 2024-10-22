@@ -21,7 +21,7 @@ package lint_test
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
