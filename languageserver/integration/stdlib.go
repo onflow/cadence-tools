@@ -19,8 +19,8 @@
 package integration
 
 import (
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/stdlib"
 	evmstdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 )
 

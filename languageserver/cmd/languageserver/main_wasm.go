@@ -28,7 +28,7 @@ import (
 	"sync"
 	"syscall/js"
 
-	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/common"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
 )

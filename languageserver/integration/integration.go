@@ -22,7 +22,7 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flowkit/v2"
 	"github.com/spf13/afero"

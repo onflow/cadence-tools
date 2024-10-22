@@ -19,9 +19,9 @@
 package integration
 
 import (
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/parser"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/parser"
+	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/cadence-tools/languageserver/conversion"
 	"github.com/onflow/cadence-tools/languageserver/protocol"
