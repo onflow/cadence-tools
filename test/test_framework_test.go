@@ -4250,6 +4250,8 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"A.0000000000000002.FungibleTokenSwitchboard",
 			"A.0000000000000001.Burner",
+			"A.0000000000000001.Crypto",
+			"A.0000000000000001.NFTStorefrontV2",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4475,6 +4477,8 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.EVM",
 			"A.0000000000000002.FungibleTokenSwitchboard",
 			"A.0000000000000001.Burner",
+			"A.0000000000000001.NFTStorefrontV2",
+			"A.0000000000000001.Crypto",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)

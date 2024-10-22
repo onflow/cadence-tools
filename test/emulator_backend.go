@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -43,6 +44,7 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkTest "github.com/onflow/flow-go-sdk/test"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
@@ -102,6 +104,9 @@ type EmulatorBackend struct {
 	// contracts is a mapping of contract identifiers to their
 	// deployed account address.
 	contracts map[string]common.Address
+
+	// locationHandler is used for resolving locations
+	locationHandler sema.LocationHandlerFunc
 }
 
 type keyInfo struct {
@@ -110,11 +115,12 @@ type keyInfo struct {
 }
 
 var chain = flow.MonotonicEmulator.Chain()
+var chainContracts = systemcontracts.SystemContractsForChain(chain.ChainID())
 
 var commonContracts = emulator.NewCommonContracts(chain)
 
+// TODO: refactor, use chainContracts.All instead
 var systemContracts = func() []common.AddressLocation {
-	chainContracts := systemcontracts.SystemContractsForChain(chain.ChainID())
 	serviceAddress := chain.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
 		"FlowServiceAccount":         serviceAddress,
@@ -138,6 +144,7 @@ var systemContracts = func() []common.AddressLocation {
 		"EVM":                        serviceAddress,
 		"FungibleTokenSwitchboard":   chainContracts.FungibleToken.Address.HexWithPrefix(),
 		"Burner":                     serviceAddress,
+		"Crypto":                     serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
@@ -175,19 +182,53 @@ func NewEmulatorBackend(
 	clock := newSystemClock()
 	blockchain.SetClock(clock)
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	cryptoContractAddress := common.Address(sc.Crypto.Address)
+
+	locationHandler := func(
+		identifiers []ast.Identifier,
+		location common.Location,
+	) ([]sema.ResolvedLocation, error) {
+		return environment.ResolveLocation(
+			identifiers,
+			location,
+			func(address flow.Address) ([]string, error) {
+				return accountContractNames(blockchain, address)
+			},
+			cryptoContractAddress,
+		)
+	}
+
 	emulatorBackend := &EmulatorBackend{
-		blockchain:    blockchain,
-		blockOffset:   0,
-		accountKeys:   map[common.Address]map[string]keyInfo{},
-		stdlibHandler: stdlibHandler,
-		logCollection: logCollectionHook,
-		clock:         clock,
-		contracts:     map[string]common.Address{},
-		accounts:      map[common.Address]*stdlib.Account{},
+		blockchain:      blockchain,
+		blockOffset:     0,
+		accountKeys:     map[common.Address]map[string]keyInfo{},
+		stdlibHandler:   stdlibHandler,
+		logCollection:   logCollectionHook,
+		clock:           clock,
+		contracts:       map[string]common.Address{},
+		accounts:        map[common.Address]*stdlib.Account{},
+		locationHandler: locationHandler,
 	}
 	emulatorBackend.bootstrapAccounts()
 
 	return emulatorBackend
+}
+
+func accountContractNames(blockchain *emulator.Blockchain, address flow.Address) ([]string, error) {
+	account, err := blockchain.GetAccount(address)
+	if err != nil {
+		return nil, err
+	}
+
+	contractNames := make([]string, 0, len(account.Contracts))
+
+	for name := range account.Contracts {
+		contractNames = append(contractNames, name)
+	}
+	sort.Strings(contractNames)
+
+	return contractNames, nil
 }
 
 func (e *EmulatorBackend) RunScript(
@@ -241,6 +282,7 @@ func (e *EmulatorBackend) RunScript(
 		inter,
 		interpreter.EmptyLocationRange,
 		e.stdlibHandler,
+		e.locationHandler,
 		result.Value,
 		expectedType,
 	)
@@ -559,6 +601,7 @@ func (e *EmulatorBackend) Events(
 				inter,
 				interpreter.EmptyLocationRange,
 				e.stdlibHandler,
+				e.locationHandler,
 				event.Value,
 				nil,
 			)
