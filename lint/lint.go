@@ -33,10 +33,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/pretty"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/pretty"
 	"github.com/onflow/cadence/tools/analysis"
-	"github.com/onflow/flow-go-sdk"
 	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
 )
 

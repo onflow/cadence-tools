@@ -21,9 +21,9 @@ package lint
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/errors"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/errors"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
