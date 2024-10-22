@@ -2909,11 +2909,6 @@ func (s *Server) handleImport(
 	error,
 ) {
 	switch importedLocation {
-	case stdlib.CryptoCheckerLocation:
-		cryptoChecker := stdlib.CryptoChecker()
-		return sema.ElaborationImport{
-			Elaboration: cryptoChecker.Elaboration,
-		}, nil
 	case stdlib.TestContractLocation:
 		testChecker := stdlib.GetTestContractType().Checker
 		return sema.ElaborationImport{
