@@ -30,12 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/cadence/runtime/tests/checker"
+	"github.com/onflow/cadence/sema"
+	"github.com/onflow/cadence/stdlib"
+	"github.com/onflow/cadence/tests/checker"
 )
 
 var firstAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 6}
