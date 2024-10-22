@@ -87,7 +87,7 @@ func testAnalyzersAdvanced(
 
 	var diagnostics []analysis.Diagnostic
 
-	programs[testLocation].Run(
+	programs.Get(testLocation).Run(
 		analyzers,
 		func(diagnostic analysis.Diagnostic) {
 			diagnostics = append(diagnostics, diagnostic)
