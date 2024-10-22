@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/rs/zerolog"
 )
 

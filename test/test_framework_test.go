@@ -30,12 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/interpreter"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/cadence/runtime/tests/checker"
+	"github.com/onflow/cadence/sema"
+	"github.com/onflow/cadence/stdlib"
+	"github.com/onflow/cadence/tests/checker"
 )
 
 var firstAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 6}
@@ -4250,6 +4250,8 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"s.7465737400000000000000000000000000000000000000000000000000000000",
 			"A.0000000000000002.FungibleTokenSwitchboard",
 			"A.0000000000000001.Burner",
+			"A.0000000000000001.Crypto",
+			"A.0000000000000001.NFTStorefrontV2",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4475,6 +4477,8 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.EVM",
 			"A.0000000000000002.FungibleTokenSwitchboard",
 			"A.0000000000000001.Burner",
+			"A.0000000000000001.NFTStorefrontV2",
+			"A.0000000000000001.Crypto",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)

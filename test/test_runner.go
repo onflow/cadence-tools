@@ -25,14 +25,14 @@ import (
 	"strings"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/errors"
+	"github.com/onflow/cadence/interpreter"
+	"github.com/onflow/cadence/parser"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/errors"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/parser"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/cadence/sema"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/debug"
@@ -480,7 +480,7 @@ func (r *TestRunner) initializeEnvironment() (
 		Environment: env,
 	}
 	if r.coverageReport != nil {
-		r.coverageReport.ExcludeLocation(stdlib.CryptoCheckerLocation)
+		r.coverageReport.ExcludeLocation(stdlib.CryptoContractLocation)
 		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
 		r.coverageReport.ExcludeLocation(helpers.BlockchainHelpersLocation)
 		r.coverageReport.ExcludeLocation(testScriptLocation)
@@ -522,9 +522,6 @@ func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandle
 	) (sema.Import, error) {
 		var elaboration *sema.Elaboration
 		switch importedLocation {
-		case stdlib.CryptoCheckerLocation:
-			cryptoChecker := stdlib.CryptoChecker()
-			elaboration = cryptoChecker.Elaboration
 
 		case stdlib.TestContractLocation:
 			testChecker := stdlib.GetTestContractType().Checker
@@ -586,17 +583,6 @@ func (r *TestRunner) interpreterContractValueHandler(
 	) interpreter.ContractValue {
 
 		switch compositeType.Location {
-		case stdlib.CryptoCheckerLocation:
-			contract, err := stdlib.NewCryptoContract(
-				inter,
-				constructorGenerator(common.Address{}),
-				invocationRange,
-			)
-			if err != nil {
-				panic(err)
-			}
-			return contract
-
 		case stdlib.TestContractLocation:
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
@@ -678,9 +664,6 @@ func (r *TestRunner) interpreterImportHandler(ctx runtime.Context) interpreter.I
 	return func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
 		var program *interpreter.Program
 		switch location {
-		case stdlib.CryptoCheckerLocation:
-			cryptoChecker := stdlib.CryptoChecker()
-			program = interpreter.ProgramFromChecker(cryptoChecker)
 
 		case stdlib.TestContractLocation:
 			testChecker := stdlib.GetTestContractType().Checker
@@ -761,13 +744,6 @@ func (r *TestRunner) parseAndCheckImport(
 		case stdlib.TestContractLocation:
 			testChecker := stdlib.GetTestContractType().Checker
 			elaboration := testChecker.Elaboration
-			return sema.ElaborationImport{
-				Elaboration: elaboration,
-			}, nil
-
-		case stdlib.CryptoCheckerLocation:
-			cryptoChecker := stdlib.CryptoChecker()
-			elaboration := cryptoChecker.Elaboration
 			return sema.ElaborationImport{
 				Elaboration: elaboration,
 			}, nil
