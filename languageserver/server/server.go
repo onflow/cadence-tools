@@ -194,7 +194,6 @@ type Server struct {
 	standardLibrary *standardLibrary
 	// scriptStandardLibrary is the standard library for scripts
 	scriptStandardLibrary *standardLibrary
-	// customImportResolvers is a map of custom import resolvers
 }
 
 type Option func(*Server) error
