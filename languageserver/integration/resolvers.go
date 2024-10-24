@@ -20,6 +20,7 @@ package integration
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -74,7 +75,7 @@ func (r *resolvers) identifierImport(location common.IdentifierLocation) (string
 	if location == stdlib.CryptoContractLocation {
 		return string(coreContracts.Crypto()), nil
 	}
-	return "", nil
+	return "", fmt.Errorf("unknown identifier location: %s", location)
 }
 
 // addressContractNames returns a slice of all the contract names on the address location.
