@@ -175,6 +175,8 @@ type Server struct {
 	resolveAddressContractNames AddressContractNamesResolver
 	// resolveStringImport is the optional function that is used to resolve string imports
 	resolveStringImport StringImportResolver
+	// resolveIdentifierImport is the optional function that is used to resolve identifier imports
+	resolveIdentifierImport func(location common.IdentifierLocation) (string, error)
 	// codeLensProviders are the functions that are used to provide code lenses for a checker
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
@@ -192,6 +194,7 @@ type Server struct {
 	standardLibrary *standardLibrary
 	// scriptStandardLibrary is the standard library for scripts
 	scriptStandardLibrary *standardLibrary
+	// customImportResolvers is a map of custom import resolvers
 }
 
 type Option func(*Server) error
@@ -238,6 +241,15 @@ func WithAddressContractNamesResolver(resolver AddressContractNamesResolver) Opt
 func WithStringImportResolver(resolver StringImportResolver) Option {
 	return func(s *Server) error {
 		s.resolveStringImport = resolver
+		return nil
+	}
+}
+
+// WithIdentifierImportResolver returns a server option that sets the given function
+// as the function that is used to resolve identifier imports
+func WithIdentifierImportResolver(resolver func(location common.IdentifierLocation) (string, error)) Option {
+	return func(s *Server) error {
+		s.resolveIdentifierImport = resolver
 		return nil
 	}
 }
@@ -2051,6 +2063,12 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 			return nil, nil
 		}
 		code, err = s.resolveAddressImport(loc)
+
+	case common.IdentifierLocation:
+		if s.resolveIdentifierImport == nil {
+			return nil, nil
+		}
+		code, err = s.resolveIdentifierImport(loc)
 
 	default:
 		return nil, nil

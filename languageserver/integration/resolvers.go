@@ -25,9 +25,12 @@ import (
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flowkit/v2"
 	"github.com/onflow/flowkit/v2/config"
+
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
 
 type resolvers struct {
@@ -64,6 +67,14 @@ func (r *resolvers) addressImport(location common.AddressLocation) (string, erro
 	}
 
 	return string(account.Contracts[location.Name]), nil
+}
+
+// identifierImport resolves the code for an identifier location.
+func (r *resolvers) identifierImport(location common.IdentifierLocation) (string, error) {
+	if location == stdlib.CryptoContractLocation {
+		return string(coreContracts.Crypto()), nil
+	}
+	return "", nil
 }
 
 // addressContractNames returns a slice of all the contract names on the address location.
