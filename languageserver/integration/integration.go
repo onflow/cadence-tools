@@ -53,6 +53,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithStringImportResolver(resolve.stringImport),
 		server.WithInitializationOptionsHandler(integration.initialize),
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
+		server.WithIdentifierImportResolver(resolve.identifierImport),
 	}
 
 	if enableFlowClient {

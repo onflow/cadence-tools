@@ -29,8 +29,11 @@ import (
 	"syscall/js"
 
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
+
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
 
 const globalFunctionNamePrefix = "CADENCE_LANGUAGE_SERVER"
@@ -185,6 +188,13 @@ func start(id int) {
 		return res.String(), nil
 	}
 
+	identifierImportResolver := func(location common.IdentifierLocation) (code string, err error) {
+		if location == stdlib.CryptoContractLocation {
+			return string(coreContracts.Crypto()), nil
+		}
+		return "", fmt.Errorf("CLS %d: unknown identifier location: %s", id, location)
+	}
+
 	languageServer, err := server.NewServer()
 	if err != nil {
 		panic(err)
@@ -193,6 +203,7 @@ func start(id int) {
 	err = languageServer.SetOptions(
 		server.WithAddressImportResolver(addressImportResolver),
 		server.WithStringImportResolver(stringImportResolver),
+		server.WithIdentifierImportResolver(identifierImportResolver),
 	)
 	if err != nil {
 		panic(err)
