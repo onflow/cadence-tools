@@ -1129,11 +1129,8 @@ var expressionCompletionItems = []*protocol.CompletionItem{
 	},
 }
 
-var allAccessOptions = []string{"pub", "priv", "pub(set)", "access(contract)", "access(account)", "access(self)"}
+var allAccessOptions = []string{"access(all)", "access(contract)", "access(account)", "access(self)"}
 var allAccessOptionsCommaSeparated = strings.Join(allAccessOptions, ",")
-
-var readAccessOptions = []string{"pub", "priv", "access(contract)", "access(account)", "access(self)"}
-var readAccessOptionsCommaSeparated = strings.Join(readAccessOptions, ",")
 
 // NOTE: if the document doesn't specify an access modifier yet,
 // the completion item's InsertText will  get prefixed with a placeholder
@@ -1287,7 +1284,7 @@ func (s *Server) Completion(
 		if requiresAccessModifierPlaceholder {
 			item = withCompletionItemInsertText(
 				item,
-				fmt.Sprintf("${1|%s|} %s", readAccessOptionsCommaSeparated, item.InsertText),
+				fmt.Sprintf("${1|%s|} %s", allAccessOptionsCommaSeparated, item.InsertText),
 			)
 		}
 		items = append(items, item)
