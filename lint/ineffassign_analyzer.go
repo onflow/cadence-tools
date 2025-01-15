@@ -20,132 +20,184 @@ package lint
 
 import (
 	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/tools/analysis"
+	"slices"
 )
 
 type operationKind int
 
 const (
-	operationKindUnknown operationKind = iota
-	operationKindAssign
+	operationKindAssign = iota
+	operationKindPartialAssign
 	operationKindUse
 )
 
+type warning struct {
+	el      ast.Element
+	message string
+}
+
+type analyzeResult struct {
+	warnings []warning
+}
+
+func (r *analyzeResult) add(el ast.Element, message string) {
+	w := warning{
+		el:      el,
+		message: message,
+	}
+	if !slices.Contains(r.warnings, w) {
+		r.warnings = append(r.warnings, w)
+	}
+}
+
+func (r *analyzeResult) merge(r2 *analyzeResult) {
+	for _, w := range r2.warnings {
+		r.add(w.el, w.message)
+	}
+}
+
+type variable struct {
+	name          string
+	declaration   ast.Element
+	functionBlock *block
+}
+
+type operations []*operation
+
+func (ops operations) uniqueVariables() []*variable {
+	variables := make([]*variable, 0)
+	for _, op := range ops {
+		if !slices.Contains(variables, op.variable) {
+			variables = append(variables, op.variable)
+		}
+	}
+	return variables
+}
+
+func (ops operations) filterByVariable(v *variable) operations {
+	res := make(operations, 0, len(ops))
+	for _, op := range ops {
+		if op.variable.declaration != v.declaration {
+			continue
+		}
+		res = append(res, op)
+	}
+	return res
+}
+
 type operation struct {
-	variable string
+	variable *variable
 	kind     operationKind
 	el       ast.Element
 }
 
-func newOperation(kind operationKind, identifier string, el ast.Element) *operation {
+type block struct {
+	parent     *block
+	children   []*block
+	locals     map[string]*variable
+	operations operations
+}
+
+func newOperation(kind operationKind, variable *variable, el ast.Element) *operation {
 	return &operation{
-		variable: identifier,
+		variable: variable,
 		kind:     kind,
 		el:       el,
 	}
 }
 
-type block struct {
-	children   []*block
-	locals     map[string]ast.Element
-	useCount   map[string]int
-	functions  map[string][]*operation
-	operations []*operation
-}
-
-func newBlock() *block {
-	return &block{
-		locals:     make(map[string]ast.Element),
-		useCount:   make(map[string]int),
-		functions:  make(map[string][]*operation),
-		operations: make([]*operation, 0),
+func newBlock(parents ...*block) *block {
+	bl := &block{
+		locals:     make(map[string]*variable),
+		operations: make(operations, 0),
 		children:   make([]*block, 0),
 	}
+
+	for _, parent := range parents {
+		parent.addChild(bl)
+	}
+	return bl
 }
 
 func (b *block) addChild(child *block) {
 	b.children = append(b.children, child)
+	child.parent = b
 }
 
-func Walk(b *block, el ast.Element) {
+func (b *block) variable(name string) *variable {
 
+	if v, ok := b.locals[name]; ok {
+		return v
+	}
+	if b.parent == nil {
+		return nil
+	}
+	return b.parent.variable(name)
 }
 
-func parseFunction(pass *analysis.Pass, block *ast.FunctionBlock) []*operation {
+func (b *block) declare(name string, el ast.Element) *variable {
+	b.locals[name] = &variable{
+		name:          name,
+		declaration:   el,
+		functionBlock: newBlock(),
+	}
+	b.assign(name, el)
+	return b.locals[name]
+}
+
+func (b *block) assign(name string, el ast.Element) {
+	v := b.variable(name)
+	if v != nil {
+		b.operations = append(b.operations, newOperation(operationKindAssign, v, el))
+	}
+}
+
+func (b *block) partialAssign(name string, el ast.Element) {
+	v := b.variable(name)
+	if v != nil {
+		b.operations = append(b.operations, newOperation(operationKindPartialAssign, v, el))
+	}
+}
+
+func (b *block) useElement(el ast.Element) {
+	if el == nil {
+		return
+	}
+	switch e := el.(type) {
+	case *ast.IdentifierExpression:
+		v := b.variable(e.Identifier.Identifier)
+		if v != nil {
+			b.operations = append(b.operations, newOperation(operationKindUse, v, nil))
+		}
+	}
+	el.Walk(b.useElement)
+}
+
+func Walk(pass *analysis.Pass, bl *block, el ast.Element) {
 
 	program := pass.Program
-	location := program.Location
-	report := pass.Report
 	elaboration := program.Checker.Elaboration
-
-	externalOperations := make([]*operation, 0)
-
-	functions := make(map[string][]*operation)
-	locals := make(map[string]ast.Element)
-	useCount := make(map[string]int)
-
-	var walk func(expr ast.Element)
-	var use func(expr ast.Element)
-
-	declare := func(variable string, el ast.Element) {
-		locals[variable] = el
-		useCount[variable] = 0
-	}
-
-	assign := func(variable string, e *ast.AssignmentStatement, check bool) {
-		useCount[variable] = 0
-		v, isLocal := locals[variable]
-		if !isLocal {
-			id, isIdentifier := e.Target.(*ast.IdentifierExpression)
-			//only identifier targets from parent scope needs tracking
-			if isIdentifier {
-				externalOperations = append(externalOperations, newOperation(operationKindAssign, id.Identifier.Identifier, e))
-			}
-			return
-		}
-		if v != nil && check {
-			report(
-				analysis.Diagnostic{
-					Location: location,
-					Range:    ast.NewRangeFromPositioned(nil, v),
-					Category: RemovalCategory,
-					Message:  "ineffectual assign",
-				},
-			)
-		}
-		locals[variable] = e
-	}
-
-	use = func(expr ast.Element) {
-		if expr == nil {
-			return
-		}
-		switch e := expr.(type) {
-		case *ast.IdentifierExpression:
-			_, isLocal := locals[e.Identifier.Identifier]
-			if !isLocal {
-				externalOperations = append(externalOperations, newOperation(operationKindUse, e.Identifier.Identifier, e))
-				return
-			}
-			locals[e.Identifier.Identifier] = nil
-			useCount[e.Identifier.Identifier]++
-			return
-
-		case *ast.IndexExpression:
-			use(e.IndexingExpression)
-			use(e.TargetExpression)
-			return
-		}
-
-		expr.Walk(use)
-
-	}
+	var walk func(el ast.Element)
+	b := bl
 
 	walk = func(element ast.Element) {
 		if element == nil {
 			return
 		}
+
 		switch e := element.(type) {
+
+		case *ast.IdentifierExpression:
+			b.useElement(e)
+
+		case *ast.FunctionDeclaration:
+			v := b.declare(e.Identifier.Identifier, e)
+			v.functionBlock = newBlock(b)
+			Walk(pass, v.functionBlock, e.FunctionBlock)
+			v.functionBlock.parent = nil
+			return
 
 		case *ast.VariableDeclaration:
 			identifier := e.Identifier.Identifier
@@ -153,160 +205,245 @@ func parseFunction(pass *analysis.Pass, block *ast.FunctionBlock) []*operation {
 			// resource tracking handles those cases no need to track the variable
 			// just track uses on values ( function parameters etc )
 			if e.Transfer.Operation == ast.TransferOperationMove {
-				use(e.Value)
-				use(e.SecondValue)
+				walk(e.Value)
+				if e.SecondValue != nil {
+					walk(e.SecondValue)
+				}
 				return
 			}
 
 			variableType := elaboration.VariableDeclarationTypes(e)
-
-			fb, isFunction := e.Value.(*ast.FunctionExpression)
-			if isFunction {
-				// delay function expression until it is called
-				functions[identifier] = parseFunction(pass, fb.FunctionBlock)
-				declare(identifier, e)
+			if variableType.TargetType.Tag().Equals(sema.FunctionTypeTag) {
+				v := b.declare(identifier, e)
+				v.functionBlock = newBlock(b)
+				walk(e.Value)
+				v.functionBlock.parent = nil
 				return
 			}
 
 			// mark locals used in value expression as used
-			use(e.Value)
+			walk(e.Value)
 
-			// track identifier if it is not reference
+			// track identifier if it is not a reference
 			if !variableType.TargetType.IsOrContainsReferenceType() {
-				declare(identifier, e)
+				b.declare(identifier, e)
 			}
+			return
 
 		case *ast.AssignmentStatement:
 
 			// no need to track resources, just track locals used on RHS
 			if e.Transfer.Operation == ast.TransferOperationMove {
-				use(e.Value)
+				walk(e.Value)
 				return
 			}
 
 			switch target := e.Target.(type) {
 			case *ast.IdentifierExpression:
-				//assignedType := elaboration.AssignmentStatementTypes(e)
-				//TODO: check function type
-
-				function, isFunction := e.Value.(*ast.FunctionExpression)
-				if isFunction {
-					// parse function and store operations to use on invocation
-					functions[target.Identifier.Identifier] = parseFunction(pass, function.FunctionBlock)
-					assign(target.Identifier.Identifier, e, true)
+				identifier := target.Identifier.Identifier
+				variableType := elaboration.AssignmentStatementTypes(e)
+				if variableType.TargetType.Tag().Equals(sema.FunctionTypeTag) {
+					v := b.variable(identifier)
+					v.functionBlock = newBlock(b)
+					walk(e.Value)
+					v.functionBlock.parent = nil
 					return
 				}
-				use(e.Value)
-				assign(target.Identifier.Identifier, e, true)
+				walk(e.Value)
+				b.assign(target.Identifier.Identifier, e)
 
 			case *ast.IndexExpression:
-				use(e.Value)
-				assign(target.TargetExpression.String(), e, false)
+				walk(e.Value)
+				b.partialAssign(target.TargetExpression.String(), e)
+
+			default:
+				walk(e.Value)
 			}
 			return
 
 		case *ast.InvocationExpression:
+			walk(e.InvokedExpression)
+			for _, arg := range e.Arguments {
+				walk(arg.Expression)
+			}
+
 			target, ok := e.InvokedExpression.(*ast.IdentifierExpression)
 			if !ok {
-				use(e)
 				return
 			}
 
-			use(target)
-
-			f, ok := functions[target.Identifier.Identifier]
-			if !ok {
-				use(e)
-				return
-			}
-
-			//simulate operations
-			for _, op := range f {
-				switch op.kind {
-				case operationKindAssign:
-					assign(op.variable, op.el.(*ast.AssignmentStatement), true)
-				case operationKindUse:
-					locals[op.variable] = nil
-				default:
-					panic("unhandled default case")
+			identifier := target.Identifier.Identifier
+			v := b.variable(identifier)
+			if v != nil {
+				for _, op := range v.functionBlock.operations {
+					b.operations = append(b.operations, op)
 				}
 			}
 
 		case *ast.ReturnStatement:
-			use(e.Expression)
+			walk(e.Expression)
 
 		case *ast.IfStatement:
-			use(e.Test)
-			use(e.Then)
+			walk(e.Test)
+
+			thenBlock := newBlock(b)
+			elseBlock := newBlock(b)
+			contBlock := newBlock(thenBlock, elseBlock)
+
+			Walk(pass, thenBlock, e.Then)
 			if e.Else != nil {
-				use(e.Else)
+				Walk(pass, elseBlock, e.Else)
 			}
+			b = contBlock
 
 		case *ast.WhileStatement:
-			//TODO: handle while block later
-			use(e.Test)
-			use(e.Block)
-			return
+			b.useElement(e.Block)
+			b.useElement(e.Test)
 
 		case *ast.ForStatement:
-			//TODO: handle for block later
-			use(e.Value)
-			use(e.Block)
-			return
+			b.useElement(e.Block)
+			b.useElement(e.Value)
 
 		case *ast.SwitchStatement:
+			walk(e.Expression)
 			for _, swCase := range e.Cases {
-				use(swCase.Expression)
+				walk(swCase.Expression)
 				for _, s := range swCase.Statements {
-					use(s)
+					b.useElement(s)
 				}
 			}
-			return
+
+		default:
+			e.Walk(walk)
 		}
-		if element != nil {
-			element.Walk(walk)
+
+	}
+
+	if el != nil {
+		walk(el)
+	}
+}
+
+func (b *block) checkConsecutiveAssignmentsAndUnused(ops operations) *analyzeResult {
+	result := &analyzeResult{}
+
+	var lastWrite ast.Element = nil
+
+	for _, v := range ops.uniqueVariables() {
+		vOps := ops.filterByVariable(v)
+
+		for i := 0; i < len(vOps); i++ {
+			currentOp := vOps[i]
+			if v.declaration != currentOp.variable.declaration {
+				continue
+			}
+
+			switch currentOp.kind {
+			case operationKindAssign, operationKindPartialAssign:
+				lastWrite = currentOp.el
+				if i < len(vOps)-1 {
+					nextOp := vOps[i+1]
+					if nextOp.kind == operationKindAssign {
+						if len(b.children) == 0 {
+							result.add(currentOp.el, "ineffectual assign")
+						}
+					}
+				}
+
+			case operationKindUse:
+				lastWrite = nil
+
+			}
+		}
+
+		if lastWrite != nil {
+			if len(b.children) == 0 {
+				result.add(lastWrite, "unused assign")
+			}
 		}
 	}
 
-	if block != nil {
-		walk(block)
+	return result
+}
+
+func (b *block) getBestChildWarnings(ops operations) *analyzeResult {
+	if len(b.children) == 0 {
+		return &analyzeResult{warnings: []warning{}}
 	}
 
-	for k, v := range locals {
-		if v != nil && useCount[k] == 0 {
-			report(
-				analysis.Diagnostic{
-					Location: location,
-					Range:    ast.NewRangeFromPositioned(nil, v),
-					Category: RemovalCategory,
-					Message:  "unused assign",
-				},
-			)
+	bestResult := b.children[0].check(ops)
+	bestCount := len(bestResult.warnings)
+
+	for _, child := range b.children[1:] {
+		childResult := child.check(ops)
+		childWarnings := len(childResult.warnings)
+
+		if childWarnings < bestCount {
+			bestResult = childResult
+			bestCount = childWarnings
+		} else if childWarnings == bestCount {
+			bestResult.merge(childResult)
 		}
 	}
 
-	return externalOperations
+	return bestResult
+}
+
+func (b *block) check(baseOps operations) *analyzeResult {
+	ops := append(baseOps, b.operations...)
+	result := b.checkConsecutiveAssignmentsAndUnused(ops)
+	childResult := b.getBestChildWarnings(ops)
+	result.merge(childResult)
+	return result
 }
 
 var IneffAssignAnalyzer = (func() *analysis.Analyzer {
 
 	elementFilter := []ast.Element{
-		(*ast.FunctionDeclaration)(nil),
+		(*ast.Block)(nil),
+		(*ast.SwitchStatement)(nil),
 	}
 
 	return &analysis.Analyzer{
-		Description: "Detects ineffectual assignments",
+		Description: "Detects ineffectual & unused assignments",
 		Requires: []*analysis.Analyzer{
 			analysis.InspectorAnalyzer,
 		},
 		Run: func(pass *analysis.Pass) interface{} {
 			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 
+			reportBlock := func(b *block) {
+				seen := operations{}
+				for _, warning := range b.check(seen).warnings {
+					pass.Report(
+						analysis.Diagnostic{
+							Location: pass.Program.Location,
+							Range:    ast.NewRangeFromPositioned(nil, warning.el),
+							Category: RemovalCategory,
+							Message:  warning.message,
+						},
+					)
+				}
+			}
 			inspector.Preorder(
 				elementFilter,
 				func(element ast.Element) {
-					block := element.(*ast.FunctionDeclaration)
-					parseFunction(pass, block.FunctionBlock)
+					switch el := element.(type) {
+					case *ast.Block:
+						b := newBlock()
+						Walk(pass, b, el)
+						reportBlock(b)
+					case *ast.SwitchStatement:
+						for _, swCase := range el.Cases {
+							b := newBlock()
+							for _, s := range swCase.Statements {
+								Walk(pass, b, s)
+							}
+							reportBlock(b)
+						}
+
+					}
+
 				},
 			)
 
