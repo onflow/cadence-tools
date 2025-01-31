@@ -4256,6 +4256,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.Burner",
 			"A.0000000000000001.Crypto",
 			"A.0000000000000001.NFTStorefrontV2",
+			"A.0000000000000002.USDCFlow",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4483,6 +4484,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.Burner",
 			"A.0000000000000001.NFTStorefrontV2",
 			"A.0000000000000001.Crypto",
+			"A.0000000000000002.USDCFlow",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
