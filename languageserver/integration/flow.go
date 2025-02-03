@@ -113,7 +113,7 @@ func (f *flowkitClient) Initialize(state flowState, numberOfAccounts int) error 
 
 	f.services = flowkit.NewFlowkit(state.getState(), config.EmulatorNetwork, emulator, logger)
 	if numberOfAccounts > len(names) || numberOfAccounts <= 0 {
-		return fmt.Errorf(fmt.Sprintf("only possible to create between 1 and %d accounts", len(names)))
+		return fmt.Errorf("only possible to create between 1 and %d accounts", len(names))
 	}
 
 	// create base accounts
@@ -170,7 +170,7 @@ func (f *flowkitClient) SetActiveClientAccount(name string) error {
 
 	account := f.GetClientAccount(name)
 	if account == nil {
-		return fmt.Errorf(fmt.Sprintf("account with a name %s not found", name))
+		return fmt.Errorf("account with a name %s not found", name)
 	}
 
 	account.Active = true
@@ -327,7 +327,7 @@ func (f *flowkitClient) CreateAccount() (*clientAccount, error) {
 
 	nextIndex := len(f.GetClientAccounts())
 	if nextIndex > len(names) {
-		return nil, fmt.Errorf(fmt.Sprintf("account limit of %d reached", len(names)))
+		return nil, fmt.Errorf("account limit of %d reached", len(names))
 	}
 
 	clientAccount := &clientAccount{
@@ -372,7 +372,7 @@ func (f *flowkitClient) createSigner(address flow.Address) (*accounts.Account, e
 		}
 	}
 	if account == nil {
-		return nil, fmt.Errorf(fmt.Sprintf("account with address %s not found in the list of accounts", address))
+		return nil, fmt.Errorf("account with address %s not found in the list of accounts", address)
 	}
 
 	var accountKey accounts.Key
