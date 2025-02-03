@@ -348,7 +348,6 @@ func newCheckerConfig(s *Server, lib *standardLibrary) *sema.Config {
 		ExtendedElaborationEnabled: true,
 		LocationHandler:            s.handleLocation,
 		ImportHandler:              s.handleImport,
-		AttachmentsEnabled:         true,
 	}
 }
 
