@@ -348,7 +348,6 @@ func newCheckerConfig(s *Server, lib *standardLibrary) *sema.Config {
 		ExtendedElaborationEnabled: true,
 		LocationHandler:            s.handleLocation,
 		ImportHandler:              s.handleImport,
-		AttachmentsEnabled:         true,
 	}
 }
 
@@ -1266,7 +1265,7 @@ func (s *Server) Completion(
 	// prioritize range completion items over other items
 	rangeCompletions := s.rangeCompletions(position, checker, uri)
 	for _, item := range rangeCompletions {
-		item.SortText = fmt.Sprintf("1" + item.Label)
+		item.SortText = "1" + item.Label
 	}
 	items = append(items, rangeCompletions...)
 
