@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.4.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.4.0 // indirect
 )
 
