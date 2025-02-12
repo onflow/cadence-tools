@@ -145,6 +145,8 @@ var systemContracts = func() []common.AddressLocation {
 		"FungibleTokenSwitchboard":   chainContracts.FungibleToken.Address.HexWithPrefix(),
 		"Burner":                     serviceAddress,
 		"Crypto":                     serviceAddress,
+		"NFTStorefrontV2":            chainContracts.NonFungibleToken.Address.HexWithPrefix(),
+		"USDCFlow":                   chainContracts.FungibleToken.Address.HexWithPrefix(),
 	}
 
 	locations := make([]common.AddressLocation, 0)

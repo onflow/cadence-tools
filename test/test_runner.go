@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 
@@ -451,8 +450,7 @@ func (r *TestRunner) initializeEnvironment() (
 	runtime.Context,
 ) {
 	config := runtime.Config{
-		AttachmentsEnabled: true,
-		CoverageReport:     r.coverageReport,
+		CoverageReport: r.coverageReport,
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(config)
@@ -502,7 +500,7 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface, nil),
+		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
 		r.coverageReport,
 	)
 
@@ -607,10 +605,12 @@ func (r *TestRunner) interpreterContractValueHandler(
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
 					inter,
+					runtime.StorageConfig{},
 				)
-				storageMap := blockchainStorage.GetStorageMap(
+				storageMap := blockchainStorage.GetDomainStorageMap(
+					inter,
 					location.Address,
-					runtime.StorageDomainContract,
+					common.StorageDomainContract,
 					false,
 				)
 				if storageMap != nil {
@@ -794,7 +794,6 @@ func setupEVMEnvironment(
 		chain.ChainID(),
 		fvmEnv,
 		runtimeEnv,
-		debug.NopTracer,
 	)
 }
 

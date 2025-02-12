@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/onflow/cadence/test_utils/sema_utils"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
-	"github.com/onflow/cadence/tests/checker"
 )
 
 var firstAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 6}
@@ -476,7 +476,7 @@ func TestImportContract(t *testing.T) {
 		_, err := runner.RunTest(code, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 2)
+		errs := RequireCheckerErrors(t, err, 2)
 
 		importedProgramError := &sema.ImportedProgramError{}
 		assert.ErrorAs(t, errs[0], &importedProgramError)
@@ -501,7 +501,7 @@ func TestImportContract(t *testing.T) {
 		_, err := runner.RunTest(code, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 2)
+		errs := RequireCheckerErrors(t, err, 2)
 
 		importedProgramError := &sema.ImportedProgramError{}
 		require.ErrorAs(t, errs[0], &importedProgramError)
@@ -2608,6 +2608,8 @@ func TestInterpretFailFunction(t *testing.T) {
 	t.Parallel()
 
 	t.Run("without message", func(t *testing.T) {
+		t.Parallel()
+
 		const script = `
             import Test
 
@@ -2624,6 +2626,8 @@ func TestInterpretFailFunction(t *testing.T) {
 	})
 
 	t.Run("with message", func(t *testing.T) {
+		t.Parallel()
+
 		const script = `
             import Test
 
@@ -2765,7 +2769,7 @@ func TestInterpretMatcher(t *testing.T) {
 		runner := NewTestRunner()
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
-		errs := checker.RequireCheckerErrors(t, err, 1)
+		errs := RequireCheckerErrors(t, err, 1)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
@@ -2807,7 +2811,7 @@ func TestInterpretMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 1)
+		errs := RequireCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
@@ -2904,7 +2908,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 2)
+		errs := RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -2941,7 +2945,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 1)
+		errs := RequireCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
@@ -3065,7 +3069,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 4)
+		errs := RequireCheckerErrors(t, err, 4)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
@@ -3098,7 +3102,7 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 3)
+		errs := RequireCheckerErrors(t, err, 3)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
@@ -3194,7 +3198,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 1)
+		errs := RequireCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
@@ -3218,7 +3222,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 2)
+		errs := RequireCheckerErrors(t, err, 2)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 	})
@@ -3243,7 +3247,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 1)
+		errs := RequireCheckerErrors(t, err, 1)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
@@ -3267,7 +3271,7 @@ func TestInterpretExpectFunction(t *testing.T) {
 		_, err := runner.RunTest(script, "test")
 		require.Error(t, err)
 
-		errs := checker.RequireCheckerErrors(t, err, 1)
+		errs := RequireCheckerErrors(t, err, 1)
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 }
@@ -4252,6 +4256,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.Burner",
 			"A.0000000000000001.Crypto",
 			"A.0000000000000001.NFTStorefrontV2",
+			"A.0000000000000002.USDCFlow",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4479,6 +4484,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.Burner",
 			"A.0000000000000001.NFTStorefrontV2",
 			"A.0000000000000001.Crypto",
+			"A.0000000000000002.USDCFlow",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)

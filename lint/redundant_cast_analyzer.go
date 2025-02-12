@@ -179,6 +179,10 @@ func (d *CheckCastVisitor) VisitStringExpression(_ *ast.StringExpression) bool {
 	return d.isTypeRedundant(sema.StringType, d.targetType)
 }
 
+func (d *CheckCastVisitor) VisitStringTemplateExpression(_ *ast.StringTemplateExpression) bool {
+	return d.isTypeRedundant(sema.StringType, d.targetType)
+}
+
 func (d *CheckCastVisitor) VisitCastingExpression(_ *ast.CastingExpression) bool {
 	// This is already covered under Case-I: where expected type is same as casted type.
 	// So skip checking it here to avid duplicate errors.
