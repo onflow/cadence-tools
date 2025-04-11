@@ -500,7 +500,9 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
+		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{
+			StorageFormatV2Enabled: true,
+		}),
 		r.coverageReport,
 	)
 
