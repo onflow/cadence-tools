@@ -500,7 +500,9 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
+		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{
+			StorageFormatV2Enabled: true,
+		}),
 		r.coverageReport,
 	)
 
@@ -605,7 +607,9 @@ func (r *TestRunner) interpreterContractValueHandler(
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
 					inter,
-					runtime.StorageConfig{},
+					runtime.StorageConfig{
+						StorageFormatV2Enabled: true,
+					},
 				)
 				storageMap := blockchainStorage.GetDomainStorageMap(
 					inter,

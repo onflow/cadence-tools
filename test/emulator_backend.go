@@ -147,6 +147,9 @@ var systemContracts = func() []common.AddressLocation {
 		"Crypto":                     serviceAddress,
 		"NFTStorefrontV2":            chainContracts.NonFungibleToken.Address.HexWithPrefix(),
 		"USDCFlow":                   chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"FlowExecutionParameters":    chainContracts.ExecutionParametersAccount.Address.Hex(),
+		"AccountV2Migration":         chainContracts.AccountV2Migration.Address.HexWithPrefix(),
+		"Migration":                  chainContracts.Migration.Address.HexWithPrefix(),
 	}
 
 	locations := make([]common.AddressLocation, 0)
