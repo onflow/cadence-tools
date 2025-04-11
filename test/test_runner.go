@@ -605,7 +605,9 @@ func (r *TestRunner) interpreterContractValueHandler(
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
 					inter,
-					runtime.StorageConfig{},
+					runtime.StorageConfig{
+						StorageFormatV2Enabled: true,
+					},
 				)
 				storageMap := blockchainStorage.GetDomainStorageMap(
 					inter,
