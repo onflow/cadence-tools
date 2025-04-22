@@ -6,8 +6,8 @@ toolchain go1.23.4
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.3.1
-	github.com/onflow/flow-go-sdk v1.3.1
+	github.com/onflow/cadence v1.3.4
+	github.com/onflow/flow-go-sdk v1.3.3
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/grpc v1.64.1
 )
@@ -18,7 +18,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.4.1-0.20230228173756-c0c9f774e40c // indirect
+	github.com/fxamacker/cbor/v2 v2.8.1-0.20250402194037-6f932b086829 // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
@@ -29,7 +29,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/onflow/atree v0.9.0 // indirect
+	github.com/onflow/atree v0.10.0 // indirect
 	github.com/onflow/crypto v0.25.1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.7 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
