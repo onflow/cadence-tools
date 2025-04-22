@@ -18,7 +18,7 @@ env:
 
 jobs:
   paths-filter:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       test: ${{ steps.filter.outputs.test }}
       lint: ${{ steps.filter.outputs.lint }}
@@ -43,7 +43,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.test == 'true' }}
     name: Test (Test Framework)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
       with:
@@ -68,7 +68,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.test == 'true' }}
     name: Lint (Test Framework)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
       with:
@@ -87,7 +87,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.lint == 'true' }}
     name: Test (Lint)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -112,7 +112,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.lint == 'true' }}
     name: Lint (Lint)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -131,7 +131,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
     name: Test (Language Server)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install wabt
@@ -164,7 +164,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
     name: Lint (Language Server)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -183,7 +183,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
     name: Test (Docgen)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install wabt
@@ -210,7 +210,7 @@ jobs:
     needs: paths-filter
     if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
     name: Lint (Docgen)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -227,7 +227,7 @@ jobs:
 
   check-license-headers:
     name: Check license headers
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v3
       with:
