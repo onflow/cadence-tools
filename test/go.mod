@@ -2,8 +2,6 @@ module github.com/onflow/cadence-tools/test
 
 go 1.23.7
 
-toolchain go1.23.10
-
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.10.0
