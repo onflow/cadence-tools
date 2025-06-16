@@ -211,3 +211,5 @@ require (
 	modernc.org/sqlite v1.28.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace github.com/onflow/cadence => ../../cadence
