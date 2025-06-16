@@ -148,7 +148,6 @@ var systemContracts = func() []common.AddressLocation {
 		"NFTStorefrontV2":                chainContracts.NonFungibleToken.Address.HexWithPrefix(),
 		"USDCFlow":                       chainContracts.FungibleToken.Address.HexWithPrefix(),
 		"FlowExecutionParameters":        chainContracts.ExecutionParametersAccount.Address.Hex(),
-		"AccountV2Migration":             chainContracts.AccountV2Migration.Address.HexWithPrefix(),
 		"Migration":                      chainContracts.Migration.Address.HexWithPrefix(),
 		"CrossVMMetadataViews":           serviceAddress,
 		"CrossVMNFT":                     serviceAddress,
@@ -257,14 +256,14 @@ func accountContractNames(blockchain *emulator.Blockchain, address flow.Address)
 }
 
 func (e *EmulatorBackend) RunScript(
-	inter *interpreter.Interpreter,
+	context stdlib.TestFrameworkScriptExecutionContext,
 	code string,
 	args []interpreter.Value,
 ) *stdlib.ScriptResult {
 
 	arguments := make([][]byte, 0, len(args))
 	for _, arg := range args {
-		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
+		exportedValue, err := runtime.ExportValue(arg, context, interpreter.EmptyLocationRange)
 		if err != nil {
 			return &stdlib.ScriptResult{
 				Error: err,
@@ -296,15 +295,15 @@ func (e *EmulatorBackend) RunScript(
 		}
 	}
 
-	staticType := runtime.ImportType(inter, result.Value.Type())
-	expectedType, err := inter.ConvertStaticToSemaType(staticType)
+	staticType := runtime.ImportType(context, result.Value.Type())
+	expectedType, err := interpreter.ConvertStaticToSemaType(context, staticType)
 	if err != nil {
 		return &stdlib.ScriptResult{
 			Error: err,
 		}
 	}
 	value, err := runtime.ImportValue(
-		inter,
+		context,
 		interpreter.EmptyLocationRange,
 		e.stdlibHandler,
 		e.locationHandler,
@@ -402,7 +401,7 @@ func (e *EmulatorBackend) GetAccount(
 }
 
 func (e *EmulatorBackend) AddTransaction(
-	inter *interpreter.Interpreter,
+	context stdlib.TestFrameworkAddTransactionContext,
 	code string,
 	authorizers []common.Address,
 	signers []*stdlib.Account,
@@ -414,7 +413,7 @@ func (e *EmulatorBackend) AddTransaction(
 	tx := e.newTransaction(code, authorizers)
 
 	for _, arg := range args {
-		exportedValue, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
+		exportedValue, err := runtime.ExportValue(arg, context, interpreter.EmptyLocationRange)
 		if err != nil {
 			return err
 		}
@@ -476,7 +475,7 @@ func (e *EmulatorBackend) CommitBlock() error {
 }
 
 func (e *EmulatorBackend) DeployContract(
-	inter *interpreter.Interpreter,
+	context stdlib.TestFrameworkContractDeploymentContext,
 	name string,
 	path string,
 	args []interpreter.Value,
@@ -504,7 +503,7 @@ func (e *EmulatorBackend) DeployContract(
 	var txArgsBuilder, addArgsBuilder strings.Builder
 
 	for i, arg := range args {
-		cadenceArg, err := runtime.ExportValue(arg, inter, interpreter.EmptyLocationRange)
+		cadenceArg, err := runtime.ExportValue(arg, context, interpreter.EmptyLocationRange)
 		if err != nil {
 			return err
 		}
@@ -588,7 +587,7 @@ func (e *EmulatorBackend) Reset(height uint64) {
 // Events returns all the emitted events up until the latest block,
 // optionally filtered by event type.
 func (e *EmulatorBackend) Events(
-	inter *interpreter.Interpreter,
+	context stdlib.TestFrameworkEventsContext,
 	eventType interpreter.StaticType,
 ) interpreter.Value {
 	latestBlock, err := e.blockchain.GetLatestBlock()
@@ -623,7 +622,7 @@ func (e *EmulatorBackend) Events(
 
 		for _, event := range sdkEvents {
 			value, err := runtime.ImportValue(
-				inter,
+				context,
 				interpreter.EmptyLocationRange,
 				e.stdlibHandler,
 				e.locationHandler,
@@ -640,15 +639,15 @@ func (e *EmulatorBackend) Events(
 	}
 
 	arrayType := interpreter.NewVariableSizedStaticType(
-		inter,
+		context,
 		interpreter.NewPrimitiveStaticType(
-			inter,
+			context,
 			interpreter.PrimitiveStaticTypeAnyStruct,
 		),
 	)
 
 	return interpreter.NewArrayValue(
-		inter,
+		context,
 		interpreter.EmptyLocationRange,
 		arrayType,
 		common.ZeroAddress,
