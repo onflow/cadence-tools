@@ -1179,7 +1179,8 @@ func TestUsingEnv(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Error(t, result.Error)
-		publicKeyError := interpreter.InvalidPublicKeyError{}
+
+		var publicKeyError *interpreter.InvalidPublicKeyError
 		assert.ErrorAs(t, result.Error, &publicKeyError)
 	})
 
@@ -2214,11 +2215,17 @@ func TestPrettyPrintTestResults(t *testing.T) {
 			error: assertion failed: unexpected error occurred
 			 --> tests/test_script.cdc:9:12
 			
+			Was this error unhelpful?
+			Consider suggesting an improvement here: https://github.com/onflow/cadence/issues.
+			
 - PASS: testFunc3
 - FAIL: testFunc4
 		Execution failed:
 			error: panic: runtime error
 			  --> tests/test_script.cdc:17:12
+			
+			Was this error unhelpful?
+			Consider suggesting an improvement here: https://github.com/onflow/cadence/issues.
 			
 `
 
@@ -2713,8 +2720,11 @@ func TestInterpretMatcher(t *testing.T) {
 		runner := NewTestRunner()
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
+
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &interpreter.TypeMismatchError{})
+
+		var typeMismatchErr *interpreter.TypeMismatchError
+		assert.ErrorAs(t, result.Error, &typeMismatchErr)
 	})
 
 	t.Run("custom resource matcher", func(t *testing.T) {
@@ -2841,8 +2851,11 @@ func TestInterpretMatcher(t *testing.T) {
 		runner := NewTestRunner()
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
+
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &interpreter.TypeMismatchError{})
+
+		var typeMismatchErr *interpreter.TypeMismatchError
+		assert.ErrorAs(t, result.Error, &typeMismatchErr)
 	})
 }
 
@@ -3162,8 +3175,11 @@ func TestInterpretExpectFunction(t *testing.T) {
 		runner := NewTestRunner()
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
+
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &interpreter.TypeMismatchError{})
+
+		var typeMismatchErr *interpreter.TypeMismatchError
+		assert.ErrorAs(t, result.Error, &typeMismatchErr)
 	})
 
 	t.Run("with explicit types", func(t *testing.T) {
@@ -4258,8 +4274,27 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.NFTStorefrontV2",
 			"A.0000000000000002.USDCFlow",
 			"A.0000000000000002.FlowExecutionParameters",
-			"A.0000000000000001.AccountV2Migration",
 			"A.0000000000000001.Migration",
+			"A.0000000000000001.CrossVMMetadataViews",
+			"A.0000000000000001.CrossVMNFT",
+			"A.0000000000000001.CrossVMToken",
+			"A.0000000000000001.FlowEVMBridge",
+			"A.0000000000000001.FlowEVMBridgeAccessor",
+			"A.0000000000000001.FlowEVMBridgeConfig",
+			"A.0000000000000001.FlowEVMBridgeHandlerInterfaces",
+			"A.0000000000000001.FlowEVMBridgeHandlers",
+			"A.0000000000000001.FlowEVMBridgeNFTEscrow",
+			"A.0000000000000001.FlowEVMBridgeResolver",
+			"A.0000000000000001.FlowEVMBridgeTemplates",
+			"A.0000000000000001.FlowEVMBridgeTokenEscrow",
+			"A.0000000000000001.FlowEVMBridgeUtils",
+			"A.0000000000000001.IBridgePermissions",
+			"A.0000000000000001.ICrossVM",
+			"A.0000000000000001.ICrossVMAsset",
+			"A.0000000000000001.IEVMBridgeNFTMinter",
+			"A.0000000000000001.IEVMBridgeTokenMinter",
+			"A.0000000000000001.IFlowEVMNFTBridge",
+			"A.0000000000000001.IFlowEVMTokenBridge",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4489,8 +4524,27 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.Crypto",
 			"A.0000000000000002.USDCFlow",
 			"A.0000000000000002.FlowExecutionParameters",
-			"A.0000000000000001.AccountV2Migration",
 			"A.0000000000000001.Migration",
+			"A.0000000000000001.CrossVMMetadataViews",
+			"A.0000000000000001.CrossVMNFT",
+			"A.0000000000000001.CrossVMToken",
+			"A.0000000000000001.FlowEVMBridge",
+			"A.0000000000000001.FlowEVMBridgeAccessor",
+			"A.0000000000000001.FlowEVMBridgeConfig",
+			"A.0000000000000001.FlowEVMBridgeHandlerInterfaces",
+			"A.0000000000000001.FlowEVMBridgeHandlers",
+			"A.0000000000000001.FlowEVMBridgeNFTEscrow",
+			"A.0000000000000001.FlowEVMBridgeResolver",
+			"A.0000000000000001.FlowEVMBridgeTemplates",
+			"A.0000000000000001.FlowEVMBridgeTokenEscrow",
+			"A.0000000000000001.FlowEVMBridgeUtils",
+			"A.0000000000000001.IBridgePermissions",
+			"A.0000000000000001.ICrossVM",
+			"A.0000000000000001.ICrossVMAsset",
+			"A.0000000000000001.IEVMBridgeNFTMinter",
+			"A.0000000000000001.IEVMBridgeTokenMinter",
+			"A.0000000000000001.IFlowEVMNFTBridge",
+			"A.0000000000000001.IFlowEVMTokenBridge",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)

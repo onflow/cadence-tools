@@ -432,7 +432,8 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 		return nil, nil, err
 	}
 
-	_, inter, err := env.Interpret(
+	interpreterEnvironment := env.(*runtime.InterpreterEnvironment)
+	_, inter, err := interpreterEnvironment.Interpret(
 		ctx.Location,
 		program,
 		nil,
@@ -455,7 +456,7 @@ func (r *TestRunner) initializeEnvironment() (
 
 	env := runtime.NewBaseInterpreterEnvironment(config)
 
-	r.testRuntime = runtime.NewInterpreterRuntime(config)
+	r.testRuntime = runtime.NewRuntime(config)
 
 	r.testFramework = NewTestFrameworkProvider(
 		r.logger,
@@ -486,8 +487,8 @@ func (r *TestRunner) initializeEnvironment() (
 	}
 
 	// Checker configs
-	env.CheckerConfig.ImportHandler = r.checkerImportHandler(ctx)
-	env.CheckerConfig.ContractValueHandler = contractValueHandler
+	env.CheckingEnvironment.Config.ImportHandler = r.checkerImportHandler(ctx)
+	env.CheckingEnvironment.Config.ContractValueHandler = contractValueHandler
 
 	// Interpreter configs
 	env.InterpreterConfig.ImportLocationHandler = r.interpreterImportHandler(ctx)
@@ -500,9 +501,7 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{
-			StorageFormatV2Enabled: true,
-		}),
+		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
 		r.coverageReport,
 	)
 
@@ -607,9 +606,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
 					inter,
-					runtime.StorageConfig{
-						StorageFormatV2Enabled: true,
-					},
+					runtime.StorageConfig{},
 				)
 				storageMap := blockchainStorage.GetDomainStorageMap(
 					inter,
@@ -739,7 +736,7 @@ func (r *TestRunner) parseAndCheckImport(
 		Environment: env,
 	}
 
-	env.CheckerConfig.ImportHandler = func(
+	env.CheckingEnvironment.Config.ImportHandler = func(
 		checker *sema.Checker,
 		importedLocation common.Location,
 		importRange ast.Range,
@@ -769,7 +766,7 @@ func (r *TestRunner) parseAndCheckImport(
 		}
 	}
 
-	env.CheckerConfig.ContractValueHandler = contractValueHandler
+	env.CheckingEnvironment.Config.ContractValueHandler = contractValueHandler
 
 	fvmEnv, ok := startCtx.Interface.(environment.Environment)
 	if !ok {
