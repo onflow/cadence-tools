@@ -5,7 +5,7 @@ go 1.23.7
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.10.0
-	github.com/onflow/cadence v1.6.0
+	github.com/onflow/cadence v1.6.2
 	github.com/onflow/flow-emulator v1.5.0
 	github.com/onflow/flow-go v0.41.0-rc.1.0.20250612202352-c000365f7daf
 	github.com/onflow/flow-go-sdk v1.6.0
