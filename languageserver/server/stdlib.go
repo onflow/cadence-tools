@@ -68,7 +68,7 @@ func (standardLibrary) GetAccountAvailableBalance(_ common.Address) (uint64, err
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) CommitStorageTemporarily(_ *interpreter.Interpreter) error {
+func (standardLibrary) CommitStorageTemporarily(_ interpreter.ValueTransferContext) error {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -105,7 +105,7 @@ func (standardLibrary) GetAccountContractCode(_ common.AddressLocation) ([]byte,
 }
 
 func (standardLibrary) EmitEvent(
-	_ *interpreter.Interpreter,
+	_ interpreter.ValueExportContext,
 	_ interpreter.LocationRange,
 	_ *sema.CompositeType,
 	_ []interpreter.Value,
@@ -268,6 +268,17 @@ func (standardLibrary) EndContractAddition(_ common.AddressLocation) {
 }
 
 func (standardLibrary) IsContractBeingAdded(_ common.AddressLocation) bool {
+	// Implementation should never be called,
+	// only its definition is used for type-checking
+	panic(errors.NewUnreachableError())
+}
+
+func (standardLibrary) LoadContractValue(
+	_ common.AddressLocation,
+	_ *interpreter.Program,
+	_ string,
+	_ stdlib.DeployedContractConstructorInvocation,
+) (*interpreter.CompositeValue, error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
