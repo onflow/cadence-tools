@@ -6,9 +6,9 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.10.0
 	github.com/onflow/cadence v1.6.2
-	github.com/onflow/flow-emulator v1.5.0
-	github.com/onflow/flow-go v0.41.0-rc.1.0.20250612202352-c000365f7daf
-	github.com/onflow/flow-go-sdk v1.6.0
+	github.com/onflow/flow-emulator v1.5.1
+	github.com/onflow/flow-go v0.41.0-rc.1.0.20250618213905-cfbf84027792
+	github.com/onflow/flow-go-sdk v1.6.1
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.10.0
 )
@@ -198,7 +198,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250414145226-207652e42e2e // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250428153025-10db94c68c34 // indirect
 	google.golang.org/grpc v1.72.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
