@@ -50,12 +50,12 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWb
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/onflow/atree v0.10.0 h1:LFYlRgb0fjs8vezBW/N/tzi+ijLMssjHwIwoV4RwYaA=
 github.com/onflow/atree v0.10.0/go.mod h1:aqnnE8Os77JiBIeC7UcbeM7N1V3Ys5XWH0CykeMpym0=
-github.com/onflow/cadence v1.6.0 h1:nFHaEFvekL+9cXuO7w33w6Y7nC1X7PZZHQdSYfE8CvQ=
-github.com/onflow/cadence v1.6.0/go.mod h1:MBHOSmj81EtNEGjvYK3UEaFMMrN6jo5wt9U7jvDVLUw=
+github.com/onflow/cadence v1.6.2 h1:bzJmfAzEv+8dggmm3HwyH6PhsYLrXqfx6GcI+nPYJCU=
+github.com/onflow/cadence v1.6.2/go.mod h1:MBHOSmj81EtNEGjvYK3UEaFMMrN6jo5wt9U7jvDVLUw=
 github.com/onflow/crypto v0.25.3 h1:XQ3HtLsw8h1+pBN+NQ1JYM9mS2mVXTyg55OldaAIF7U=
 github.com/onflow/crypto v0.25.3/go.mod h1:+1igaXiK6Tjm9wQOBD1EGwW7bYWMUGKtwKJ/2QL/OWs=
-github.com/onflow/flow-go-sdk v1.6.0 h1:rN5T5Icva4GjV+RPiUlFm2FMmm0IkQ9f/B8SDlZHRu8=
-github.com/onflow/flow-go-sdk v1.6.0/go.mod h1:EBcCMA9Bbjgp/A21i4qCthv9enV4CUYEVZoF8a68vMQ=
+github.com/onflow/flow-go-sdk v1.6.1 h1:Gf+4fV2rvKN8jyubtcQfuJPpbeHmhPWbUv8YvhWnUqg=
+github.com/onflow/flow-go-sdk v1.6.1/go.mod h1:Ssf06IM5qZ2ctFe7NCBPQOxUashwm57N9AywghGyqfU=
 github.com/onflow/flow/protobuf/go/flow v0.4.7 h1:iP6DFx4wZ3ETORsyeqzHu7neFT3d1CXF6wdK+AOOjmc=
 github.com/onflow/flow/protobuf/go/flow v0.4.7/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/go-ethereum v1.14.8 h1:PnSeWun1oiavZ+RWKsSsl6Lq2VFeaw3kFvBB/Jqpfow=
