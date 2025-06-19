@@ -2,8 +2,6 @@ module github.com/onflow/cadence-tools/languageserver
 
 go 1.23.7
 
-toolchain go1.23.8
-
 require (
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/google/uuid v1.6.0
