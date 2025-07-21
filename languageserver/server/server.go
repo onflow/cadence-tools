@@ -2381,6 +2381,16 @@ func (s *Server) convertError(
 				},
 			)
 		}
+	case *sema.InvalidAccessError:
+		// If this is an access(account) error, only report this as a warning
+		if primitiveAccess := err.RestrictingAccess.(*sema.PrimitiveAccess); primitiveAccess != nil && ast.PrimitiveAccess(*primitiveAccess) == ast.AccessAccount {
+			diagnostic.Severity = protocol.SeverityWarning
+			diagnostic.Message = fmt.Sprintf(
+				"`access(account)` member `%s` appears to be accessed by a different account than where it was declared on one or more networks. "+
+					"This may lead to inconsistent behavior. Ensure the contract is deployed to the same account across all networks, or use a less-restrictive access modifier.",
+				err.Name,
+			)
+		}
 	}
 
 	if hasSuggestedFixes, ok := err.(errors.HasSuggestedFixes[ast.TextEdit]); ok {
