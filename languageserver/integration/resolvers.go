@@ -153,7 +153,7 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 		return false
 	}
 
-	// Check that member location matches for all of checker's networks.
+	// Check that member address matches for all of checker's networks.
 	for network, checkerAddress := range checkerAddressesByNetwork {
 		memberAddress, exists := memberAddressesByNetwork[network]
 		if !exists || checkerAddress != memberAddress {
