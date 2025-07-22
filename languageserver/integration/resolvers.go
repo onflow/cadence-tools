@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flowkit/v2"
-	"github.com/onflow/flowkit/v2/config"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
@@ -107,26 +106,143 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 		return false
 	}
 
-	contracts, err := r.client.getState().getState().DeploymentContractsByNetwork(config.EmulatorNetwork)
+	if checker.Location == nil || memberLocation == nil {
+		return false
+	}
+
+	state := r.client.getState().getState()
+	if state == nil {
+		return false
+	}
+
+	// If checker and member locations are both address locations, we can directly compare them.
+	checkerAddressLocation, ok := checker.Location.(common.AddressLocation)
+	if ok {
+		memberAddressLocation, ok := memberLocation.(common.AddressLocation)
+		if ok {
+			return checkerAddressLocation.Address == memberAddressLocation.Address
+		}
+	}
+
+	// Otherwise, both locations must be string locations and we will compare their addresses for each network.
+	checkerStringLocation, ok := checker.Location.(common.StringLocation)
+	if !ok {
+		return false
+	}
+	memberStringLocation, ok := memberLocation.(common.StringLocation)
+	if !ok {
+		return false
+	}
+
+	// Resolve account address for every configured network for both checker and member locations.
+	// They should have the same addresses for every deployed network.
+	checkerAddressesByNetwork, err := resolveLocationAddresses(
+		state,
+		r.client.getState().getConfigPath(),
+		checkerStringLocation,
+	)
+	if err != nil {
+		return false
+	}
+	memberAddressesByNetwork, err := resolveLocationAddresses(
+		state,
+		r.client.getState().getConfigPath(),
+		memberStringLocation,
+	)
 	if err != nil {
 		return false
 	}
 
-	var checkerAccount, memberAccount string
-	// go over contracts and match contract by the location of checker and member and assign the account name for later check
-	for _, c := range contracts {
-		// get absolute path of the contract relative to the dir where flow.json is (working env)
-		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(r.client.getConfigPath()), c.Location()))
-
-		if memberLocation.String() == absLocation {
-			memberAccount = c.AccountName
+	// Check that member location matches for all of checker's networks.
+	for network, checkerAddress := range checkerAddressesByNetwork {
+		memberAddress, exists := memberAddressesByNetwork[network]
+		if !exists || checkerAddress != memberAddress {
+			return false
 		}
-		if checker.Location.String() == absLocation {
-			checkerAccount = c.AccountName
+	}
+	
+	return true
+}
+
+func resolveLocationAddresses(
+	state *flowkit.State,
+	configPath string,
+	location common.StringLocation,
+) (map[string]flow.Address, error) {
+	if strings.Contains(location.String(), ".cdc") {
+		return resolvePathLocationAddresses(state, configPath, location)
+	} else {
+		return resolveStringImportAddresses(state, location)
+	}
+}
+
+func resolvePathLocationAddresses(
+	state *flowkit.State,
+	configPath string,
+	location common.StringLocation,
+) (map[string]flow.Address, error) {
+	addresses := make(map[string]flow.Address)
+	
+	for _, contract := range *state.Contracts() {
+		contractAbsLocation, err := filepath.Abs(filepath.Join(filepath.Dir(configPath), contract.Location))
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve absolute path for contract %s: %w", contract.Name, err)
+		}
+		if contractAbsLocation == location.String() {
+			for _, alias := range contract.Aliases {
+				addresses[alias.Network] = alias.Address
+			}
+			return addresses, nil
 		}
 	}
 
-	return checkerAccount == memberAccount && checkerAccount != "" && memberAccount != ""
+	for _, network := range state.Config().Networks {
+		contracts, err := state.DeploymentContractsByNetwork(network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get deployment contracts for network %s: %w", network.Name, err)
+		}
+		for _, contract := range contracts {
+			contractAbsLocation, err := filepath.Abs(filepath.Join(filepath.Dir(configPath), contract.Location()))
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve absolute path for contract %s: %w", contract.Name, err)
+			}
+			if contractAbsLocation == location.String() {
+				addresses[network.Name] = contract.AccountAddress
+				return addresses, nil
+			}
+		}
+	}
+	return addresses, nil
+}
+
+func resolveStringImportAddresses(
+	state *flowkit.State,
+	location common.StringLocation,
+) (map[string]flow.Address, error) {
+	addresses := make(map[string]flow.Address)
+
+	for _, contract := range *state.Contracts() {
+		if contract.Name == location.String() {
+			for _, alias := range contract.Aliases {
+				addresses[alias.Network] = alias.Address
+			}
+		}
+	}
+
+	for _, network := range state.Config().Networks {
+		contracts, err := state.DeploymentContractsByNetwork(network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get deployment contracts for network %s: %w", network.Name, err)
+		}
+		for _, contract := range contracts {
+			if contract.Name == location.String() {
+				addresses[network.Name] = contract.AccountAddress
+				break
+			}
+		}
+	}
+
+	return addresses, nil
 }
 
 // workaround for Windows files being sent with prefixed '/' which is /c:/test/foo
