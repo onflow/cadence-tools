@@ -54,6 +54,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithInitializationOptionsHandler(integration.initialize),
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
 		server.WithIdentifierImportResolver(resolve.identifierImport),
+		server.WithMemberAccountAccessHandler(resolve.accountAccess),
 	}
 
 	if enableFlowClient {
@@ -65,7 +66,6 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
-			server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
 	}
 

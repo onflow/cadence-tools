@@ -2383,7 +2383,7 @@ func (s *Server) convertError(
 		}
 	case *sema.InvalidAccessError:
 		// If this is an access(account) error, only report this as a warning
-		if primitiveAccess := err.RestrictingAccess.(*sema.PrimitiveAccess); primitiveAccess != nil && ast.PrimitiveAccess(*primitiveAccess) == ast.AccessAccount {
+		if primitiveAccess, ok := err.RestrictingAccess.(sema.PrimitiveAccess); ok && ast.PrimitiveAccess(primitiveAccess) == ast.AccessAccount {
 			diagnostic.Severity = protocol.SeverityWarning
 			diagnostic.Message = fmt.Sprintf(
 				"`access(account)` member `%s` appears to be accessed by a different account than where it was declared on one or more networks. "+

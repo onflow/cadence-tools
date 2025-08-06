@@ -102,15 +102,11 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 //
 // if the contracts were deployed on the same account then it returns true and hence allows the access, false otherwise.
 func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.Location) bool {
-	if r.client == nil {
-		return false
-	}
-
 	if checker.Location == nil || memberLocation == nil {
 		return false
 	}
 
-	state := r.client.getState().getState()
+	state := r.state.getState()
 	if state == nil {
 		return false
 	}
@@ -138,7 +134,7 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 	// They should have the same addresses for every deployed network.
 	checkerAddressesByNetwork, err := resolveLocationAddresses(
 		state,
-		r.client.getState().getConfigPath(),
+		r.state.getConfigPath(),
 		checkerStringLocation,
 	)
 	if err != nil {
@@ -146,7 +142,7 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 	}
 	memberAddressesByNetwork, err := resolveLocationAddresses(
 		state,
-		r.client.getState().getConfigPath(),
+		r.state.getConfigPath(),
 		memberStringLocation,
 	)
 	if err != nil {
@@ -160,7 +156,7 @@ func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.L
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -172,7 +168,7 @@ func resolveLocationAddresses(
 	if strings.Contains(location.String(), ".cdc") {
 		return resolvePathLocationAddresses(state, configPath, location)
 	} else {
-		return resolveStringImportAddresses(state, location)
+		return resolveStringImportAddresses(state, configPath, location)
 	}
 }
 
@@ -182,7 +178,7 @@ func resolvePathLocationAddresses(
 	location common.StringLocation,
 ) (map[string]flow.Address, error) {
 	addresses := make(map[string]flow.Address)
-	
+
 	for _, contract := range *state.Contracts() {
 		contractAbsLocation, err := filepath.Abs(filepath.Join(filepath.Dir(configPath), contract.Location))
 		if err != nil {
@@ -192,7 +188,6 @@ func resolvePathLocationAddresses(
 			for _, alias := range contract.Aliases {
 				addresses[alias.Network] = alias.Address
 			}
-			return addresses, nil
 		}
 	}
 
@@ -202,13 +197,8 @@ func resolvePathLocationAddresses(
 			return nil, fmt.Errorf("failed to get deployment contracts for network %s: %w", network.Name, err)
 		}
 		for _, contract := range contracts {
-			contractAbsLocation, err := filepath.Abs(filepath.Join(filepath.Dir(configPath), contract.Location()))
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve absolute path for contract %s: %w", contract.Name, err)
-			}
-			if contractAbsLocation == location.String() {
+			if normalizePath(configPath, contract.Location()) == location.String() {
 				addresses[network.Name] = contract.AccountAddress
-				return addresses, nil
 			}
 		}
 	}
@@ -217,6 +207,7 @@ func resolvePathLocationAddresses(
 
 func resolveStringImportAddresses(
 	state *flowkit.State,
+	configPath string,
 	location common.StringLocation,
 ) (map[string]flow.Address, error) {
 	addresses := make(map[string]flow.Address)
@@ -235,9 +226,8 @@ func resolveStringImportAddresses(
 			return nil, fmt.Errorf("failed to get deployment contracts for network %s: %w", network.Name, err)
 		}
 		for _, contract := range contracts {
-			if contract.Name == location.String() {
+			if normalizePath(configPath, contract.Location()) == location.String() {
 				addresses[network.Name] = contract.AccountAddress
-				break
 			}
 		}
 	}
@@ -253,4 +243,12 @@ func cleanWindowsPath(path string) string {
 		path = path[1:]
 	}
 	return path
+}
+
+func normalizePath(basePath, relativePath string) string {
+	if filepath.IsAbs(relativePath) {
+		return relativePath
+	}
+
+	return filepath.Join(filepath.Dir(basePath), relativePath)
 }
