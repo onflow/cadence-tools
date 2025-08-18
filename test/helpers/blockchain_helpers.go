@@ -64,8 +64,8 @@ func BlockchainHelpersChecker() *sema.Checker {
 	}
 
 	activation := sema.NewVariableActivation(sema.BaseValueActivation)
-	activation.DeclareValue(stdlib.AssertFunction)
-	activation.DeclareValue(stdlib.PanicFunction)
+	activation.DeclareValue(stdlib.InterpreterAssertFunction)
+	activation.DeclareValue(stdlib.InterpreterPanicFunction)
 
 	checker, err := sema.NewChecker(
 		program,
