@@ -64,8 +64,11 @@ func BlockchainHelpersChecker() *sema.Checker {
 	}
 
 	activation := sema.NewVariableActivation(sema.BaseValueActivation)
-	activation.DeclareValue(stdlib.AssertFunction)
-	activation.DeclareValue(stdlib.PanicFunction)
+	// Declare the standard library values that are used in the helpers.
+	// It does not matter if they are interpreter or VM values,
+	// as the values are only used for type checking.
+	activation.DeclareValue(stdlib.InterpreterAssertFunction)
+	activation.DeclareValue(stdlib.InterpreterPanicFunction)
 
 	checker, err := sema.NewChecker(
 		program,
