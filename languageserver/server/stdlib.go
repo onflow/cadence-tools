@@ -287,7 +287,9 @@ func (standardLibrary) LoadContractValue(
 func newStandardLibrary() *standardLibrary {
 	result := &standardLibrary{}
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
-	for _, valueDeclaration := range stdlib.DefaultStandardLibraryValues(result) {
+	// It does not matter if they are interpreter or VM values,
+	// as the values are only used for type checking.
+	for _, valueDeclaration := range stdlib.InterpreterDefaultStandardLibraryValues(result) {
 		result.baseValueActivation.DeclareValue(valueDeclaration)
 	}
 	return result
@@ -296,7 +298,9 @@ func newStandardLibrary() *standardLibrary {
 func newScriptStandardLibrary() *standardLibrary {
 	result := &standardLibrary{}
 	result.baseValueActivation = sema.NewVariableActivation(sema.BaseValueActivation)
-	for _, declaration := range stdlib.DefaultScriptStandardLibraryValues(result) {
+	// It does not matter if they are interpreter or VM values,
+	// as the values are only used for type checking.
+	for _, declaration := range stdlib.InterpreterDefaultScriptStandardLibraryValues(result) {
 		result.baseValueActivation.DeclareValue(declaration)
 	}
 	return result
