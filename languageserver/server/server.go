@@ -2398,8 +2398,7 @@ func (s *Server) convertError(
 		}
 	}
 
-	// TODO: replace with errors.HasDocumentationLink, once available
-	if hasDocumentationLink, ok := err.(interface{ DocumentationLink() string }); ok {
+	if hasDocumentationLink, ok := err.(errors.HasDocumentationLink); ok {
 		// TODO: once Cadence errors have codes, use the code instead of a placeholder
 		diagnostic.Code = "documentation"
 		diagnostic.CodeDescription = &protocol.CodeDescription{
@@ -2407,8 +2406,7 @@ func (s *Server) convertError(
 		}
 	}
 
-	// TODO: replace with errors.HasMigrationNote, once available
-	if hasMigrationNote, ok := err.(interface{ MigrationNote() string }); ok {
+	if hasMigrationNote, ok := err.(errors.HasMigrationNote); ok {
 		// If the message does not end with a newline,
 		// add one to separate the migration note from the message
 		if !strings.HasSuffix(diagnostic.Message, "\n") {
