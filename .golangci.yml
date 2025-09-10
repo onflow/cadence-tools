@@ -1,35 +1,28 @@
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
-    - govet
-    - gosimple
-    - errcheck
-    - staticcheck
-    - ineffassign
-    - typecheck
-    - misspell
-    - unused
-    - gocritic
-    - gofmt
-    - goimports
-    - unconvert
-    - nilerr
-    - forbidigo
-    - bidichk
     - asciicheck
+    - bidichk
     - copyloopvar
-
+    - errcheck
+    - forbidigo
+    - gocritic
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - singleCaseSwitch
+        - unslice
+        - commentFormatting
+        - exitAfterDefer
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-
-linters-settings:
-  gocritic:
-    disabled-checks:
-      - ifElseChain        # style
-      - singleCaseSwitch   # style
-      - unslice            # false positives
-      - commentFormatting  # does not detect commented out code
-      - exitAfterDefer
-  goimports:
-    local-prefixes: github.com/onflow/cadence-tools
