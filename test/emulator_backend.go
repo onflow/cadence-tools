@@ -169,6 +169,7 @@ var systemContracts = func() []common.AddressLocation {
 		"IEVMBridgeTokenMinter":          serviceAddress,
 		"IFlowEVMNFTBridge":              serviceAddress,
 		"IFlowEVMTokenBridge":            serviceAddress,
+		"FlowCallbackScheduler":          serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
@@ -558,7 +559,7 @@ func (e *EmulatorBackend) DeployContract(
 	e.blockOffset++
 
 	result := e.ExecuteNextTransaction()
-	if result.Error != nil {
+	if result != nil && result.Error != nil {
 		return result.Error
 	}
 
@@ -595,7 +596,7 @@ func (e *EmulatorBackend) Events(
 		panic(err)
 	}
 
-	latestBlockHeight := latestBlock.Header.Height
+	latestBlockHeight := latestBlock.Height
 	height := uint64(0)
 	values := make([]interpreter.Value, 0)
 
@@ -776,8 +777,8 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 		var address common.Address
 		var found bool
-		if len(importDeclaration.Identifiers) > 0 {
-			address, found = e.contracts[importDeclaration.Identifiers[0].Identifier]
+		if len(importDeclaration.Imports) > 0 {
+			address, found = e.contracts[importDeclaration.Imports[0].Identifier.Identifier]
 		} else {
 			address, found = e.contracts[location.String()]
 		}

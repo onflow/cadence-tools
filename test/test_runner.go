@@ -502,6 +502,8 @@ func (r *TestRunner) initializeEnvironment() (
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
 		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
+		nil,
+		nil,
 		r.coverageReport,
 	)
 
