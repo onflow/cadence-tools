@@ -2381,6 +2381,9 @@ func (s *Server) convertError(
 				},
 			)
 		}
+
+	case *sema.UnreachableStatementError:
+		diagnostic.Tags = append(diagnostic.Tags, protocol.Unnecessary)
 	}
 
 	if hasSuggestedFixes, ok := err.(errors.HasSuggestedFixes[ast.TextEdit]); ok {
