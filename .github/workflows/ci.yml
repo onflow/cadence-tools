@@ -70,18 +70,16 @@ jobs:
     name: Lint (Test Framework)
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        working-directory: test
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: ${{ env.GOLANGCI_LINT_VERSION }}
-        args: -v --timeout=5m
-        # https://github.com/golangci/golangci-lint-action/issues/244
-        skip-cache: true
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: test
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
 
   test-lint:
     needs: paths-filter
@@ -118,14 +116,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           working-directory: lint
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: -v --timeout=5m
-          # https://github.com/golangci/golangci-lint-action/issues/244
-          skip-cache: true
 
   test-languageserver:
     needs: paths-filter
@@ -170,14 +166,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           working-directory: languageserver
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: -v --timeout=5m
-          # https://github.com/golangci/golangci-lint-action/issues/244
-          skip-cache: true
 
   test-docgen:
     needs: paths-filter
@@ -216,14 +210,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           working-directory: docgen
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: -v --timeout=5m
-          # https://github.com/golangci/golangci-lint-action/issues/244
-          skip-cache: true
 
   check-license-headers:
     name: Check license headers
