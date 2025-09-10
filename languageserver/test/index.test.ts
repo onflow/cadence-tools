@@ -228,7 +228,7 @@ describe("diagnostics", () => {
 
   test("script", async () =>
     testCode(`access(all) fun main() { let x = X }`, [
-      "cannot find variable in this scope: `X`. not found in this scope",
+      "cannot find variable in this scope: `X`. not found in this scope; check for typos or declare it",
     ]));
 
   test("script auth account", async () =>
@@ -239,14 +239,14 @@ describe("diagnostics", () => {
 
   test("transaction", async () =>
     testCode(`transaction() { execute { let x = X } }`, [
-      "cannot find variable in this scope: `X`. not found in this scope",
+      "cannot find variable in this scope: `X`. not found in this scope; check for typos or declare it",
     ]));
 
   test("transaction auth account", async () =>
     testCode(
       `transaction() { execute { let account = getAuthAccount<&Account>(0x01) } }`,
       [
-        "cannot find variable in this scope: `getAuthAccount`. not found in this scope",
+        "cannot find variable in this scope: `getAuthAccount`. not found in this scope; check for typos or declare it",
       ]
     ));
 
@@ -436,7 +436,7 @@ describe("diagnostics", () => {
     expect(script.uri).toEqual(`file://${scriptName}.cdc`);
     expect(script.diagnostics).toHaveLength(1);
     expect(script.diagnostics[0].message).toEqual(
-      "value of type `&Foo` has no member `zoo`. unknown member"
+      "value of type `&Foo` has no member `zoo`. the member is not defined on the type; check for typos or if the member exists on the type"
     );
   });
 

@@ -52,5 +52,5 @@ func (d *DocumentChanges) MarshalJSON() ([]byte, error) {
 	} else if d.RenameFile != nil {
 		return json.Marshal(d.RenameFile)
 	}
-	return nil, fmt.Errorf("Empty DocumentChanges union value")
+	return nil, fmt.Errorf("empty DocumentChanges union value")
 }
