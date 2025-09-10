@@ -129,7 +129,7 @@ func TestLinting(t *testing.T) {
 						End:   protocol.Position{Line: 2, Character: 18},
 					},
 					Severity: protocol.SeverityError,
-					Message:  "mismatched types. expected `Bool`, got `Int`",
+					Message:  "mismatched types. expected `Bool`, got `Int`; check the expression's type or convert it to the expected type",
 					Code:     "documentation",
 					CodeDescription: &protocol.CodeDescription{
 						Href: "https://cadence-lang.org/docs/language/values-and-types",
