@@ -657,6 +657,15 @@ func (s *Server) Hover(
 
 	position := conversion.ProtocolToSemaPosition(params.Position)
 	occurrence := checker.PositionInfo.Occurrences.Find(position)
+	if occurrence == nil {
+		// If no occurrence is found,
+		// then try the preceding position
+		if position.Column > 0 {
+			previousPosition := position
+			previousPosition.Column -= 1
+			occurrence = checker.PositionInfo.Occurrences.Find(previousPosition)
+		}
+	}
 
 	if occurrence == nil || occurrence.Origin == nil {
 		return nil, nil
