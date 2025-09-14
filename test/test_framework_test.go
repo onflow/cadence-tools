@@ -1149,7 +1149,10 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{
+			"TestHandler": firstAccountAddress,
+		})
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5297,7 +5300,8 @@ func TestImportingHelperFile(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{"TestHandler": firstAccountAddress})
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5569,6 +5573,164 @@ func TestRandomizedTestExecution(t *testing.T) {
 `
 
 	assert.Equal(t, expected, resultsStr)
+}
+
+func TestScheduledCallbacks(t *testing.T) {
+	t.Parallel()
+
+	const handlerContract = `
+		import "FlowCallbackScheduler"
+
+		access(all) contract TestHandler {
+			access(all) event HandlerExecuted(id: UInt64, data: String)
+
+			access(all) var counter: UInt64
+
+			access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
+				access(all) let name: String
+				access(all) let description: String
+
+				access(FlowCallbackScheduler.Execute) fun executeCallback(id: UInt64, data: AnyStruct?) {
+					TestHandler.counter = TestHandler.counter + 1
+					let s = data == nil ? "" : data as! String
+					emit HandlerExecuted(id: id, data: s)
+				}
+
+				init(name: String, description: String) {
+					self.name = name
+					self.description = description
+				}
+			}
+
+			access(all) fun createHandler(): @Handler {
+				return <-create Handler(name: "Test", description: "Exec on schedule")
+			}
+
+		init() {
+			self.counter = 0
+		}
+	}
+	`
+
+	const scheduleTx = `
+		import "FungibleToken"
+		import "FlowToken"
+		import "FlowCallbackScheduler"
+		import TestHandler from "TestHandler.cdc"
+
+		transaction {
+			prepare(acct: auth(BorrowValue, SaveValue, Capabilities) &Account) {
+				if acct.storage.borrow<&TestHandler.Handler>(from: /storage/testHandler) == nil {
+					let h <- TestHandler.createHandler()
+					acct.storage.save(<-h, to: /storage/testHandler)
+				}
+
+				let cap = acct.capabilities.storage.issue<auth(FlowCallbackScheduler.Execute) &{FlowCallbackScheduler.CallbackHandler}>(/storage/testHandler)
+
+				let ts = getCurrentBlock().timestamp + 2.0
+				let estimate = FlowCallbackScheduler.estimate(
+					data: "hello",
+					timestamp: ts,
+					priority: FlowCallbackScheduler.Priority.Medium,
+					executionEffort: 10
+				)
+
+				let vaultRef = acct.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("Could not borrow FlowToken.Vault reference")
+
+				let flowFees: @FlowToken.Vault <- vaultRef.withdraw(amount: estimate.flowFee!) as! @FlowToken.Vault
+
+				let sc <- FlowCallbackScheduler.schedule(
+					callback: cap,
+					data: "hello",
+					timestamp: estimate.timestamp!,
+					priority: FlowCallbackScheduler.Priority.Medium,
+					executionEffort: 10,
+					fees: <-flowFees
+				)
+				destroy sc
+			}
+		}
+	`
+
+	const testCode = `
+		import Test
+		import BlockchainHelpers
+		import "FlowCallbackScheduler"
+		import TestHandler from "TestHandler.cdc"
+
+		access(all)
+		let account = Test.getAccount(0x0000000000000006)
+
+		access(all)
+		fun setup() {
+			let err = Test.deployContract(
+				name: "TestHandler",
+				path: "TestHandler.cdc",
+				arguments: []
+			)
+			Test.expect(err, Test.beNil())
+
+			let mintResult = mintFlow(to: account, amount: 1.0)
+			Test.expect(mintResult, Test.beSucceeded())
+		}
+
+		access(all)
+		fun testScheduleAndExecuteCallback() {
+			let code = Test.readFile("schedule_callback.cdc")
+			let tx = Test.Transaction(
+				code: code,
+				authorizers: [account.address],
+				signers: [account],
+				arguments: []
+			)
+			let result = Test.executeTransaction(tx)
+			Test.expect(result, Test.beSucceeded())
+
+			// Assert scheduling succeeded by verifying Scheduled event was emitted
+			let schedType = Type<FlowCallbackScheduler.Scheduled>()
+			let schedEvents = Test.eventsOfType(schedType)
+			Test.expect(schedEvents.length, Test.beGreaterThan(0))
+		}
+	`
+
+
+
+
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "TestHandler.cdc":
+			return handlerContract, nil
+		case "schedule_callback.cdc":
+			return scheduleTx, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.StringLocation:
+			if location == "TestHandler.cdc" {
+				return handlerContract, nil
+			}
+		}
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{
+			"TestHandler": firstAccountAddress,
+		})
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }
 
 func TestReferenceDeployedContractTypes(t *testing.T) {
