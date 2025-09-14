@@ -5711,6 +5711,10 @@ func TestScheduledCallbacks(t *testing.T) {
 
 	importResolver := func(location common.Location) (string, error) {
 		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "TestHandler" {
+				return handlerContract, nil
+			}
 		case common.StringLocation:
 			if location == "TestHandler.cdc" {
 				return handlerContract, nil
