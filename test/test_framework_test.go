@@ -5582,19 +5582,12 @@ func TestScheduledCallbacks(t *testing.T) {
 		import "FlowCallbackScheduler"
 
 		access(all) contract TestHandler {
-			access(all) event HandlerExecuted(id: UInt64, data: String)
-
-			access(all) var counter: UInt64
 
 			access(all) resource Handler: FlowCallbackScheduler.CallbackHandler {
 				access(all) let name: String
 				access(all) let description: String
 
-				access(FlowCallbackScheduler.Execute) fun executeCallback(id: UInt64, data: AnyStruct?) {
-					TestHandler.counter = TestHandler.counter + 1
-					let s = data == nil ? "" : data as! String
-					emit HandlerExecuted(id: id, data: s)
-				}
+				access(FlowCallbackScheduler.Execute) fun executeCallback(id: UInt64, data: AnyStruct?) {}
 
 				init(name: String, description: String) {
 					self.name = name
@@ -5606,9 +5599,7 @@ func TestScheduledCallbacks(t *testing.T) {
 				return <-create Handler(name: "Test", description: "Exec on schedule")
 			}
 
-		init() {
-			self.counter = 0
-		}
+		init() {}
 	}
 	`
 
