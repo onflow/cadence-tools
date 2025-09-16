@@ -824,6 +824,7 @@ func newBlockchain(
 				emulator.WithServerLogger(testLogger),
 				emulator.Contracts(commonContracts),
 				emulator.WithChainID(chain.ChainID()),
+				emulator.WithScheduledCallbacks(true),
 			},
 			opts...,
 		)...,
