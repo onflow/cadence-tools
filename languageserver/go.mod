@@ -12,9 +12,9 @@ require (
 	github.com/onflow/cadence-tools/test v1.5.1
 	github.com/onflow/flow-go v0.43.0
 	github.com/onflow/flow-go-sdk v1.8.2
-	github.com/onflow/flowkit/v2 v2.5.0
+	github.com/onflow/flowkit/v2 v2.5.2
 	github.com/sourcegraph/jsonrpc2 v0.1.0
-	github.com/spf13/afero v1.10.0
+	github.com/spf13/afero v1.15.0
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
