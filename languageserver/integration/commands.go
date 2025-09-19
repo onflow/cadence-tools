@@ -41,7 +41,7 @@ const (
 
 type commands struct {
 	client flowClient
-	state  flowState
+	cfg    *ConfigManager
 }
 
 func (c *commands) getAll() []server.Command {
@@ -129,7 +129,15 @@ func (c *commands) sendTransaction(args ...json.RawMessage) (any, error) {
 		signerAddresses = append(signerAddresses, account.Address)
 	}
 
-	tx, txResult, err := c.client.SendTransaction(signerAddresses, location, txArgs)
+	// Resolve appropriate client based on the file's closest flow.json
+	client := c.client
+	if c.cfg != nil {
+		if cl, err := c.cfg.ResolveClientForPath(location.Path); err == nil && cl != nil {
+			client = cl
+		}
+	}
+
+	tx, txResult, err := client.SendTransaction(signerAddresses, location, txArgs)
 	if err != nil {
 		return nil, fmt.Errorf("transaction error: %w", err)
 	}
@@ -169,7 +177,14 @@ func (c *commands) executeScript(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid script arguments cadence encoding format: %s, error: %s", argsJSON, err)
 	}
 
-	scriptResult, err := c.client.ExecuteScript(location, scriptArgs)
+	client := c.client
+	if c.cfg != nil {
+		if cl, err := c.cfg.ResolveClientForPath(location.Path); err == nil && cl != nil {
+			client = cl
+		}
+	}
+
+	scriptResult, err := client.ExecuteScript(location, scriptArgs)
 	if err != nil {
 		return nil, fmt.Errorf("script error: %w", err)
 	}
@@ -204,7 +219,10 @@ func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 
 // reloadConfig when the client detects changes in flow.json so we have an updated state.
 func (c *commands) reloadConfig(_ ...json.RawMessage) (any, error) {
-	return nil, c.state.Reload()
+	if c.cfg != nil {
+		return nil, c.cfg.ReloadAll()
+	}
+	return nil, nil
 }
 
 // getAccounts return the client account list with information about the active client.
@@ -252,17 +270,25 @@ func (c *commands) deployContract(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid signer name: %s", args[2])
 	}
 
+	// Resolve client for this location
+	client := c.client
+	if c.cfg != nil {
+		if cl, err := c.cfg.ResolveClientForPath(location.Path); err == nil && cl != nil {
+			client = cl
+		}
+	}
+
 	var account *clientAccount
 	if signerName == "" { // choose default active account
-		account = c.client.GetActiveClientAccount()
+		account = client.GetActiveClientAccount()
 	} else {
-		account = c.client.GetClientAccount(signerName)
+		account = client.GetClientAccount(signerName)
 		if account == nil {
 			return nil, fmt.Errorf("signer account with name %s doesn't exist", signerName)
 		}
 	}
 
-	deployError := c.client.DeployContract(account.Address, name, location)
+	deployError := client.DeployContract(account.Address, name, location)
 	if deployError != nil {
 		return nil, fmt.Errorf("error deploying contract: %w", deployError)
 	}

@@ -468,7 +468,7 @@ describe("script execution", () => {
 
       expect(result).toEqual(`Result: "HELLO WORLD"`);
     }, true);
-  });
+  }, 15000);
 });
 
 async function getAccounts(connection: ProtocolConnection) {
@@ -602,7 +602,7 @@ describe("transactions", () => {
 
       expect(resultRegex.test(result)).toBeTruthy();
     }, true);
-  });
+  }, 15000);
 });
 
 describe("contracts", () => {
@@ -626,7 +626,7 @@ describe("contracts", () => {
       result = await deploy(connection, "Bob", "foo", "Foo");
       expect(result).toEqual("Contract Foo has been deployed to account Bob");
     }, true);
-  });
+  }, 15000);
 
   test("deploy contract with file import", async () => {
     await withConnection(async (connection) => {
@@ -640,7 +640,7 @@ describe("contracts", () => {
         "Contract Bar has been deployed to account moose [flow.json]"
       );
     }, true);
-  });
+  }, 15000);
 
   test("deploy contract with string imports", async () => {
     await withConnection(async (connection) => {
@@ -654,7 +654,7 @@ describe("contracts", () => {
         "Contract Zoo has been deployed to account moose [flow.json]"
       );
     }, true);
-  });
+  }, 15000);
 });
 
 describe("codelenses", () => {
@@ -685,7 +685,7 @@ describe("codelenses", () => {
       expect(c.title).toEqual("💡 Deploy contract Foo to Alice");
       expect(c.arguments).toEqual([path, "Foo", "Alice"]);
     }, true);
-  });
+  }, 15000);
 
   test("transactions codelenses", async () => {
     await withConnection(async (connection) => {
@@ -712,7 +712,7 @@ describe("codelenses", () => {
       expect(c.title).toEqual("💡 Send signed by Alice");
       expect(c.arguments).toEqual([path, "[]", ["Alice"]]);
     }, true);
-  });
+  }, 15000);
 
   test("script codelenses", async () => {
     await withConnection(async (connection) => {

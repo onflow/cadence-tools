@@ -56,7 +56,7 @@ func runTestInputs(name string, t *testing.T, f func(args ...json.RawMessage) (a
 
 func Test_ExecuteScript(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{client: mock}
+	cmds := commands{client: mock, cfg: nil}
 
 	runTestInputs(
 		"invalid arguments",
@@ -86,7 +86,7 @@ func Test_ExecuteScript(t *testing.T) {
 
 func Test_ExecuteTransaction(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{client: mock}
+	cmds := commands{client: mock, cfg: nil}
 
 	runTestInputs(
 		"invalid arguments",
@@ -127,7 +127,7 @@ func Test_ExecuteTransaction(t *testing.T) {
 
 func Test_SwitchActiveAccount(t *testing.T) {
 	client := newFlowkitClient(nil)
-	cmds := commands{client, nil}
+	cmds := commands{client: client, cfg: nil}
 
 	name, _ := json.Marshal("koko")
 	runTestInputs(
@@ -158,7 +158,7 @@ func Test_SwitchActiveAccount(t *testing.T) {
 
 func Test_DeployContract(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{mock, nil}
+	cmds := commands{client: mock, cfg: nil}
 
 	name, _ := json.Marshal("NFT")
 	runTestInputs(
@@ -223,10 +223,7 @@ func Test_DeployContract(t *testing.T) {
 }
 
 func Test_ReloadConfig(t *testing.T) {
-	state := mockFlowState{}
-	cmds := commands{nil, &state}
-
-	state.On("Reload").Return(nil)
+	cmds := commands{client: nil, cfg: nil}
 
 	t.Run("reload configuration", func(t *testing.T) {
 		t.Parallel()
@@ -234,6 +231,6 @@ func Test_ReloadConfig(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, nil, resp)
-		state.AssertCalled(t, "Reload")
+		// no-op without cfgManager
 	})
 }

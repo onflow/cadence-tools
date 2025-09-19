@@ -29,6 +29,7 @@ import (
 	"syscall/js"
 
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
@@ -162,7 +163,7 @@ func start(id int) {
 		onServerClose,
 	)
 
-	addressImportResolver := func(location common.AddressLocation) (code string, err error) {
+	addressImportResolver := func(_ *sema.Checker, location common.AddressLocation) (code string, err error) {
 		getAddressCodeFunc := global.Get(globalFunctionName(id, "getAddressCode"))
 		if getAddressCodeFunc.IsNull() || getAddressCodeFunc.IsUndefined() {
 			return "", fmt.Errorf("CLS %d: getAddressCode not defined", id)
@@ -175,7 +176,7 @@ func start(id int) {
 		return res.String(), nil
 	}
 
-	stringImportResolver := func(location common.StringLocation) (code string, err error) {
+	stringImportResolver := func(_ *sema.Checker, location common.StringLocation) (code string, err error) {
 		getStringCodeFunc := global.Get(globalFunctionName(id, "getStringCode"))
 		if getStringCodeFunc.IsNull() || getStringCodeFunc.IsUndefined() {
 			return "", fmt.Errorf("CLS %d: getStringCode not defined", id)
@@ -188,7 +189,7 @@ func start(id int) {
 		return res.String(), nil
 	}
 
-	identifierImportResolver := func(location common.IdentifierLocation) (code string, err error) {
+	identifierImportResolver := func(_ *sema.Checker, location common.IdentifierLocation) (code string, err error) {
 		if location == stdlib.CryptoContractLocation {
 			return string(coreContracts.Crypto()), nil
 		}

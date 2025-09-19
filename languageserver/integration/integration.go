@@ -27,6 +27,9 @@ import (
 	"github.com/onflow/flowkit/v2"
 	"github.com/spf13/afero"
 
+	"path/filepath"
+	"strings"
+
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 	"github.com/onflow/cadence-tools/languageserver/server"
 )
@@ -43,12 +46,16 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		state:            state,
 	}
 
+	// Always create a config manager so per-file config discovery works even without init options
+	integration.cfgManager = NewConfigManager(loader, enableFlowClient, 0, "")
+
 	resolve := resolvers{
-		loader: loader,
-		state:  state,
+		loader:     loader,
+		state:      state,
+		cfgManager: integration.cfgManager,
 	}
 
-	options := []server.Option{
+    options := []server.Option{
 		server.WithDiagnosticProvider(diagnostics),
 		server.WithStringImportResolver(resolve.stringImport),
 		server.WithInitializationOptionsHandler(integration.initialize),
@@ -65,11 +72,11 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
-			server.WithMemberAccountAccessHandler(resolve.accountAccess),
+            // Do not register account access handler in this PR scope
 		)
 	}
 
-	comm := commands{client: integration.client, state: integration.state}
+	comm := commands{client: integration.client, cfg: integration.cfgManager}
 	for _, command := range comm.getAll() {
 		options = append(options, server.WithCommand(command))
 	}
@@ -90,6 +97,7 @@ type FlowIntegration struct {
 	client           flowClient
 	state            *flowkitState
 	loader           flowkit.ReaderWriter
+	cfgManager       *ConfigManager
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {
@@ -108,6 +116,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 		if i.enableFlowClient {
 			return errors.New("initialization options: invalid config path")
 		}
+		// Keep existing config manager; no default path, multi-config resolution only
 		return nil
 	}
 
@@ -117,6 +126,20 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	if err != nil {
 		return err
 	}
+
+	// Initialize ConfigManager with provided default config path
+	numberOfAccounts := 0
+	if i.enableFlowClient {
+		if numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string); ok && numberOfAccountsString != "" {
+			if n, convErr := strconv.Atoi(numberOfAccountsString); convErr == nil {
+				numberOfAccounts = n
+			}
+		}
+	}
+	// Reuse existing manager instance to avoid stale references
+	i.cfgManager.enableFlowClient = i.enableFlowClient
+	i.cfgManager.numberOfAccounts = numberOfAccounts
+	i.cfgManager.SetDefaultConfigPath(configPath)
 
 	// If client is enabled, initialize the client
 	if i.enableFlowClient {
@@ -138,6 +161,9 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	return nil
 }
 
+// onConfigChanged was used to update default config path from workspace settings.
+// For this PR, dynamic workspace settings are out of scope; initialization options only.
+
 func (i *FlowIntegration) codeLenses(
 	uri protocol.DocumentURI,
 	version int32,
@@ -150,6 +176,25 @@ func (i *FlowIntegration) codeLenses(
 
 	// todo refactor - define codelens provider interface and merge both into one
 
+	// Ensure we watch the document directory for flow.json creation/removal
+	if i.cfgManager != nil {
+		// Only for file:// URIs
+		u := string(uri)
+		if strings.HasPrefix(u, "file://") {
+			path := cleanWindowsPath(strings.TrimPrefix(u, "file://"))
+			dir := filepath.Dir(path)
+			i.cfgManager.EnsureDirWatcher(dir)
+		}
+	}
+
+	// Resolve per-document client if available
+	clientToUse := i.client
+	if i.cfgManager != nil {
+		if cl, err := i.cfgManager.ResolveClientForChecker(checker); err == nil && cl != nil {
+			clientToUse = cl
+		}
+	}
+
 	// Add code lenses for contracts and contract interfaces
 	contract := i.contractInfo[uri]
 	if contract == nil {
@@ -157,7 +202,7 @@ func (i *FlowIntegration) codeLenses(
 		i.contractInfo[uri] = contract
 	}
 	contract.update(uri, version, checker)
-	actions = append(actions, contract.codelens(i.client)...)
+	actions = append(actions, contract.codelens(clientToUse)...)
 
 	// Add code lenses for scripts and transactions
 	entryPoint := i.entryPointInfo[uri]
@@ -166,7 +211,7 @@ func (i *FlowIntegration) codeLenses(
 		i.entryPointInfo[uri] = entryPoint
 	}
 	entryPoint.update(uri, version, checker)
-	actions = append(actions, entryPoint.codelens(i.client)...)
+	actions = append(actions, entryPoint.codelens(clientToUse)...)
 
 	return actions, nil
 }

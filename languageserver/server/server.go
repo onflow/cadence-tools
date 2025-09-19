@@ -137,14 +137,16 @@ func (d Document) HasAnyPrecedingStringsAtPosition(options []string, line, colum
 // submitted from the client using workspace/executeCommand.
 type CommandHandler func(args ...json2.RawMessage) (interface{}, error)
 
-// AddressImportResolver is a function that is used to resolve address imports
-type AddressImportResolver func(location common.AddressLocation) (string, error)
+// AddressImportResolver resolves address imports, signature: (checker, location)
+// checker is the current file's checker context
+type AddressImportResolver func(checker *sema.Checker, location common.AddressLocation) (string, error)
 
 // AddressContractNamesResolver is a function that is used to resolve contract names of an address
 type AddressContractNamesResolver func(address common.Address) ([]string, error)
 
-// StringImportResolver is a function that is used to resolve string imports
-type StringImportResolver func(location common.StringLocation) (string, error)
+// StringImportResolver resolves string imports, signature: (checker, location)
+// checker is the current file's checker context
+type StringImportResolver func(checker *sema.Checker, location common.StringLocation) (string, error)
 
 // CodeLensProvider is a function that is used to provide code lenses for the given checker
 type CodeLensProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.CodeLens, error)
@@ -176,14 +178,16 @@ type Server struct {
 	// resolveStringImport is the optional function that is used to resolve string imports
 	resolveStringImport StringImportResolver
 	// resolveIdentifierImport is the optional function that is used to resolve identifier imports
-	resolveIdentifierImport func(location common.IdentifierLocation) (string, error)
+	resolveIdentifierImport func(checker *sema.Checker, location common.IdentifierLocation) (string, error)
 	// codeLensProviders are the functions that are used to provide code lenses for a checker
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
 	diagnosticProviders []DiagnosticProvider
 	// initializationOptionsHandlers are the functions that are used to handle initialization options sent by the client
 	initializationOptionsHandlers []InitializationOptionsHandler
-	accessCheckMode               sema.AccessCheckMode
+	// configurationChangeHandlers are invoked on workspace/didChangeConfiguration
+	configurationChangeHandlers []func(settings any) error
+	accessCheckMode             sema.AccessCheckMode
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
 	// checkerStandardConfig is a config used to check contracts and transactions
@@ -197,6 +201,14 @@ type Server struct {
 }
 
 type Option func(*Server) error
+
+// WithConfigurationChangeHandler registers a handler for workspace/didChangeConfiguration
+func WithConfigurationChangeHandler(handler func(settings any) error) Option {
+	return func(s *Server) error {
+		s.configurationChangeHandlers = append(s.configurationChangeHandlers, handler)
+		return nil
+	}
+}
 
 type Command struct {
 	Name    string
@@ -246,7 +258,7 @@ func WithStringImportResolver(resolver StringImportResolver) Option {
 
 // WithIdentifierImportResolver returns a server option that sets the given function
 // as the function that is used to resolve identifier imports
-func WithIdentifierImportResolver(resolver func(location common.IdentifierLocation) (string, error)) Option {
+func WithIdentifierImportResolver(resolver func(checker *sema.Checker, location common.IdentifierLocation) (string, error)) Option {
 	return func(s *Server) error {
 		s.resolveIdentifierImport = resolver
 		return nil
@@ -1702,6 +1714,11 @@ func (s *Server) DidChangeConfiguration(_ protocol.Conn, params *protocol.DidCha
 		s.accessCheckMode = accessCheckModeFromName(accessCheckModeName)
 	}
 
+	// Invoke registered handlers
+	for _, handler := range s.configurationChangeHandlers {
+		_ = handler(cadenceMap)
+	}
+
 	return nil, nil
 }
 
@@ -2044,43 +2061,33 @@ func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Pr
 	return program, err
 }
 
-func (s *Server) resolveImport(location common.Location) (program *ast.Program, err error) {
-	// NOTE: important, *DON'T* return an error when a location type
-	// is not supported: the import location can simply not be resolved,
-	// no error occurred while resolving it.
-	//
-	// For example, the Crypto contract has an IdentifierLocation,
-	// and we simply return no code for it, so that the checker's
-	// import handler is called which resolves the location
-
+// resolveImport provides the checker context to import resolvers,
+// enabling per-document configuration (multi-config) resolution.
+func (s *Server) resolveImport(checker *sema.Checker, location common.Location) (program *ast.Program, err error) {
+	// We have the full checker context; import resolvers receive the checker
 	var code string
 	switch loc := location.(type) {
 	case common.StringLocation:
 		if s.resolveStringImport == nil {
 			return nil, nil
 		}
-
-		code, err = s.resolveStringImport(loc)
-
+		code, err = s.resolveStringImport(checker, loc)
 	case common.AddressLocation:
 		if s.resolveAddressImport == nil {
 			return nil, nil
 		}
-		code, err = s.resolveAddressImport(loc)
-
+		code, err = s.resolveAddressImport(checker, loc)
 	case common.IdentifierLocation:
 		if s.resolveIdentifierImport == nil {
 			return nil, nil
 		}
-		code, err = s.resolveIdentifierImport(loc)
-
+		code, err = s.resolveIdentifierImport(checker, loc)
 	default:
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-
 	return parser.ParseProgram(nil, []byte(code), parser.Config{})
 }
 
@@ -2979,7 +2986,8 @@ func (s *Server) handleImport(
 
 		importedChecker, ok := s.checkers[importedLocation]
 		if !ok {
-			importedProgram, err := s.resolveImport(importedLocation)
+			// Pass the current checker to import resolvers so they can resolve per-config state
+			importedProgram, err := s.resolveImport(checker, importedLocation)
 
 			if err != nil {
 				return nil, err
