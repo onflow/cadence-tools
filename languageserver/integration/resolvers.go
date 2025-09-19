@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flowkit/v2"
+	"github.com/onflow/flowkit/v2/config"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
@@ -45,7 +46,7 @@ type resolvers struct {
 
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
 func deURI(path string) string {
-    path = strings.TrimPrefix(path, "file://")
+	path = strings.TrimPrefix(path, "file://")
 	// Decode percent-escapes like %20
 	if unescaped, err := neturl.PathUnescape(path); err == nil {
 		path = unescaped
@@ -178,7 +179,38 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 // accountAccess checks whether the current program location and accessed program location were deployed to the same account.
 //
 // if the contracts were deployed on the same account then it returns true and hence allows the access, false otherwise.
-// accountAccess handler removed for this PR scope; access(account) behavior unchanged.
+func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.Location) bool {
+	cl := r.client
+	if r.cfgManager != nil {
+		if resolved, err := r.cfgManager.ResolveClientForChecker(checker); err == nil && resolved != nil {
+			cl = resolved
+		}
+	}
+	if cl == nil {
+		return false
+	}
+
+	contracts, err := cl.getState().getState().DeploymentContractsByNetwork(config.EmulatorNetwork)
+	if err != nil {
+		return false
+	}
+
+	var checkerAccount, memberAccount string
+	// go over contracts and match contract by the location of checker and member and assign the account name for later check
+	for _, c := range contracts {
+		// get absolute path of the contract relative to the dir where flow.json is (working env)
+		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(cl.getConfigPath()), c.Location()))
+
+		if memberLocation.String() == absLocation {
+			memberAccount = c.AccountName
+		}
+		if checker.Location.String() == absLocation {
+			checkerAccount = c.AccountName
+		}
+	}
+
+	return checkerAccount == memberAccount && checkerAccount != "" && memberAccount != ""
+}
 
 // workaround for Windows files being sent with prefixed '/' which is /c:/test/foo
 // we remove the first / for Windows files, so they are valid, also replace encoded column sign.

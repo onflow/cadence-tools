@@ -68,11 +68,11 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		integration.client = client
 		resolve.client = client
 
-		options = append(options,
+        options = append(options,
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
-            // Do not register account access handler in this PR scope
+            server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
 	}
 
@@ -160,9 +160,6 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 
 	return nil
 }
-
-// onConfigChanged was used to update default config path from workspace settings.
-// For this PR, dynamic workspace settings are out of scope; initialization options only.
 
 func (i *FlowIntegration) codeLenses(
 	uri protocol.DocumentURI,
