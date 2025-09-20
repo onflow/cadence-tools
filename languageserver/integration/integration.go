@@ -76,7 +76,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		)
 	}
 
-	comm := commands{client: integration.client, cfg: integration.cfgManager}
+    comm := commands{cfg: integration.cfgManager}
 	for _, command := range comm.getAll() {
 		options = append(options, server.WithCommand(command))
 	}
@@ -141,7 +141,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	i.cfgManager.numberOfAccounts = numberOfAccounts
 	i.cfgManager.SetDefaultConfigPath(configPath)
 
-	// If client is enabled, initialize the client
+    // If client is enabled, initialize the client
 	if i.enableFlowClient {
 		numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
 		if !ok || numberOfAccountsString == "" {
@@ -152,10 +152,14 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 			return errors.New("initialization options: invalid account number value")
 		}
 
-		err = i.client.Initialize(i.state, numberOfAccounts)
-		if err != nil {
-			return err
-		}
+        err = i.client.Initialize(i.state, numberOfAccounts)
+        if err != nil {
+            return err
+        }
+        // Seed default client into ConfigManager to be available for commands without path
+        if i.cfgManager != nil {
+            i.cfgManager.SetDefaultClientForPath(configPath, i.client)
+        }
 	}
 
 	return nil

@@ -39,6 +39,10 @@ type ConfigManager struct {
 	// Optional default config path to use if a document has no ancestor flow.json
 	defaultConfigPath string
 
+    // lastUsedConfigPath remembers the most recently resolved config path
+    // for prioritizing a "current" project when no path is provided.
+    lastUsedConfigPath string
+
 	// Maps a config file path to a state/client instance
 	states  map[string]flowState
 	clients map[string]flowClient
@@ -108,10 +112,10 @@ func (m *ConfigManager) ReloadAll() error {
 // Internal helpers
 
 func (m *ConfigManager) resolveStateForPath(filePath string) (flowState, error) {
-	cfgPath := m.lookupOrFindConfig(filePath)
-	if cfgPath == "" {
-		cfgPath = m.defaultConfigPath
-	}
+    cfgPath := m.lookupOrFindConfig(filePath)
+    if cfgPath == "" {
+        cfgPath = m.preferredDefaultConfigPath()
+    }
 	if cfgPath == "" {
 		return nil, nil
 	}
@@ -119,19 +123,24 @@ func (m *ConfigManager) resolveStateForPath(filePath string) (flowState, error) 
 	st, ok := m.states[cfgPath]
 	m.mu.RUnlock()
 	if ok && st != nil && st.IsLoaded() {
+        m.setLastUsed(cfgPath)
 		return st, nil
 	}
-	return m.loadState(cfgPath)
+    st, err := m.loadState(cfgPath)
+    if err == nil && st != nil {
+        m.setLastUsed(cfgPath)
+    }
+    return st, err
 }
 
 func (m *ConfigManager) resolveClientForPath(filePath string) (flowClient, error) {
 	if !m.enableFlowClient {
 		return nil, nil
 	}
-	cfgPath := m.lookupOrFindConfig(filePath)
-	if cfgPath == "" {
-		cfgPath = m.defaultConfigPath
-	}
+    cfgPath := m.lookupOrFindConfig(filePath)
+    if cfgPath == "" {
+        cfgPath = m.preferredDefaultConfigPath()
+    }
 	if cfgPath == "" {
 		return nil, nil
 	}
@@ -139,6 +148,7 @@ func (m *ConfigManager) resolveClientForPath(filePath string) (flowClient, error
 	cl, ok := m.clients[cfgPath]
 	m.mu.RUnlock()
 	if ok && cl != nil {
+        m.setLastUsed(cfgPath)
 		return cl, nil
 	}
 	// Ensure state exists first
@@ -146,7 +156,11 @@ func (m *ConfigManager) resolveClientForPath(filePath string) (flowClient, error
 	if err != nil {
 		return nil, err
 	}
-	return m.loadClient(cfgPath, st)
+    cl, err = m.loadClient(cfgPath, st)
+    if err == nil && cl != nil {
+        m.setLastUsed(cfgPath)
+    }
+    return cl, err
 }
 
 func (m *ConfigManager) loadState(cfgPath string) (flowState, error) {
@@ -235,6 +249,58 @@ func (m *ConfigManager) NearestConfigPath(filePath string) string {
 	return m.findNearestFlowJSON(filePath)
 }
 
+// DefaultClient returns any initialized client if available (first encountered).
+// Returns nil if no clients are initialized.
+func (m *ConfigManager) DefaultClient() flowClient {
+    if !m.enableFlowClient {
+        return nil
+    }
+    m.mu.RLock()
+    // Prefer explicit default config's client if set
+    if m.defaultConfigPath != "" {
+        if cl, ok := m.clients[m.defaultConfigPath]; ok && cl != nil {
+            m.mu.RUnlock()
+            return cl
+        }
+    }
+    // Next, prefer last used config's client if present
+    if m.lastUsedConfigPath != "" {
+        if cl, ok := m.clients[m.lastUsedConfigPath]; ok && cl != nil {
+            m.mu.RUnlock()
+            return cl
+        }
+    }
+    // Otherwise, return any initialized client
+    for _, cl := range m.clients {
+        if cl != nil {
+            m.mu.RUnlock()
+            return cl
+        }
+    }
+    m.mu.RUnlock()
+    return nil
+}
+
+// preferredDefaultConfigPath returns the best config path to use when no file-path context is provided.
+// It prefers the last used config if available, otherwise the explicitly set default config.
+func (m *ConfigManager) preferredDefaultConfigPath() string {
+    m.mu.RLock()
+    def := m.defaultConfigPath
+    last := m.lastUsedConfigPath
+    m.mu.RUnlock()
+    if def != "" {
+        return def
+    }
+    return last
+}
+
+func (m *ConfigManager) setLastUsed(cfgPath string) {
+    abs, _ := filepath.Abs(cleanWindowsPath(cfgPath))
+    m.mu.Lock()
+    m.lastUsedConfigPath = abs
+    m.mu.Unlock()
+}
+
 // SetDefaultConfigPath updates the default config used when a document has no ancestor flow.json.
 // Ensures a watcher exists for the new default.
 func (m *ConfigManager) SetDefaultConfigPath(cfgPath string) {
@@ -244,6 +310,19 @@ func (m *ConfigManager) SetDefaultConfigPath(cfgPath string) {
 	if cfgPath != "" {
 		m.ensureWatcherLocked(cfgPath)
 	}
+}
+
+// SetDefaultClientForPath seeds the manager with a ready client for the given config path.
+// Useful to make a default client available before any resolution happens.
+func (m *ConfigManager) SetDefaultClientForPath(cfgPath string, cl flowClient) {
+    if cfgPath == "" || cl == nil {
+        return
+    }
+    absCfgPath, _ := filepath.Abs(cleanWindowsPath(cfgPath))
+    m.mu.Lock()
+    m.clients[absCfgPath] = cl
+    m.lastUsedConfigPath = absCfgPath
+    m.mu.Unlock()
 }
 
 // EnsureDirWatcher adds a watcher for the given directory to detect flow.json creation/removal.

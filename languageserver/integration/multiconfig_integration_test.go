@@ -51,7 +51,7 @@ func Test_CommandsRoutePerClosestFlowJSON(t *testing.T) {
 	mgr.mu.Unlock()
 
 	_ = &FlowIntegration{enableFlowClient: true, cfgManager: mgr}
-	cmds := commands{client: nil, cfg: mgr}
+    cmds := commands{cfg: mgr}
 
 	// executeScript in /w/a should use mockA
 	aURL, _ := url.Parse("file:///w/a/script.cdc")
