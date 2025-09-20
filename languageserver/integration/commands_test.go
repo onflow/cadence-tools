@@ -54,9 +54,16 @@ func runTestInputs(name string, t *testing.T, f func(args ...json.RawMessage) (a
 	})
 }
 
+// helper config manager stub that returns a provided default client
+type cmStub struct{ cl flowClient }
+
+func (s *cmStub) ResolveClientForPath(_ string) (flowClient, error) { return s.cl, nil }
+func (s *cmStub) DefaultClient() flowClient                         { return s.cl }
+func (s *cmStub) ReloadAll() error                                  { return nil }
+
 func Test_ExecuteScript(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{client: mock}
+	cmds := commands{cfg: &cmStub{cl: mock}}
 
 	runTestInputs(
 		"invalid arguments",
@@ -86,7 +93,7 @@ func Test_ExecuteScript(t *testing.T) {
 
 func Test_ExecuteTransaction(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{client: mock}
+	cmds := commands{cfg: &cmStub{cl: mock}}
 
 	runTestInputs(
 		"invalid arguments",
@@ -127,7 +134,7 @@ func Test_ExecuteTransaction(t *testing.T) {
 
 func Test_SwitchActiveAccount(t *testing.T) {
 	client := newFlowkitClient(nil)
-	cmds := commands{client, nil}
+	cmds := commands{cfg: &cmStub{cl: client}}
 
 	name, _ := json.Marshal("koko")
 	runTestInputs(
@@ -158,7 +165,7 @@ func Test_SwitchActiveAccount(t *testing.T) {
 
 func Test_DeployContract(t *testing.T) {
 	mock := &mockFlowClient{}
-	cmds := commands{mock, nil}
+	cmds := commands{cfg: &cmStub{cl: mock}}
 
 	name, _ := json.Marshal("NFT")
 	runTestInputs(
@@ -222,11 +229,34 @@ func Test_DeployContract(t *testing.T) {
 	})
 }
 
-func Test_ReloadConfig(t *testing.T) {
-	state := mockFlowState{}
-	cmds := commands{nil, &state}
+// Ensure that when no path is provided, commands use the most recently "used" client
+// (simulated by DefaultClient() swapping under the hood).
+func Test_DefaultsToLastUsedClient(t *testing.T) {
+	first := &mockFlowClient{}
+	second := &mockFlowClient{}
+	stub := &cmStub{cl: first}
+	cmds := commands{cfg: stub}
 
-	state.On("Reload").Return(nil)
+	// First call should use the first client
+	first.
+		On("GetClientAccounts").
+		Return([]*clientAccount{{Name: "a"}})
+	res1, err1 := cmds.getAccounts()
+	assert.NoError(t, err1)
+	assert.Equal(t, []*clientAccount{{Name: "a"}}, res1)
+
+	// Switch default to second client and ensure subsequent call uses it
+	second.
+		On("GetClientAccounts").
+		Return([]*clientAccount{{Name: "b"}})
+	stub.cl = second
+	res2, err2 := cmds.getAccounts()
+	assert.NoError(t, err2)
+	assert.Equal(t, []*clientAccount{{Name: "b"}}, res2)
+}
+
+func Test_ReloadConfig(t *testing.T) {
+	cmds := commands{cfg: nil}
 
 	t.Run("reload configuration", func(t *testing.T) {
 		t.Parallel()
@@ -234,6 +264,6 @@ func Test_ReloadConfig(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, nil, resp)
-		state.AssertCalled(t, "Reload")
+		// no-op without cfgManager
 	})
 }

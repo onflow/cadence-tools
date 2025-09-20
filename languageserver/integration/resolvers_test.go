@@ -40,14 +40,14 @@ func Test_FileImport(t *testing.T) {
 
 	t.Run("existing file", func(t *testing.T) {
 		t.Parallel()
-		resolved, err := resolver.stringImport("./test.cdc")
+		resolved, err := resolver.stringImport(nil, common.StringLocation("./test.cdc"))
 		assert.NoError(t, err)
 		assert.Equal(t, "hello test", resolved)
 	})
 
 	t.Run("non existing file", func(t *testing.T) {
 		t.Parallel()
-		resolved, err := resolver.stringImport("./foo.cdc")
+		resolved, err := resolver.stringImport(nil, common.StringLocation("./foo.cdc"))
 		assert.EqualError(t, err, "open foo.cdc: file does not exist")
 		assert.Equal(t, "", resolved)
 	})
@@ -79,21 +79,21 @@ func Test_AddressImport(t *testing.T) {
 		Return(nil, fmt.Errorf("failed to get account with address %s", nonExisting.String()))
 
 	t.Run("existing address", func(t *testing.T) {
-		resolved, err := resolver.addressImport(address)
+		resolved, err := resolver.addressImport(nil, address)
 		assert.NoError(t, err)
 		assert.Equal(t, "hello tests", resolved)
 	})
 
 	t.Run("non existing contract import", func(t *testing.T) {
 		address.Name = "invalid"
-		resolved, err := resolver.addressImport(address)
+		resolved, err := resolver.addressImport(nil, address)
 		assert.NoError(t, err)
 		assert.Empty(t, resolved)
 	})
 
 	t.Run("non existing address", func(t *testing.T) {
 		address.Address, _ = common.HexToAddress("2")
-		resolved, err := resolver.addressImport(address)
+		resolved, err := resolver.addressImport(nil, address)
 		assert.EqualError(t, err, "failed to get account with address 0000000000000002")
 		assert.Empty(t, resolved)
 	})
@@ -121,13 +121,13 @@ func Test_SimpleImport(t *testing.T) {
 	mock.On("GetCodeByName", "Foo").Return("", fmt.Errorf("couldn't find the contract by import identifier: Foo"))
 
 	t.Run("existing import", func(t *testing.T) {
-		resolved, err := resolver.stringImport("Test")
+		resolved, err := resolver.stringImport(nil, common.StringLocation("Test"))
 		assert.NoError(t, err)
 		assert.Equal(t, code, resolved)
 	})
 
 	t.Run("non existing import", func(t *testing.T) {
-		resolved, err := resolver.stringImport("Foo")
+		resolved, err := resolver.stringImport(nil, common.StringLocation("Foo"))
 		assert.EqualError(t, err, "couldn't find the contract by import identifier: Foo")
 		assert.Empty(t, resolved)
 	})
