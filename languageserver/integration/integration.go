@@ -19,33 +19,169 @@
 package integration
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
 	"strconv"
+	"sync"
+	"sync/atomic"
 
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flowkit/v2"
 	"github.com/spf13/afero"
 
+	"path/filepath"
+	"strings"
+
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 	"github.com/onflow/cadence-tools/languageserver/server"
 )
+
+func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, protocol.DocumentURI, string) {
+	return func(conn protocol.Conn, uri protocol.DocumentURI, _ string) {
+		u := string(uri)
+		if !strings.HasPrefix(u, "file://") || !strings.HasSuffix(strings.ToLower(u), ".cdc") {
+			return
+		}
+		path := deURI(cleanWindowsPath(strings.TrimPrefix(u, "file://")))
+		if _, statErr := i.loader.Stat(path); statErr != nil {
+			return
+		}
+		if abs, err := filepath.Abs(path); err == nil {
+			path = abs
+		}
+		if real, err := filepath.EvalSymlinks(path); err == nil {
+			path = real
+		}
+		if i.cfgManager == nil {
+			return
+		}
+		// If init-config override is set but invalid, surface an error and skip prompt
+		if i.cfgManager.initConfigPath != "" {
+			cfg := i.cfgManager.initConfigPath
+			if abs, err := filepath.Abs(cfg); err == nil {
+				cfg = abs
+			}
+			// reason 1: configured path does not exist
+			if _, err := i.loader.Stat(cfg); err != nil {
+				conn.ShowMessage(&protocol.ShowMessageParams{
+					Type:    protocol.Error,
+					Message: fmt.Sprintf("Configured Flow config path is invalid: %s", cfg),
+				})
+				return
+			}
+			// Validate JSON structure; if invalid, show an error once and skip prompt
+			if data, rErr := i.loader.ReadFile(cfg); rErr == nil {
+				var js map[string]any
+				// reason 2: invalid JSON
+				if jErr := json.Unmarshal(data, &js); jErr != nil {
+					conn.ShowMessage(&protocol.ShowMessageParams{
+						Type:    protocol.Error,
+						Message: fmt.Sprintf("Invalid flow.json: %s", jErr.Error()),
+					})
+					return
+				}
+				// reason 3: contracts point to non-existent paths (warn only on didOpen once)
+				if contracts, ok := js["contracts"].(map[string]any); ok {
+					for k, v := range contracts {
+						if rel, isStr := v.(string); isStr {
+							candidate := filepath.Join(filepath.Dir(cfg), rel)
+							if _, statErr := i.loader.Stat(candidate); statErr != nil {
+								conn.ShowMessage(&protocol.ShowMessageParams{
+									Type:    protocol.Error,
+									Message: fmt.Sprintf("Invalid contract path for %s in flow.json: %s", k, rel),
+								})
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		if cfg := i.cfgManager.NearestConfigPath(path); cfg != "" {
+			// Attempt to load config; if flowkit fails, show the error and skip prompt
+			if _, err := i.cfgManager.ResolveStateForPath(cfg); err != nil {
+				conn.ShowMessage(&protocol.ShowMessageParams{
+					Type:    protocol.Error,
+					Message: fmt.Sprintf("Failed to load flow.json: %s", err.Error()),
+				})
+			}
+			return
+		}
+		if !i.promptShown.CompareAndSwap(false, true) {
+			return
+		}
+		dir := filepath.Dir(path)
+		if root := s.WorkspaceFolderRootForPath(path); root != "" {
+			dir = root
+		}
+		// If we've already prompted for this root in this session, skip
+		i.promptMu.Lock()
+		if _, seen := i.promptedRoots[dir]; seen {
+			i.promptMu.Unlock()
+			return
+		}
+		// mark as seen early to avoid races with concurrent didOpen on same root
+		i.promptedRoots[dir] = struct{}{}
+		i.promptMu.Unlock()
+		go func() {
+			action, err := conn.ShowMessageRequest(&protocol.ShowMessageRequestParams{
+				Type:    protocol.Info,
+				Message: "No Flow project detected. Initialize a new Flow project?",
+				Actions: []protocol.MessageActionItem{{Title: "Create flow.json"}, {Title: "Ignore"}},
+			})
+			if err != nil || action == nil || action.Title != "Create flow.json" {
+				// keep promptedRoots mark so we don't re-prompt this root until restart
+				i.promptShown.Store(false)
+				return
+			}
+			target := filepath.Join(dir, "flow.json")
+			cmd := exec.Command("flow", "init", "--config-only")
+			cmd.Dir = dir
+			runErr := cmd.Run()
+			if runErr != nil || !func() bool { _, err := os.Stat(target); return err == nil }() {
+				conn.ShowMessage(&protocol.ShowMessageParams{
+					Type:    protocol.Error,
+					Message: fmt.Sprintf("Failed to initialize Flow project: %s", runErr.Error()),
+				})
+				return
+			}
+			_, _ = i.cfgManager.ResolveStateForPath(filepath.Join(dir, "flow.json"))
+			i.promptShown.Store(false)
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Info,
+				Message: "Initialized Flow project: " + dir,
+			})
+		}()
+	}
+}
 
 func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegration, error) {
 	loader := &afero.Afero{Fs: afero.NewOsFs()}
 	state := newFlowkitState(loader)
 
 	integration := &FlowIntegration{
-		entryPointInfo:   map[protocol.DocumentURI]*entryPointInfo{},
-		contractInfo:     map[protocol.DocumentURI]*contractInfo{},
-		enableFlowClient: enableFlowClient,
-		loader:           loader,
-		state:            state,
+		entryPointInfo:     map[protocol.DocumentURI]*entryPointInfo{},
+		contractInfo:       map[protocol.DocumentURI]*contractInfo{},
+		enableFlowClient:   enableFlowClient,
+		loader:             loader,
+		state:              state,
+		promptedRoots:      make(map[string]struct{}),
+		invalidWarnedRoots: make(map[string]struct{}),
 	}
 
+	// Always create a config manager so per-file config discovery works even without init options
+	integration.cfgManager = NewConfigManager(loader, enableFlowClient, 0, "")
+
+	// Provide a project identity provider keyed by nearest flow.json for checker cache scoping
+	projectProvider := projectIdentityProvider{cfg: integration.cfgManager}
+
 	resolve := resolvers{
-		loader: loader,
-		state:  state,
+		loader:     loader,
+		cfgManager: integration.cfgManager,
 	}
 
 	options := []server.Option{
@@ -53,13 +189,16 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithStringImportResolver(resolve.stringImport),
 		server.WithInitializationOptionsHandler(integration.initialize),
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
-		server.WithIdentifierImportResolver(resolve.identifierImport),
+		server.WithIdentifierImportResolver(resolve.identifierImportProject),
+		server.WithProjectIdentityProvider(projectProvider),
 	}
+
+	// Prompt to create flow.json when opening an existing .cdc file without a config.
+	options = append(options, server.WithDidOpenHook(integration.didOpenInitHook(s)))
 
 	if enableFlowClient {
 		client := newFlowkitClient(loader)
 		integration.client = client
-		resolve.client = client
 
 		options = append(options,
 			server.WithCodeLensProvider(integration.codeLenses),
@@ -69,9 +208,14 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		)
 	}
 
-	comm := commands{client: integration.client, state: integration.state}
-	for _, command := range comm.getAll() {
-		options = append(options, server.WithCommand(command))
+	// Register Flow commands only when the Flow client is enabled.
+	// This preserves the previous behavior where Flow features are unavailable
+	// unless the server is started with --enable-flow-client=true.
+	if enableFlowClient {
+		comm := commands{cfg: integration.cfgManager}
+		for _, command := range comm.getAll() {
+			options = append(options, server.WithCommand(command))
+		}
 	}
 
 	err := s.SetOptions(options...)
@@ -86,10 +230,65 @@ type FlowIntegration struct {
 	entryPointInfo map[protocol.DocumentURI]*entryPointInfo
 	contractInfo   map[protocol.DocumentURI]*contractInfo
 
-	enableFlowClient bool
-	client           flowClient
-	state            *flowkitState
-	loader           flowkit.ReaderWriter
+	enableFlowClient   bool
+	client             flowClient
+	state              *flowkitState
+	loader             flowkit.ReaderWriter
+	cfgManager         *ConfigManager
+	promptShown        atomic.Bool
+	promptMu           sync.Mutex
+	promptedRoots      map[string]struct{}
+	invalidWarnedMu    sync.Mutex
+	invalidWarnedRoots map[string]struct{}
+}
+
+// projectIdentityProvider implements server.ProjectIdentityProvider using ConfigManager.
+// It returns the absolute flow.json path as the project ID, or empty if none is found.
+type projectIdentityProvider struct{ cfg *ConfigManager }
+
+func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) string {
+	if p.cfg == nil {
+		return ""
+	}
+	// If an init-config override is set, always scope by that config (with mtime suffix)
+	if p.cfg.initConfigPath != "" {
+		cfgPath := p.cfg.initConfigPath
+		if abs, err := filepath.Abs(cfgPath); err == nil {
+			cfgPath = abs
+		}
+		if fi, err := p.cfg.loader.Stat(cfgPath); err == nil {
+			return cfgPath + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
+		}
+		return cfgPath
+	}
+	u := string(uri)
+	var path string
+	if strings.HasPrefix(u, "file://") {
+		// Decode URI and normalize Windows paths (handles %20, etc.)
+		path = deURI(cleanWindowsPath(strings.TrimPrefix(u, "file://")))
+	} else {
+		// Assume raw filesystem path
+		path = deURI(cleanWindowsPath(u))
+	}
+	cfgPath := p.cfg.NearestConfigPath(path)
+	// If no on-disk config is found, but an init-config override exists, use it for project scoping
+	if cfgPath == "" && p.cfg.initConfigPath != "" {
+		cfgPath = p.cfg.initConfigPath
+	}
+	if cfgPath == "" {
+		if abs, err := filepath.Abs(path); err == nil {
+			return filepath.Dir(abs)
+		}
+		return filepath.Dir(path)
+	}
+	// Normalize to absolute path for stability and include modtime to bust global cache on config edits
+	if abs, err := filepath.Abs(cfgPath); err == nil {
+		cfgPath = abs
+	}
+	if fi, err := p.cfg.loader.Stat(cfgPath); err == nil {
+		return cfgPath + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
+	}
+	return cfgPath
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {
@@ -111,14 +310,64 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 		return nil
 	}
 
-	// Load the config state if provided
+	// Load the config state if provided. If it fails, don't fail initialization;
+	// still set the init-config override so the server can run and the user can fix the file.
 	configPath = cleanWindowsPath(configPath)
 	err := i.state.Load(configPath)
 	if err != nil {
-		return err
+		// Seed cfgManager with the init-config path so project scoping still works
+		if i.cfgManager != nil {
+			i.cfgManager.enableFlowClient = i.enableFlowClient
+			i.cfgManager.numberOfAccounts = 0
+			i.cfgManager.SetInitConfigPath(configPath)
+		}
+		// Try to parse enough of flow.json to detect invalid contract paths and surface to the user via ShowMessage
+		if i.client != nil {
+			// best-effort: read file and try to detect bad paths
+			if data, readErr := i.loader.ReadFile(configPath); readErr == nil {
+				var parsed struct {
+					Contracts map[string]string `json:"contracts"`
+				}
+				if jsonErr := json.Unmarshal(data, &parsed); jsonErr == nil && len(parsed.Contracts) > 0 {
+					for _, rel := range parsed.Contracts {
+						candidate := filepath.Join(filepath.Dir(configPath), rel)
+						if _, statErr := i.loader.Stat(candidate); statErr != nil {
+							// Inform user once per root
+							root := filepath.Dir(configPath)
+							i.invalidWarnedMu.Lock()
+							if _, seen := i.invalidWarnedRoots[root]; !seen {
+								i.invalidWarnedRoots[root] = struct{}{}
+								i.invalidWarnedMu.Unlock()
+								// send message via client logger if available
+								// Note: we don't have conn here; rely on code lenses/diagnostics path to surface errors on open
+								// Alternatively, no-op. Keeping mark prevents repeated errors.
+							} else {
+								i.invalidWarnedMu.Unlock()
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+		return nil
 	}
 
-	// If client is enabled, initialize the client
+	// Initialize ConfigManager with provided init-config path (override)
+	numberOfAccounts := 0
+	if i.enableFlowClient {
+		if numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string); ok && numberOfAccountsString != "" {
+			if n, convErr := strconv.Atoi(numberOfAccountsString); convErr == nil {
+				numberOfAccounts = n
+			}
+		}
+	}
+	// Reuse existing manager instance to avoid stale references
+	i.cfgManager.enableFlowClient = i.enableFlowClient
+	i.cfgManager.numberOfAccounts = numberOfAccounts
+	i.cfgManager.SetInitConfigPath(configPath)
+
+	// If client is enabled, initialize the client (only when state loaded successfully)
 	if i.enableFlowClient {
 		numberOfAccountsString, ok := optsMap["numberOfAccounts"].(string)
 		if !ok || numberOfAccountsString == "" {
@@ -132,6 +381,10 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 		err = i.client.Initialize(i.state, numberOfAccounts)
 		if err != nil {
 			return err
+		}
+		// Seed default client into ConfigManager to be available for commands without path
+		if i.cfgManager != nil {
+			i.cfgManager.SetDefaultClientForPath(configPath, i.client)
 		}
 	}
 
@@ -150,6 +403,25 @@ func (i *FlowIntegration) codeLenses(
 
 	// todo refactor - define codelens provider interface and merge both into one
 
+	// Ensure we watch the document directory for flow.json creation/removal
+	if i.cfgManager != nil {
+		// Only for file:// URIs
+		u := string(uri)
+		if strings.HasPrefix(u, "file://") {
+			path := cleanWindowsPath(strings.TrimPrefix(u, "file://"))
+			dir := filepath.Dir(path)
+			i.cfgManager.EnsureDirWatcher(dir)
+		}
+	}
+
+	// Prefer already-initialized integration client; fall back to per-document resolution only if nil
+	clientToUse := i.client
+	if clientToUse == nil && i.cfgManager != nil {
+		if cl, err := i.cfgManager.ResolveClientForChecker(checker); err == nil && cl != nil {
+			clientToUse = cl
+		}
+	}
+
 	// Add code lenses for contracts and contract interfaces
 	contract := i.contractInfo[uri]
 	if contract == nil {
@@ -157,7 +429,7 @@ func (i *FlowIntegration) codeLenses(
 		i.contractInfo[uri] = contract
 	}
 	contract.update(uri, version, checker)
-	actions = append(actions, contract.codelens(i.client)...)
+	actions = append(actions, contract.codelens(clientToUse)...)
 
 	// Add code lenses for scripts and transactions
 	entryPoint := i.entryPointInfo[uri]
@@ -166,7 +438,7 @@ func (i *FlowIntegration) codeLenses(
 		i.entryPointInfo[uri] = entryPoint
 	}
 	entryPoint.update(uri, version, checker)
-	actions = append(actions, entryPoint.codelens(i.client)...)
+	actions = append(actions, entryPoint.codelens(clientToUse)...)
 
 	return actions, nil
 }

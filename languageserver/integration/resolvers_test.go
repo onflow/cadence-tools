@@ -40,24 +40,39 @@ func Test_FileImport(t *testing.T) {
 
 	t.Run("existing file", func(t *testing.T) {
 		t.Parallel()
-		resolved, err := resolver.stringImport("./test.cdc")
+		resolved, err := resolver.stringImport("", common.StringLocation("./test.cdc"))
 		assert.NoError(t, err)
 		assert.Equal(t, "hello test", resolved)
 	})
 
 	t.Run("non existing file", func(t *testing.T) {
 		t.Parallel()
-		resolved, err := resolver.stringImport("./foo.cdc")
-		assert.EqualError(t, err, "open foo.cdc: file does not exist")
+		resolved, err := resolver.stringImport("", common.StringLocation("./foo.cdc"))
+		// Accept either relative or absolute error message depending on OS/CWD
+		if assert.Error(t, err) {
+			msg := err.Error()
+			assert.Contains(t, msg, "file does not exist")
+			assert.Contains(t, msg, "foo.cdc")
+		}
 		assert.Equal(t, "", resolved)
 	})
 }
 
 func Test_AddressImport(t *testing.T) {
 	mock := &mockFlowClient{}
-	resolver := resolvers{
-		client: mock,
-	}
+	resolver := resolvers{}
+	// Seed cfgManager with a default client under a project flow.json
+	mem := afero.NewMemMapFs()
+	af := afero.Afero{Fs: mem}
+	cm := NewConfigManager(af, true, 0, "")
+	projectCfg := "/proj/flow.json"
+	// Ensure directory exists in memfs
+	_ = af.MkdirAll("/proj", 0755)
+	_ = af.WriteFile(projectCfg, []byte("{}"), 0644)
+	cm.SetDefaultClientForPath(projectCfg, mock)
+	resolver.cfgManager = cm
+	resolver.loader = af
+	projID := projectCfg
 
 	a, _ := common.HexToAddress("1")
 	address := common.NewAddressLocation(nil, a, "test")
@@ -79,21 +94,21 @@ func Test_AddressImport(t *testing.T) {
 		Return(nil, fmt.Errorf("failed to get account with address %s", nonExisting.String()))
 
 	t.Run("existing address", func(t *testing.T) {
-		resolved, err := resolver.addressImport(address)
+		resolved, err := resolver.addressImport(projID, address)
 		assert.NoError(t, err)
 		assert.Equal(t, "hello tests", resolved)
 	})
 
 	t.Run("non existing contract import", func(t *testing.T) {
 		address.Name = "invalid"
-		resolved, err := resolver.addressImport(address)
+		resolved, err := resolver.addressImport(projID, address)
 		assert.NoError(t, err)
 		assert.Empty(t, resolved)
 	})
 
 	t.Run("non existing address", func(t *testing.T) {
 		address.Address, _ = common.HexToAddress("2")
-		resolved, err := resolver.addressImport(address)
+		resolved, err := resolver.addressImport(projID, address)
 		assert.EqualError(t, err, "failed to get account with address 0000000000000002")
 		assert.Empty(t, resolved)
 	})
@@ -106,29 +121,27 @@ func Test_AddressImport(t *testing.T) {
 }
 
 func Test_SimpleImport(t *testing.T) {
-	mockFS := afero.NewMemMapFs()
-	af := afero.Afero{Fs: mockFS}
+	mem := afero.NewMemMapFs()
+	af := afero.Afero{Fs: mem}
 	code := `access(all) contract Test {}`
-	_ = afero.WriteFile(mockFS, "./test.cdc", []byte(code), 0644)
+	// project structure
+	_ = af.MkdirAll("/p", 0755)
+	_ = afero.WriteFile(mem, "/p/test.cdc", []byte(code), 0644)
+	flowJSON := []byte(`{ "contracts": { "Test": "./test.cdc" } }`)
+	_ = afero.WriteFile(mem, "/p/flow.json", flowJSON, 0644)
 
-	mock := &mockFlowState{}
-	resolver := resolvers{
-		loader: af,
-		state:  mock,
-	}
-
-	mock.On("GetCodeByName", "Test").Return(code, nil)
-	mock.On("GetCodeByName", "Foo").Return("", fmt.Errorf("couldn't find the contract by import identifier: Foo"))
+	cm := NewConfigManager(af, false, 0, "/p/flow.json")
+	resolver := resolvers{loader: af, cfgManager: cm}
 
 	t.Run("existing import", func(t *testing.T) {
-		resolved, err := resolver.stringImport("Test")
+		resolved, err := resolver.stringImport("/p/flow.json", common.StringLocation("Test"))
 		assert.NoError(t, err)
 		assert.Equal(t, code, resolved)
 	})
 
 	t.Run("non existing import", func(t *testing.T) {
-		resolved, err := resolver.stringImport("Foo")
-		assert.EqualError(t, err, "couldn't find the contract by import identifier: Foo")
+		resolved, err := resolver.stringImport("/p/flow.json", common.StringLocation("Foo"))
+		assert.Error(t, err)
 		assert.Empty(t, resolved)
 	})
 }

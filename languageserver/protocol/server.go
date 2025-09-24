@@ -38,6 +38,7 @@ type Server struct {
 type Conn interface {
 	Notify(method string, params any) error
 	ShowMessage(params *ShowMessageParams)
+	ShowMessageRequest(params *ShowMessageRequestParams) (*MessageActionItem, error)
 	LogMessage(params *LogMessageParams)
 	PublishDiagnostics(params *PublishDiagnosticsParams) error
 	RegisterCapability(params *RegistrationParams) error
@@ -51,6 +52,15 @@ type connection struct {
 // the user.
 func (conn *connection) ShowMessage(params *ShowMessageParams) {
 	_ = conn.Notify("window/showMessage", params)
+}
+
+// ShowMessageRequest displays a message with actions and waits for a user selection.
+func (conn *connection) ShowMessageRequest(params *ShowMessageRequestParams) (*MessageActionItem, error) {
+	var result MessageActionItem
+	if err := conn.jsonrpc2Server.CallWithResult("window/showMessageRequest", params, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // LogMessage logs a message to the Cadence terminal in VS Code. It isn't

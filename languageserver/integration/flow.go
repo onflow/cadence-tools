@@ -190,8 +190,7 @@ func (f *flowkitClient) ExecuteScript(
 	if err != nil {
 		return nil, err
 	}
-
-	codeFilename, err := resolveFilename(f.getConfigPath(), location.Path)
+	codeFilename, err := computeCodeFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +215,7 @@ func (f *flowkitClient) DeployContract(
 	if err != nil {
 		return err
 	}
-
-	codeFilename, err := resolveFilename(f.getConfigPath(), location.Path)
+	codeFilename, err := computeCodeFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return err
 	}
@@ -262,8 +260,7 @@ func (f *flowkitClient) SendTransaction(
 	if err != nil {
 		return nil, nil, err
 	}
-
-	codeFilename, err := resolveFilename(f.getConfigPath(), location.Path)
+	codeFilename, err := computeCodeFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -412,4 +409,15 @@ func resolveFilename(configPath string, path string) (string, error) {
 	}
 
 	return filename, nil
+}
+
+// computeCodeFilename returns the path value used for flowkit.Script.Location
+// by joining the config directory with the config-root-relative path of the
+// provided file path.
+func computeCodeFilename(configPath string, rawPath string) (string, error) {
+	rel, err := resolveFilename(configPath, rawPath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(configPath), rel), nil
 }

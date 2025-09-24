@@ -103,6 +103,11 @@ func (server *Server) Call(method string, params any) error {
 	return server.conn.Call(context.Background(), method, params, nil)
 }
 
+// CallWithResult performs a JSON-RPC call expecting a result to be decoded into result.
+func (server *Server) CallWithResult(method string, params any, result any) error {
+	return server.conn.Call(context.Background(), method, params, result)
+}
+
 func (server *Server) Stop() error {
 	return server.conn.Close()
 }
