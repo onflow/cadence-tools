@@ -59,57 +59,26 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 		if i.cfgManager == nil {
 			return
 		}
-		// If init-config override is set but invalid, surface an error and skip prompt
+        // Do not validate init-config here; rely on ConfigManager load errors instead
+        if cfg := i.cfgManager.NearestConfigPath(path); cfg != "" {
+            // Attempt to load; if flowkit fails, remember and show the error and skip prompt
+            if _, err := i.cfgManager.ResolveStateForPath(cfg); err != nil {
+                conn.ShowMessage(&protocol.ShowMessageParams{
+                    Type:    protocol.Error,
+                    Message: fmt.Sprintf("Failed to load flow.json: %s", err.Error()),
+                })
+            }
+			return
+		}
+		// No nearest flow.json: if an init-config override exists and had load errors, surface them now.
 		if i.cfgManager.initConfigPath != "" {
-			cfg := i.cfgManager.initConfigPath
-			if abs, err := filepath.Abs(cfg); err == nil {
-				cfg = abs
-			}
-			// reason 1: configured path does not exist
-			if _, err := i.loader.Stat(cfg); err != nil {
+			if msg := i.cfgManager.LastLoadError(i.cfgManager.initConfigPath); msg != "" {
 				conn.ShowMessage(&protocol.ShowMessageParams{
 					Type:    protocol.Error,
-					Message: fmt.Sprintf("Configured Flow config path is invalid: %s", cfg),
+					Message: fmt.Sprintf("Invalid flow.json: %s", msg),
 				})
 				return
 			}
-			// Validate JSON structure; if invalid, show an error once and skip prompt
-			if data, rErr := i.loader.ReadFile(cfg); rErr == nil {
-				var js map[string]any
-				// reason 2: invalid JSON
-				if jErr := json.Unmarshal(data, &js); jErr != nil {
-					conn.ShowMessage(&protocol.ShowMessageParams{
-						Type:    protocol.Error,
-						Message: fmt.Sprintf("Invalid flow.json: %s", jErr.Error()),
-					})
-					return
-				}
-				// reason 3: contracts point to non-existent paths (warn only on didOpen once)
-				if contracts, ok := js["contracts"].(map[string]any); ok {
-					for k, v := range contracts {
-						if rel, isStr := v.(string); isStr {
-							candidate := filepath.Join(filepath.Dir(cfg), rel)
-							if _, statErr := i.loader.Stat(candidate); statErr != nil {
-								conn.ShowMessage(&protocol.ShowMessageParams{
-									Type:    protocol.Error,
-									Message: fmt.Sprintf("Invalid contract path for %s in flow.json: %s", k, rel),
-								})
-								break
-							}
-						}
-					}
-				}
-			}
-		}
-		if cfg := i.cfgManager.NearestConfigPath(path); cfg != "" {
-			// Attempt to load config; if flowkit fails, show the error and skip prompt
-			if _, err := i.cfgManager.ResolveStateForPath(cfg); err != nil {
-				conn.ShowMessage(&protocol.ShowMessageParams{
-					Type:    protocol.Error,
-					Message: fmt.Sprintf("Failed to load flow.json: %s", err.Error()),
-				})
-			}
-			return
 		}
 		if !i.promptShown.CompareAndSwap(false, true) {
 			return
@@ -320,6 +289,8 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 			i.cfgManager.enableFlowClient = i.enableFlowClient
 			i.cfgManager.numberOfAccounts = 0
 			i.cfgManager.SetInitConfigPath(configPath)
+			// Record the failure in cfgManager by attempting to resolve state there as well
+			_, _ = i.cfgManager.ResolveStateForProject(configPath)
 		}
 		// Try to parse enough of flow.json to detect invalid contract paths and surface to the user via ShowMessage
 		if i.client != nil {
@@ -366,6 +337,8 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	i.cfgManager.enableFlowClient = i.enableFlowClient
 	i.cfgManager.numberOfAccounts = numberOfAccounts
 	i.cfgManager.SetInitConfigPath(configPath)
+	// Ensure cfgManager has loaded state so future LastLoadError reflects reality
+	_, _ = i.cfgManager.ResolveStateForProject(configPath)
 
 	// If client is enabled, initialize the client (only when state loaded successfully)
 	if i.enableFlowClient {

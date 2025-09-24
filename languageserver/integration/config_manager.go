@@ -59,6 +59,9 @@ type ConfigManager struct {
 
 	// directory watchers to detect creation/removal of flow.json
 	dirWatchers map[string]*fsnotify.Watcher
+
+    // loadErrors keeps the last load/reload error per config path (abs)
+    loadErrors map[string]string
 }
 
 func NewConfigManager(loader flowkit.ReaderWriter, enableFlowClient bool, numberOfAccounts int, initConfigPath string) *ConfigManager {
@@ -72,6 +75,7 @@ func NewConfigManager(loader flowkit.ReaderWriter, enableFlowClient bool, number
 		watchers:         make(map[string]*fsnotify.Watcher),
 		docToConfig:      make(map[string]string),
 		dirWatchers:      make(map[string]*fsnotify.Watcher),
+        loadErrors:       make(map[string]string),
 	}
 }
 
@@ -169,11 +173,14 @@ func (m *ConfigManager) loadState(cfgPath string) (flowState, error) {
 		return st, nil
 	}
 	st := newFlowkitState(m.loader)
-	if err := st.Load(absCfgPath); err != nil {
+    if err := st.Load(absCfgPath); err != nil {
+        m.loadErrors[absCfgPath] = err.Error()
 		return nil, err
 	}
 	m.states[absCfgPath] = st
 	m.ensureWatcherLocked(absCfgPath)
+    // clear last error on success
+    delete(m.loadErrors, absCfgPath)
 	return st, nil
 }
 
@@ -188,10 +195,12 @@ func (m *ConfigManager) loadClient(cfgPath string, st flowState) (flowClient, er
 		return cl, nil
 	}
 	cl := newFlowkitClient(m.loader)
-	if err := cl.Initialize(st, m.numberOfAccounts); err != nil {
+    if err := cl.Initialize(st, m.numberOfAccounts); err != nil {
+        m.loadErrors[absCfgPath] = err.Error()
 		return nil, err
 	}
 	m.clients[absCfgPath] = cl
+    delete(m.loadErrors, absCfgPath)
 	return cl, nil
 }
 
@@ -537,17 +546,22 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 			st := m.states[cfgPath]
 			cl := m.clients[cfgPath]
 			m.mu.RUnlock()
-			if st != nil {
-				if err := st.Reload(); err != nil {
-					// Surface reload error via a hook if provided in future; for now, drop broken state/client
-					m.mu.Lock()
-					delete(m.states, cfgPath)
-					if c := m.clients[cfgPath]; c != nil {
-						delete(m.clients, cfgPath)
-					}
-					m.mu.Unlock()
-				}
-			}
+            if st != nil {
+                if err := st.Reload(); err != nil {
+                    m.mu.Lock()
+                    m.loadErrors[cfgPath] = err.Error()
+                    // drop broken state/client so next access tries re-load and reports error
+                    delete(m.states, cfgPath)
+                    if c := m.clients[cfgPath]; c != nil {
+                        delete(m.clients, cfgPath)
+                    }
+                    m.mu.Unlock()
+                } else {
+                    m.mu.Lock()
+                    delete(m.loadErrors, cfgPath)
+                    m.mu.Unlock()
+                }
+            }
 			if cl != nil {
 				_ = cl.Reload()
 			}
@@ -560,6 +574,14 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 			// ignore errors for now
 		}
 	}
+}
+
+// LastLoadError returns the last captured load/reload error for a given projectID (flow.json path).
+func (m *ConfigManager) LastLoadError(projectID string) string {
+    abs := m.ConfigPathForProject(projectID)
+    m.mu.RLock()
+    defer m.mu.RUnlock()
+    return m.loadErrors[abs]
 }
 
 // invalidateIndexForConfig removes any doc cache entries pointing at cfgPath
