@@ -59,15 +59,15 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 		if i.cfgManager == nil {
 			return
 		}
-        // Do not validate init-config here; rely on ConfigManager load errors instead
-        if cfg := i.cfgManager.NearestConfigPath(path); cfg != "" {
-            // Attempt to load; if flowkit fails, remember and show the error and skip prompt
-            if _, err := i.cfgManager.ResolveStateForPath(cfg); err != nil {
-                conn.ShowMessage(&protocol.ShowMessageParams{
-                    Type:    protocol.Error,
-                    Message: fmt.Sprintf("Failed to load flow.json: %s", err.Error()),
-                })
-            }
+		// Do not validate init-config here; rely on ConfigManager load errors instead
+		if cfg := i.cfgManager.NearestConfigPath(path); cfg != "" {
+			// Attempt to load; if flowkit fails, remember and show the error and skip prompt
+			if _, err := i.cfgManager.ResolveStateForPath(cfg); err != nil {
+				conn.ShowMessage(&protocol.ShowMessageParams{
+					Type:    protocol.Error,
+					Message: fmt.Sprintf("Failed to load flow.json: %s", err.Error()),
+				})
+			}
 			return
 		}
 		// No nearest flow.json: if an init-config override exists and had load errors, surface them now.
