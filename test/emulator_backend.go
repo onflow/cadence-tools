@@ -170,6 +170,7 @@ var systemContracts = func() []common.AddressLocation {
 		"IFlowEVMNFTBridge":              serviceAddress,
 		"IFlowEVMTokenBridge":            serviceAddress,
 		"FlowTransactionScheduler":       serviceAddress,
+		"FlowTransactionSchedulerUtils":  serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
