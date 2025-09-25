@@ -40,7 +40,6 @@ type resolvers struct {
 	cfgManager *ConfigManager
 }
 
-//
 
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
 func deURI(path string) string {
