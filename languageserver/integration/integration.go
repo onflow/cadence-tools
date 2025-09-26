@@ -238,7 +238,7 @@ func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) strin
 			cfgPath = abs
 		}
 		if fi, err := p.cfg.loader.Stat(cfgPath); err == nil {
-			return cfgPath + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
+			return fmt.Sprintf("%s@%d", cfgPath, fi.ModTime().UnixNano())
 		}
 		return cfgPath
 	}
