@@ -88,14 +88,20 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 			dir = root
 		}
 		// If we've already prompted for this root in this session, skip
-		i.promptMu.Lock()
-		if _, seen := i.promptedRoots[dir]; seen {
-			i.promptMu.Unlock()
+		skip := false
+		func() {
+			i.promptMu.Lock()
+			defer i.promptMu.Unlock()
+			if _, seen := i.promptedRoots[dir]; seen {
+				skip = true
+				return
+			}
+			// mark as seen early to avoid races with concurrent didOpen on same root
+			i.promptedRoots[dir] = struct{}{}
+		}()
+		if skip {
 			return
 		}
-		// mark as seen early to avoid races with concurrent didOpen on same root
-		i.promptedRoots[dir] = struct{}{}
-		i.promptMu.Unlock()
 		go func() {
 			action, err := conn.ShowMessageRequest(&protocol.ShowMessageRequestParams{
 				Type:    protocol.Info,
@@ -118,7 +124,13 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 				})
 				return
 			}
-			_, _ = i.cfgManager.ResolveStateForPath(filepath.Join(dir, "flow.json"))
+			if _, loadErr := i.cfgManager.ResolveStateForPath(target); loadErr != nil {
+				conn.ShowMessage(&protocol.ShowMessageParams{
+					Type:    protocol.Error,
+					Message: fmt.Sprintf("Failed to load initialized Flow project: %s", loadErr.Error()),
+				})
+				return
+			}
 			i.promptShown.Store(false)
 			conn.ShowMessage(&protocol.ShowMessageParams{
 				Type:    protocol.Info,
@@ -284,43 +296,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	configPath = cleanWindowsPath(configPath)
 	err := i.state.Load(configPath)
 	if err != nil {
-		// Seed cfgManager with the init-config path so project scoping still works
-		if i.cfgManager != nil {
-			i.cfgManager.enableFlowClient = i.enableFlowClient
-			i.cfgManager.numberOfAccounts = 0
-			i.cfgManager.SetInitConfigPath(configPath)
-			// Record the failure in cfgManager by attempting to resolve state there as well
-			_, _ = i.cfgManager.ResolveStateForProject(configPath)
-		}
-		// Try to parse enough of flow.json to detect invalid contract paths and surface to the user via ShowMessage
-		if i.client != nil {
-			// best-effort: read file and try to detect bad paths
-			if data, readErr := i.loader.ReadFile(configPath); readErr == nil {
-				var parsed struct {
-					Contracts map[string]string `json:"contracts"`
-				}
-				if jsonErr := json.Unmarshal(data, &parsed); jsonErr == nil && len(parsed.Contracts) > 0 {
-					for _, rel := range parsed.Contracts {
-						candidate := filepath.Join(filepath.Dir(configPath), rel)
-						if _, statErr := i.loader.Stat(candidate); statErr != nil {
-							// Inform user once per root
-							root := filepath.Dir(configPath)
-							i.invalidWarnedMu.Lock()
-							if _, seen := i.invalidWarnedRoots[root]; !seen {
-								i.invalidWarnedRoots[root] = struct{}{}
-								i.invalidWarnedMu.Unlock()
-								// send message via client logger if available
-								// Note: we don't have conn here; rely on code lenses/diagnostics path to surface errors on open
-								// Alternatively, no-op. Keeping mark prevents repeated errors.
-							} else {
-								i.invalidWarnedMu.Unlock()
-							}
-							break
-						}
-					}
-				}
-			}
-		}
+		i.handleInitConfigLoadFailure(configPath)
 		return nil
 	}
 
@@ -334,11 +310,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 		}
 	}
 	// Reuse existing manager instance to avoid stale references
-	i.cfgManager.enableFlowClient = i.enableFlowClient
-	i.cfgManager.numberOfAccounts = numberOfAccounts
-	i.cfgManager.SetInitConfigPath(configPath)
-	// Ensure cfgManager has loaded state so future LastLoadError reflects reality
-	_, _ = i.cfgManager.ResolveStateForProject(configPath)
+	i.setupConfigManager(configPath, numberOfAccounts)
 
 	// If client is enabled, initialize the client (only when state loaded successfully)
 	if i.enableFlowClient {
@@ -362,6 +334,59 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	}
 
 	return nil
+}
+
+// handleInitConfigLoadFailure seeds the config manager with the init-config path and
+// records any load error for later surfacing, without failing initialization.
+func (i *FlowIntegration) handleInitConfigLoadFailure(configPath string) {
+	// Seed cfgManager with the init-config path so project scoping still works
+	if i.cfgManager != nil {
+		i.cfgManager.enableFlowClient = i.enableFlowClient
+		i.cfgManager.numberOfAccounts = 0
+		i.cfgManager.SetInitConfigPath(configPath)
+		// Record the failure in cfgManager by attempting to resolve state there as well
+		if _, loadErr := i.cfgManager.ResolveStateForProject(configPath); loadErr != nil {
+			// cfgManager tracks last load error internally; no-op here
+		}
+	}
+	// Best-effort: read file and try to detect bad contract paths for user feedback later
+	if i.client != nil {
+		if data, readErr := i.loader.ReadFile(configPath); readErr == nil {
+			var parsed struct {
+				Contracts map[string]string `json:"contracts"`
+			}
+			if jsonErr := json.Unmarshal(data, &parsed); jsonErr == nil && len(parsed.Contracts) > 0 {
+				for _, rel := range parsed.Contracts {
+					candidate := filepath.Join(filepath.Dir(configPath), rel)
+					if _, statErr := i.loader.Stat(candidate); statErr != nil {
+						root := filepath.Dir(configPath)
+						i.invalidWarnedMu.Lock()
+						if _, seen := i.invalidWarnedRoots[root]; !seen {
+							i.invalidWarnedRoots[root] = struct{}{}
+							i.invalidWarnedMu.Unlock()
+						} else {
+							i.invalidWarnedMu.Unlock()
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
+// setupConfigManager configures cfgManager for the given configPath and numberOfAccounts
+// and ensures state is loaded so LastLoadError reflects reality.
+func (i *FlowIntegration) setupConfigManager(configPath string, numberOfAccounts int) {
+	if i.cfgManager == nil {
+		return
+	}
+	i.cfgManager.enableFlowClient = i.enableFlowClient
+	i.cfgManager.numberOfAccounts = numberOfAccounts
+	i.cfgManager.SetInitConfigPath(configPath)
+	if _, loadErr := i.cfgManager.ResolveStateForProject(configPath); loadErr != nil {
+		// Do not fail initialization; errors will be surfaced on demand
+	}
 }
 
 func (i *FlowIntegration) codeLenses(

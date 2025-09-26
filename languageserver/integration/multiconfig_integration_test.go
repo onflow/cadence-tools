@@ -27,18 +27,19 @@ import (
 	"github.com/onflow/flow-go-sdk"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_CommandsRoutePerClosestFlowJSON(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	loader := &afero.Afero{Fs: fs}
 
-	_ = loader.MkdirAll("/w/a", 0o755)
-	_ = loader.MkdirAll("/w/b", 0o755)
-	_ = loader.WriteFile("/w/a/flow.json", []byte("{}"), 0o644)
-	_ = loader.WriteFile("/w/b/flow.json", []byte("{}"), 0o644)
-	_ = loader.WriteFile("/w/a/script.cdc", []byte("pub fun main() {}"), 0o644)
-	_ = loader.WriteFile("/w/b/script.cdc", []byte("pub fun main() {}"), 0o644)
+	require.NoError(t, loader.MkdirAll("/w/a", 0o755))
+	require.NoError(t, loader.MkdirAll("/w/b", 0o755))
+	require.NoError(t, loader.WriteFile("/w/a/flow.json", []byte("{}"), 0o644))
+	require.NoError(t, loader.WriteFile("/w/b/flow.json", []byte("{}"), 0o644))
+	require.NoError(t, loader.WriteFile("/w/a/script.cdc", []byte("pub fun main() {}"), 0o644))
+	require.NoError(t, loader.WriteFile("/w/b/script.cdc", []byte("pub fun main() {}"), 0o644))
 
 	mgr := NewConfigManager(loader, true, 0, "")
 
@@ -50,7 +51,7 @@ func Test_CommandsRoutePerClosestFlowJSON(t *testing.T) {
 	mgr.clients["/w/b/flow.json"] = mockB
 	mgr.mu.Unlock()
 
-	_ = &FlowIntegration{enableFlowClient: true, cfgManager: mgr}
+	// Integration instance not required for commands; ensure no dead code remains
 	cmds := commands{cfg: mgr}
 
 	// executeScript in /w/a should use mockA

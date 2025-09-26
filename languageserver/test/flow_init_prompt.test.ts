@@ -9,6 +9,8 @@ import {
 } from "vscode-languageserver-protocol";
 
 import { execSync, spawn } from "child_process";
+const FLOW_JSON = "flow.json";
+
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -92,7 +94,7 @@ test("prompts and creates flow.json on accept", async () => {
     });
 
     // Wait up to 10s for flow.json to appear
-    const target = path.join(dir, "flow.json");
+    const target = path.join(dir, FLOW_JSON);
     const deadline = Date.now() + 10000;
     while (!fs.existsSync(target) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 150));
@@ -136,7 +138,7 @@ test("creates flow.json at workspace folder root when file is nested", async () 
       ),
     });
 
-    const targetAtRoot = path.join(root, "flow.json");
+    const targetAtRoot = path.join(root, FLOW_JSON);
     const deadline = Date.now() + 10000;
     while (!fs.existsSync(targetAtRoot) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 150));
@@ -179,7 +181,7 @@ test("fallback: creates in file directory when not under any workspace folder", 
       ),
     });
 
-    const targetInFileDir = path.join(otherRoot, "flow.json");
+    const targetInFileDir = path.join(otherRoot, FLOW_JSON);
     const deadline = Date.now() + 10000;
     while (!fs.existsSync(targetInFileDir) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 150));
@@ -218,7 +220,7 @@ test("prompts and does not create flow.json on ignore", async () => {
 
     // Give time in case any background action would run
     await new Promise((r) => setTimeout(r, 400));
-    expect(fs.existsSync(path.join(dir, "flow.json"))).toBeFalsy();
+    expect(fs.existsSync(path.join(dir, FLOW_JSON))).toBeFalsy();
   });
 
   try {

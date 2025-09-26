@@ -40,7 +40,6 @@ type resolvers struct {
 	cfgManager *ConfigManager
 }
 
-
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
 func deURI(path string) string {
 	path = strings.TrimPrefix(path, "file://")
@@ -55,24 +54,33 @@ func deURI(path string) string {
 // stringImport loads the code for a string location that can either be file path or contract identifier.
 // projectID identifies the project scope (e.g., abs flow.json path) established by the server
 func (r *resolvers) stringImport(projectID string, location common.StringLocation) (string, error) {
-	// Identifier import: resolve from project state/mapping
 	name := location.String()
 	if !strings.Contains(name, ".cdc") {
-		if r.cfgManager == nil || projectID == "" {
-			return "", fmt.Errorf("no project context available for identifier import")
-		}
-		if st, _ := r.cfgManager.ResolveStateForProject(projectID); st != nil {
-			if code, err := st.GetCodeByName(name); err == nil {
-				return code, nil
-			}
-		}
-		if mapped, _ := r.cfgManager.GetContractSourceForProject(projectID, name); mapped != "" {
-			return mapped, nil
-		}
-		return "", fmt.Errorf("failed to resolve project state")
+		return r.resolveStringIdentifierImport(projectID, name)
 	}
+	return r.resolveFileImport(projectID, name)
+}
 
-	// File import: try as provided first, then project-root relative
+// resolveStringIdentifierImport resolves a string identifier import within the given project.
+// e.g. import "Contract"
+func (r *resolvers) resolveStringIdentifierImport(projectID string, name string) (string, error) {
+	if r.cfgManager == nil || projectID == "" {
+		return "", fmt.Errorf("no project context available for identifier import")
+	}
+	if st, _ := r.cfgManager.ResolveStateForProject(projectID); st != nil {
+		if code, err := st.GetCodeByName(name); err == nil {
+			return code, nil
+		}
+	}
+	if mapped, _ := r.cfgManager.GetContractSourceForProject(projectID, name); mapped != "" {
+		return mapped, nil
+	}
+	return "", fmt.Errorf("failed to resolve project state")
+}
+
+// resolveFileImport resolves a file import path relative to the project root if necessary.
+// e.g. import "./contract.cdc"
+func (r *resolvers) resolveFileImport(projectID string, name string) (string, error) {
 	filename := deURI(cleanWindowsPath(name))
 
 	if data, err := r.loader.ReadFile(filename); err == nil {

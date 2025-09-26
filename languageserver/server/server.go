@@ -240,7 +240,9 @@ type CheckerCache interface {
 // Default implementations
 type defaultProjectIdentity struct{}
 
-func (defaultProjectIdentity) ProjectIDForURI(uri protocol.DocumentURI) string { return "" }
+func (defaultProjectIdentity) ProjectIDForURI(uri protocol.DocumentURI) string {
+	return ""
+}
 
 type defaultKeyResolver struct{}
 
@@ -256,9 +258,18 @@ type mapCheckerCache struct{ m map[CheckerKey]*sema.Checker }
 func newMapCheckerCache() *mapCheckerCache {
 	return &mapCheckerCache{m: make(map[CheckerKey]*sema.Checker)}
 }
-func (c *mapCheckerCache) Get(key CheckerKey) (*sema.Checker, bool)  { v, ok := c.m[key]; return v, ok }
-func (c *mapCheckerCache) Put(key CheckerKey, checker *sema.Checker) { c.m[key] = checker }
-func (c *mapCheckerCache) Delete(key CheckerKey)                     { delete(c.m, key) }
+func (c *mapCheckerCache) Get(key CheckerKey) (*sema.Checker, bool) {
+	v, ok := c.m[key]
+	return v, ok
+}
+
+func (c *mapCheckerCache) Put(key CheckerKey, checker *sema.Checker) {
+	c.m[key] = checker
+}
+
+func (c *mapCheckerCache) Delete(key CheckerKey) {
+	delete(c.m, key)
+}
 
 type Option func(*Server) error
 
