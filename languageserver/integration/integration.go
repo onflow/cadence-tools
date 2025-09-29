@@ -297,6 +297,7 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 	err := i.state.Load(configPath)
 	if err != nil {
 		i.handleInitConfigLoadFailure(configPath)
+		//nolint:nilerr // intentionally do not fail initialization; LS should run and surface config errors later
 		return nil
 	}
 
@@ -345,9 +346,7 @@ func (i *FlowIntegration) handleInitConfigLoadFailure(configPath string) {
 		i.cfgManager.numberOfAccounts = 0
 		i.cfgManager.SetInitConfigPath(configPath)
 		// Record the failure in cfgManager by attempting to resolve state there as well
-		if _, loadErr := i.cfgManager.ResolveStateForProject(configPath); loadErr != nil {
-			// cfgManager tracks last load error internally; no-op here
-		}
+		_, _ = i.cfgManager.ResolveStateForProject(configPath)
 	}
 	// Best-effort: read file and try to detect bad contract paths for user feedback later
 	if i.client != nil {
@@ -384,9 +383,7 @@ func (i *FlowIntegration) setupConfigManager(configPath string, numberOfAccounts
 	i.cfgManager.enableFlowClient = i.enableFlowClient
 	i.cfgManager.numberOfAccounts = numberOfAccounts
 	i.cfgManager.SetInitConfigPath(configPath)
-	if _, loadErr := i.cfgManager.ResolveStateForProject(configPath); loadErr != nil {
-		// Do not fail initialization; errors will be surfaced on demand
-	}
+	_, _ = i.cfgManager.ResolveStateForProject(configPath)
 }
 
 func (i *FlowIntegration) codeLenses(
