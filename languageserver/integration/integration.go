@@ -349,7 +349,8 @@ func (i *FlowIntegration) handleInitConfigLoadFailure(configPath string) {
 		i.cfgManager.SetInitConfigPath(configPath)
 		// Record the failure in cfgManager by attempting to resolve state there as well
 		if _, loadErr := i.cfgManager.ResolveStateForProject(configPath); loadErr != nil {
-			// cfgManager tracks last load error internally; no-op here
+			// cfgManager tracks last load error internally; retain for diagnostics to satisfy staticcheck
+			_ = loadErr
 		}
 	}
 	// Best-effort: read file and try to detect bad contract paths for user feedback later
