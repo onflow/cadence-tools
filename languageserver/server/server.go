@@ -249,6 +249,7 @@ type defaultKeyResolver struct{}
 func (defaultKeyResolver) KeyForRoot(projectID string, rootURI protocol.DocumentURI) CheckerKey {
 	return CheckerKey{ProjectID: projectID, Location: uriToLocation(rootURI)}
 }
+
 func (defaultKeyResolver) KeyForImport(parent CheckerKey, imported common.Location) CheckerKey {
 	return CheckerKey{ProjectID: parent.ProjectID, Location: imported}
 }
