@@ -190,7 +190,7 @@ func (f *flowkitClient) ExecuteScript(
 	if err != nil {
 		return nil, err
 	}
-	
+
 	codeFilename, err := computeCodeFilename(f.getConfigPath(), location.Path)
 	if err != nil {
 		return nil, err
