@@ -311,7 +311,9 @@ func (i *FlowIntegration) initialize(initializationOptions any) error {
 		}
 	}
 	// Reuse existing manager instance to avoid stale references
-	i.setupConfigManager(configPath, numberOfAccounts)
+	if err := i.setupConfigManager(configPath, numberOfAccounts); err != nil {
+		return err
+	}
 
 	// If client is enabled, initialize the client (only when state loaded successfully)
 	if i.enableFlowClient {
@@ -346,7 +348,9 @@ func (i *FlowIntegration) handleInitConfigLoadFailure(configPath string) {
 		i.cfgManager.numberOfAccounts = 0
 		i.cfgManager.SetInitConfigPath(configPath)
 		// Record the failure in cfgManager by attempting to resolve state there as well
-		_, _ = i.cfgManager.ResolveStateForProject(configPath)
+		if _, loadErr := i.cfgManager.ResolveStateForProject(configPath); loadErr != nil {
+			// cfgManager tracks last load error internally; no-op here
+		}
 	}
 	// Best-effort: read file and try to detect bad contract paths for user feedback later
 	if i.client != nil {
@@ -376,14 +380,17 @@ func (i *FlowIntegration) handleInitConfigLoadFailure(configPath string) {
 
 // setupConfigManager configures cfgManager for the given configPath and numberOfAccounts
 // and ensures state is loaded so LastLoadError reflects reality.
-func (i *FlowIntegration) setupConfigManager(configPath string, numberOfAccounts int) {
+func (i *FlowIntegration) setupConfigManager(configPath string, numberOfAccounts int) error {
 	if i.cfgManager == nil {
-		return
+		return nil
 	}
 	i.cfgManager.enableFlowClient = i.enableFlowClient
 	i.cfgManager.numberOfAccounts = numberOfAccounts
 	i.cfgManager.SetInitConfigPath(configPath)
-	_, _ = i.cfgManager.ResolveStateForProject(configPath)
+	if _, err := i.cfgManager.ResolveStateForProject(configPath); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (i *FlowIntegration) codeLenses(
