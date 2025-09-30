@@ -233,14 +233,7 @@ func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) strin
 	}
 	// If an init-config override is set, always scope by that config (with mtime suffix)
 	if p.cfg.initConfigPath != "" {
-		cfgPath := p.cfg.initConfigPath
-		if abs, err := filepath.Abs(cfgPath); err == nil {
-			cfgPath = abs
-		}
-		if fi, err := p.cfg.loader.Stat(cfgPath); err == nil {
-			return fmt.Sprintf("%s@%d", cfgPath, fi.ModTime().UnixNano())
-		}
-		return cfgPath
+		return stableProjectID(p.cfg.loader, p.cfg.initConfigPath)
 	}
 	u := string(uri)
 	var path string
@@ -266,10 +259,7 @@ func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) strin
 	if abs, err := filepath.Abs(cfgPath); err == nil {
 		cfgPath = abs
 	}
-	if fi, err := p.cfg.loader.Stat(cfgPath); err == nil {
-		return cfgPath + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
-	}
-	return cfgPath
+	return stableProjectID(p.cfg.loader, cfgPath)
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {
@@ -444,4 +434,16 @@ func (i *FlowIntegration) codeLenses(
 	actions = append(actions, entryPoint.codelens(clientToUse)...)
 
 	return actions, nil
+}
+
+// stableProjectID composes a stable project identifier using an absolute config path and its modtime.
+// The format is: <absConfigPath>@<unix_nanos>. If stat fails, returns the absolute path without suffix.
+func stableProjectID(loader flowkit.ReaderWriter, cfgPath string) string {
+	if abs, err := filepath.Abs(cfgPath); err == nil {
+		cfgPath = abs
+	}
+	if fi, err := loader.Stat(cfgPath); err == nil {
+		return fmt.Sprintf("%s@%d", cfgPath, fi.ModTime().UnixNano())
+	}
+	return cfgPath
 }
