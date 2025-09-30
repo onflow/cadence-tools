@@ -90,8 +90,8 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 		// If we've already prompted for this root in this session, skip
 		skip := false
 		func() {
-			i.promptMu.Lock()
-			defer i.promptMu.Unlock()
+			i.promptedRootsMu.Lock()
+			defer i.promptedRootsMu.Unlock()
 			if _, seen := i.promptedRoots[dir]; seen {
 				skip = true
 				return
@@ -217,7 +217,7 @@ type FlowIntegration struct {
 	loader             flowkit.ReaderWriter
 	cfgManager         *ConfigManager
 	promptShown        atomic.Bool
-	promptMu           sync.Mutex
+	promptedRootsMu    sync.Mutex
 	promptedRoots      map[string]struct{}
 	invalidWarnedMu    sync.Mutex
 	invalidWarnedRoots map[string]struct{}
