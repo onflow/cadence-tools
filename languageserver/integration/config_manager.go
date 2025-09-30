@@ -166,7 +166,10 @@ func (m *ConfigManager) resolveClientForPath(filePath string) (flowClient, error
 }
 
 func (m *ConfigManager) loadState(cfgPath string) (flowState, error) {
-	absCfgPath, _ := filepath.Abs(cleanWindowsPath(cfgPath))
+	absCfgPath, err := filepath.Abs(cleanWindowsPath(cfgPath))
+	if err != nil {
+		return nil, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if st, ok := m.states[absCfgPath]; ok && st != nil && st.IsLoaded() {
@@ -188,7 +191,10 @@ func (m *ConfigManager) loadClient(cfgPath string, st flowState) (flowClient, er
 	if !m.enableFlowClient {
 		return nil, nil
 	}
-	absCfgPath, _ := filepath.Abs(cleanWindowsPath(cfgPath))
+	absCfgPath, err := filepath.Abs(cleanWindowsPath(cfgPath))
+	if err != nil {
+		return nil, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if cl, ok := m.clients[absCfgPath]; ok && cl != nil {
@@ -262,7 +268,10 @@ func (m *ConfigManager) ConfigPathForProject(projectID string) string {
 	}
 	cfgPath := cleanWindowsPath(projectID)
 	cfgPath = deURI(cfgPath)
-	absCfgPath, _ := filepath.Abs(cfgPath)
+	absCfgPath, err := filepath.Abs(cfgPath)
+	if err != nil {
+		return cfgPath
+	}
 	// If a directory was provided, prefer flow.json within it
 	if filepath.Base(absCfgPath) != "flow.json" {
 		candidate := filepath.Join(absCfgPath, "flow.json")
@@ -429,7 +438,10 @@ func (m *ConfigManager) DefaultClient() flowClient {
 }
 
 func (m *ConfigManager) setLastUsed(cfgPath string) {
-	abs, _ := filepath.Abs(cleanWindowsPath(cfgPath))
+	abs, err := filepath.Abs(cleanWindowsPath(cfgPath))
+	if err != nil {
+		abs = cfgPath
+	}
 	m.mu.Lock()
 	m.lastUsedConfigPath = abs
 	m.mu.Unlock()
