@@ -16,6 +16,8 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 
+const FLOW_JSON = "flow.json";
+
 beforeAll(() => {
   execSync("go build ../cmd/languageserver", {
     cwd: __dirname,
@@ -53,7 +55,7 @@ async function withConnection(
 
 describe("multi-config routing (no flow client)", () => {
   const baseFlow = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "flow.json"), "utf8")
+    fs.readFileSync(path.join(__dirname, FLOW_JSON), "utf8")
   );
 
   function writeFlow(dir: string, accountName: string) {
@@ -72,10 +74,7 @@ describe("multi-config routing (no flow client)", () => {
       delete flow.deployments.emulator.moose;
     }
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(
-      path.join(dir, "flow.json"),
-      JSON.stringify(flow, null, 2)
-    );
+    fs.writeFileSync(path.join(dir, FLOW_JSON), JSON.stringify(flow, null, 2));
   }
 
   test("string imports resolve against closest flow.json per file", async () => {
@@ -262,19 +261,19 @@ describe("multi-config routing (no flow client)", () => {
 
     // Overwrite the flow.json contracts mapping to point to the specific files
     const aFlow = JSON.parse(
-      fs.readFileSync(path.join(aDir, "flow.json"), "utf8")
+      fs.readFileSync(path.join(aDir, FLOW_JSON), "utf8")
     );
     aFlow.contracts = { Foo: "./fooA.cdc" };
     fs.writeFileSync(
-      path.join(aDir, "flow.json"),
+      path.join(aDir, FLOW_JSON),
       JSON.stringify(aFlow, null, 2)
     );
     const bFlow = JSON.parse(
-      fs.readFileSync(path.join(bDir, "flow.json"), "utf8")
+      fs.readFileSync(path.join(bDir, FLOW_JSON), "utf8")
     );
     bFlow.contracts = { Foo: "./fooB.cdc" };
     fs.writeFileSync(
-      path.join(bDir, "flow.json"),
+      path.join(bDir, FLOW_JSON),
       JSON.stringify(bFlow, null, 2)
     );
 

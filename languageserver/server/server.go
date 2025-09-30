@@ -2225,6 +2225,13 @@ func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Pr
 // enabling per-document configuration (multi-config) resolution.
 // projectID is the root project identity for the entire checking session.
 func (s *Server) resolveImport(projectID string, checker *sema.Checker, location common.Location) (program *ast.Program, err error) {
+	// NOTE: important, *DON'T* return an error when a location type
+	// is not supported: the import location can simply not be resolved,
+	// no error occurred while resolving it.
+	//
+	// For example, the Crypto contract has an IdentifierLocation,
+	// and we simply return no code for it, so that the checker's
+	// import handler is called which resolves the location
 	projID := projectID
 	var code string
 	switch loc := location.(type) {
