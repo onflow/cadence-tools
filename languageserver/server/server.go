@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,14 +138,16 @@ func (d Document) HasAnyPrecedingStringsAtPosition(options []string, line, colum
 // submitted from the client using workspace/executeCommand.
 type CommandHandler func(args ...json2.RawMessage) (interface{}, error)
 
-// AddressImportResolver is a function that is used to resolve address imports
-type AddressImportResolver func(location common.AddressLocation) (string, error)
+// AddressImportResolver resolves address imports, scoped by project ID
+// projectID identifies the project configuration (e.g., flow.json path)
+type AddressImportResolver func(projectID string, location common.AddressLocation) (string, error)
 
 // AddressContractNamesResolver is a function that is used to resolve contract names of an address
 type AddressContractNamesResolver func(address common.Address) ([]string, error)
 
-// StringImportResolver is a function that is used to resolve string imports
-type StringImportResolver func(location common.StringLocation) (string, error)
+// StringImportResolver resolves string imports, scoped by project ID
+// projectID identifies the project configuration (e.g., flow.json path)
+type StringImportResolver func(projectID string, location common.StringLocation) (string, error)
 
 // CodeLensProvider is a function that is used to provide code lenses for the given checker
 type CodeLensProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.CodeLens, error)
@@ -162,7 +165,7 @@ type CodeActionResolver func() []*protocol.CodeAction
 
 type Server struct {
 	protocolServer       *protocol.Server
-	checkers             map[common.Location]*sema.Checker
+	checkerCache         CheckerCache
 	documents            map[protocol.DocumentURI]Document
 	memberResolvers      map[protocol.DocumentURI]map[string]sema.MemberResolver
 	ranges               map[protocol.DocumentURI]map[string]sema.Range
@@ -175,8 +178,8 @@ type Server struct {
 	resolveAddressContractNames AddressContractNamesResolver
 	// resolveStringImport is the optional function that is used to resolve string imports
 	resolveStringImport StringImportResolver
-	// resolveIdentifierImport is the optional function that is used to resolve identifier imports
-	resolveIdentifierImport func(location common.IdentifierLocation) (string, error)
+	// resolveIdentifierImport is the optional function that is used to resolve identifier imports (scoped by project)
+	resolveIdentifierImport func(projectID string, location common.IdentifierLocation) (string, error)
 	// codeLensProviders are the functions that are used to provide code lenses for a checker
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
@@ -186,17 +189,128 @@ type Server struct {
 	accessCheckMode               sema.AccessCheckMode
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
-	// checkerStandardConfig is a config used to check contracts and transactions
-	checkerStandardConfig *sema.Config
-	// checkerScriptConfig is a config used to check scripts
-	checkerScriptConfig *sema.Config
+	// memberAccountAccessHandler stored to apply when building per-project configs
+	memberAccountAccessHandler sema.MemberAccountAccessHandlerFunc
+	// checkerStandardConfig is a config factory for contracts and transactions (per project)
+	checkerStandardConfig func(projectID string) *sema.Config
+	// checkerScriptConfig is a config factory for scripts (per project)
+	checkerScriptConfig func(projectID string) *sema.Config
 	// standardLibrary is the default standard library
 	standardLibrary *standardLibrary
 	// scriptStandardLibrary is the standard library for scripts
 	scriptStandardLibrary *standardLibrary
+
+	// workspaceFolders stores any workspace folders provided by the client on initialize
+	workspaceFolders []protocol.WorkspaceFolder
+
+	// onDidOpen, if set, is invoked after a document is opened
+	onDidOpen func(conn protocol.Conn, uri protocol.DocumentURI, text string)
+	// keyResolver builds cache keys for root/imported checkers
+	keyResolver CheckerKeyResolver
+	// projectIdentity provides a project-scoped identity for a given document URI
+	projectIdentity ProjectIdentityProvider
+}
+
+// checkerKey scopes a cached checker by its originating document URI and the imported location.
+// This prevents collisions for name-based imports (e.g., common.StringLocation) across projects.
+// CheckerKey identifies a cached checker instance.
+type CheckerKey struct {
+	ProjectID string
+	Location  common.Location
+}
+
+// ProjectIdentityProvider maps a document URI to a stable project identity (e.g., abs flow.json path).
+type ProjectIdentityProvider interface {
+	ProjectIDForURI(uri protocol.DocumentURI) string
+}
+
+// CheckerKeyResolver composes keys for root and imported checkers.
+type CheckerKeyResolver interface {
+	KeyForRoot(projectID string, rootURI protocol.DocumentURI) CheckerKey
+	KeyForImport(parent CheckerKey, imported common.Location) CheckerKey
+}
+
+// CheckerCache is a storage for checkers keyed by CheckerKey.
+type CheckerCache interface {
+	Get(key CheckerKey) (*sema.Checker, bool)
+	Put(key CheckerKey, checker *sema.Checker)
+	Delete(key CheckerKey)
+}
+
+// Default implementations
+type defaultProjectIdentity struct{}
+
+func (defaultProjectIdentity) ProjectIDForURI(uri protocol.DocumentURI) string {
+	return ""
+}
+
+type defaultKeyResolver struct{}
+
+func (defaultKeyResolver) KeyForRoot(projectID string, rootURI protocol.DocumentURI) CheckerKey {
+	return CheckerKey{ProjectID: projectID, Location: uriToLocation(rootURI)}
+}
+
+func (defaultKeyResolver) KeyForImport(parent CheckerKey, imported common.Location) CheckerKey {
+	return CheckerKey{ProjectID: parent.ProjectID, Location: imported}
+}
+
+type mapCheckerCache struct{ m map[CheckerKey]*sema.Checker }
+
+func newMapCheckerCache() *mapCheckerCache {
+	return &mapCheckerCache{m: make(map[CheckerKey]*sema.Checker)}
+}
+func (c *mapCheckerCache) Get(key CheckerKey) (*sema.Checker, bool) {
+	v, ok := c.m[key]
+	return v, ok
+}
+
+func (c *mapCheckerCache) Put(key CheckerKey, checker *sema.Checker) {
+	c.m[key] = checker
+}
+
+func (c *mapCheckerCache) Delete(key CheckerKey) {
+	delete(c.m, key)
 }
 
 type Option func(*Server) error
+
+// WithDidOpenHook registers a callback invoked after a document is opened.
+func WithDidOpenHook(hook func(conn protocol.Conn, uri protocol.DocumentURI, text string)) Option {
+	return func(s *Server) error {
+		s.onDidOpen = hook
+		return nil
+	}
+}
+
+// WithProjectIdentityProvider sets the project identity provider used for cache scoping
+func WithProjectIdentityProvider(p ProjectIdentityProvider) Option {
+	return func(s *Server) error {
+		if p != nil {
+			s.projectIdentity = p
+		}
+		return nil
+	}
+}
+
+// WithCheckerKeyResolver sets the resolver that builds checker cache keys
+func WithCheckerKeyResolver(r CheckerKeyResolver) Option {
+	return func(s *Server) error {
+		if r != nil {
+			s.keyResolver = r
+		}
+		return nil
+	}
+}
+
+// WithCheckerCache sets a custom checker cache implementation
+func WithCheckerCache(c CheckerCache) Option {
+	return func(s *Server) error {
+		if c != nil {
+			s.checkerCache = c
+		}
+		return nil
+	}
+}
 
 type Command struct {
 	Name    string
@@ -246,7 +360,7 @@ func WithStringImportResolver(resolver StringImportResolver) Option {
 
 // WithIdentifierImportResolver returns a server option that sets the given function
 // as the function that is used to resolve identifier imports
-func WithIdentifierImportResolver(resolver func(location common.IdentifierLocation) (string, error)) Option {
+func WithIdentifierImportResolver(resolver func(projectID string, location common.IdentifierLocation) (string, error)) Option {
 	return func(s *Server) error {
 		s.resolveIdentifierImport = resolver
 		return nil
@@ -287,8 +401,7 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 // determines whether the access is allowed based on the location of program and the called member.
 func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
 	return func(server *Server) error {
-		server.checkerStandardConfig.MemberAccountAccessHandler = handler
-		server.checkerScriptConfig.MemberAccountAccessHandler = handler
+		server.memberAccountAccessHandler = handler
 		return nil
 	}
 }
@@ -314,13 +427,15 @@ const ParseEntryPointArgumentsCommand = "cadence.server.parseEntryPointArguments
 
 func NewServer() (*Server, error) {
 	server := &Server{
-		checkers:             make(map[common.Location]*sema.Checker),
+		checkerCache:         newMapCheckerCache(),
 		documents:            make(map[protocol.DocumentURI]Document),
 		memberResolvers:      make(map[protocol.DocumentURI]map[string]sema.MemberResolver),
 		ranges:               make(map[protocol.DocumentURI]map[string]sema.Range),
 		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]CodeActionResolver),
 		commands:             make(map[string]CommandHandler),
 		accessCheckMode:      sema.AccessCheckModeStrict,
+		keyResolver:          defaultKeyResolver{},
+		projectIdentity:      defaultProjectIdentity{},
 	}
 	server.protocolServer = protocol.NewServer(server)
 
@@ -341,16 +456,20 @@ func NewServer() (*Server, error) {
 	server.standardLibrary = newStandardLibrary()
 	server.scriptStandardLibrary = newScriptStandardLibrary()
 
-	// create checker configurations
-	server.checkerStandardConfig = newCheckerConfig(server, server.standardLibrary)
-	server.checkerScriptConfig = newCheckerConfig(server, server.scriptStandardLibrary)
+	// per-project config builders
+	server.checkerStandardConfig = func(projectID string) *sema.Config {
+		return newCheckerConfig(server, server.standardLibrary, projectID)
+	}
+	server.checkerScriptConfig = func(projectID string) *sema.Config {
+		return newCheckerConfig(server, server.scriptStandardLibrary, projectID)
+	}
 
 	return server, nil
 }
 
 // newCheckerConfig creates a checker config based on the standard library provided set to base value activations.
-func newCheckerConfig(s *Server, lib *standardLibrary) *sema.Config {
-	return &sema.Config{
+func newCheckerConfig(s *Server, lib *standardLibrary, projectID string) *sema.Config {
+	cfg := &sema.Config{
 		BaseValueActivationHandler: func(_ common.Location) *sema.VariableActivation {
 			return lib.baseValueActivation
 		},
@@ -358,8 +477,12 @@ func newCheckerConfig(s *Server, lib *standardLibrary) *sema.Config {
 		PositionInfoEnabled:        true,
 		ExtendedElaborationEnabled: true,
 		LocationHandler:            s.handleLocation,
-		ImportHandler:              s.handleImport,
+		ImportHandler: func(chk *sema.Checker, importedLocation common.Location, r ast.Range) (sema.Import, error) {
+			return s.handleImport(projectID, chk, importedLocation, r)
+		},
+		MemberAccountAccessHandler: s.memberAccountAccessHandler,
 	}
+	return cfg
 }
 
 func (s *Server) SetOptions(options ...Option) error {
@@ -381,8 +504,12 @@ func (s *Server) Stop() error {
 }
 
 func (s *Server) checkerForDocument(uri protocol.DocumentURI) *sema.Checker {
-	location := uriToLocation(uri)
-	return s.checkers[location]
+	projectID := s.projectIdentity.ProjectIDForURI(uri)
+	key := s.keyResolver.KeyForRoot(projectID, uri)
+	if chk, ok := s.checkerCache.Get(key); ok {
+		return chk
+	}
+	return nil
 }
 
 func (s *Server) Initialize(
@@ -415,13 +542,19 @@ func (s *Server) Initialize(
 		},
 	}
 
+	// capture workspace folders (or fall back to rootUri if provided)
+	if params.WorkspaceFolders != nil {
+		s.workspaceFolders = params.WorkspaceFolders
+	} else if params.RootURI != "" {
+		s.workspaceFolders = []protocol.WorkspaceFolder{{
+			URI:  string(params.RootURI),
+			Name: "root",
+		}}
+	}
+
 	options := params.InitializationOptions
 
 	s.configure(options)
-
-	// update the value after config is initialized
-	s.checkerStandardConfig.AccessCheckMode = s.accessCheckMode
-	s.checkerScriptConfig.AccessCheckMode = s.accessCheckMode
 
 	for _, handler := range s.initializationOptionsHandlers {
 		err := handler(options)
@@ -434,6 +567,39 @@ func (s *Server) Initialize(
 	go s.registerCommands(conn)
 
 	return result, nil
+}
+
+// WorkspaceFolderRootForPath returns the workspace folder root directory for the given
+// absolute file system path. If no configured workspace folder contains the path,
+// it returns an empty string.
+func (s *Server) WorkspaceFolderRootForPath(absPath string) string {
+	if absPath == "" || len(s.workspaceFolders) == 0 {
+		return ""
+	}
+	// normalize absPath
+	if ap, err := filepath.Abs(absPath); err == nil {
+		absPath = ap
+	}
+	if rp, err := filepath.EvalSymlinks(absPath); err == nil {
+		absPath = rp
+	}
+	for _, wf := range s.workspaceFolders {
+		u := wf.URI
+		if strings.HasPrefix(u, filePrefix) {
+			dir := strings.TrimPrefix(u, filePrefix)
+			if dp, err := filepath.Abs(dir); err == nil {
+				dir = dp
+			}
+			if rp, err := filepath.EvalSymlinks(dir); err == nil {
+				dir = rp
+			}
+			// ensure absPath is within dir
+			if rel, err := filepath.Rel(dir, absPath); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return dir
+			}
+		}
+	}
+	return ""
 }
 
 // initCrashReporting set-ups sentry as crash reporting tool, it also sets listener for panics.
@@ -568,6 +734,9 @@ func (s *Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpe
 		Version: version,
 	}
 
+	if s.onDidOpen != nil {
+		s.onDidOpen(conn, uri, text)
+	}
 	s.checkAndPublishDiagnostics(conn, uri, text, version)
 
 	return nil
@@ -590,9 +759,9 @@ func (s *Server) DidChangeTextDocument(
 
 	// todo implement smarter cache invalidation with dependency resolution using https://github.com/onflow/cadence/pull/1634
 	// we should build dependency tree upfront and then based on the changes only reset checkers contained in that tree
-	for locationID := range s.checkers {
-		delete(s.checkers, locationID)
-	}
+	// Clear only the root checker for this document; sub-checkers are scoped by project
+	rootKey := s.keyResolver.KeyForRoot(s.projectIdentity.ProjectIDForURI(uri), uri)
+	s.checkerCache.Delete(rootKey)
 
 	s.checkAndPublishDiagnostics(conn, uri, text, version)
 
@@ -1848,12 +2017,13 @@ var lintingAnalyzers = maps.Values(linter.Analyzers)
 // decideCheckerConfig based on the program type
 //
 // if a program is a script return the augmented config containing additional values
-func (s *Server) decideCheckerConfig(program *ast.Program) *sema.Config {
-	if program.SoleTransactionDeclaration() != nil || program.SoleContractDeclaration() != nil {
-		return s.checkerStandardConfig
-	}
 
-	return s.checkerScriptConfig
+// decideCheckerConfig chooses the checker config based on program kind and project scope
+func (s *Server) decideCheckerConfig(projectID string, program *ast.Program) *sema.Config {
+	if program.SoleTransactionDeclaration() != nil || program.SoleContractDeclaration() != nil {
+		return s.checkerStandardConfig(projectID)
+	}
+	return s.checkerScriptConfig(projectID)
 }
 
 // getDiagnostics parses and checks the given file and generates diagnostics
@@ -1895,21 +2065,26 @@ func (s *Server) getDiagnostics(
 	location := uriToLocation(uri)
 
 	if program == nil {
-		delete(s.checkers, location)
+		rootKey := s.keyResolver.KeyForRoot(s.projectIdentity.ProjectIDForURI(uri), uri)
+		s.checkerCache.Delete(rootKey)
 		return
 	}
 
+	// Build checker with a config that captures the root project ID for all nested imports
+	projID := s.projectIdentity.ProjectIDForURI(uri)
+	cfgCopy := s.decideCheckerConfig(projID, program)
 	var checker *sema.Checker
 	checker, diagnosticsErr = sema.NewChecker(
 		program,
 		location,
 		nil,
-		s.decideCheckerConfig(program),
+		cfgCopy,
 	)
 	if diagnosticsErr != nil {
 		return
 	}
 
+	// Determine project for this checker before checking so imports can see it
 	start := time.Now()
 	checkError := checker.Check()
 	elapsed := time.Since(start)
@@ -1920,7 +2095,9 @@ func (s *Server) getDiagnostics(
 		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
 	})
 
-	s.checkers[location] = checker
+	// Cache the root checker by project-aware key
+	rootKey := s.keyResolver.KeyForRoot(projID, uri)
+	s.checkerCache.Put(rootKey, checker)
 
 	if checkError != nil {
 		if parentErr, ok := checkError.(errors.ParentError); ok {
@@ -2044,7 +2221,10 @@ func parse(code, location string, log func(*protocol.LogMessageParams)) (*ast.Pr
 	return program, err
 }
 
-func (s *Server) resolveImport(location common.Location) (program *ast.Program, err error) {
+// resolveImport provides the checker context to import resolvers,
+// enabling per-document configuration (multi-config) resolution.
+// projectID is the root project identity for the entire checking session.
+func (s *Server) resolveImport(projectID string, checker *sema.Checker, location common.Location) (program *ast.Program, err error) {
 	// NOTE: important, *DON'T* return an error when a location type
 	// is not supported: the import location can simply not be resolved,
 	// no error occurred while resolving it.
@@ -2052,35 +2232,30 @@ func (s *Server) resolveImport(location common.Location) (program *ast.Program, 
 	// For example, the Crypto contract has an IdentifierLocation,
 	// and we simply return no code for it, so that the checker's
 	// import handler is called which resolves the location
-
+	projID := projectID
 	var code string
 	switch loc := location.(type) {
 	case common.StringLocation:
 		if s.resolveStringImport == nil {
 			return nil, nil
 		}
-
-		code, err = s.resolveStringImport(loc)
-
+		code, err = s.resolveStringImport(projID, loc)
 	case common.AddressLocation:
 		if s.resolveAddressImport == nil {
 			return nil, nil
 		}
-		code, err = s.resolveAddressImport(loc)
-
+		code, err = s.resolveAddressImport(projID, loc)
 	case common.IdentifierLocation:
 		if s.resolveIdentifierImport == nil {
 			return nil, nil
 		}
-		code, err = s.resolveIdentifierImport(loc)
-
+		code, err = s.resolveIdentifierImport(projID, loc)
 	default:
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-
 	return parser.ParseProgram(nil, []byte(code), parser.Config{})
 }
 
@@ -2945,14 +3120,8 @@ func (s *Server) handleLocation(
 	return resolvedLocations, nil
 }
 
-func (s *Server) handleImport(
-	checker *sema.Checker,
-	importedLocation common.Location,
-	_ ast.Range,
-) (
-	sema.Import,
-	error,
-) {
+// handleImport is the import resolver that is bound with the root projectID via newCheckerConfig
+func (s *Server) handleImport(projectID string, checker *sema.Checker, importedLocation common.Location, r ast.Range) (sema.Import, error) {
 	switch importedLocation {
 	case stdlib.TestContractLocation:
 		testChecker := stdlib.GetTestContractType().Checker
@@ -2966,44 +3135,34 @@ func (s *Server) handleImport(
 		}, nil
 	default:
 		if isPathLocation(importedLocation) {
-			// import may be a relative path and therefore should be normalized
-			// against the current location
+			// import may be a relative path and therefore should be normalized against current location
 			importedLocation = normalizePathLocation(checker.Location, importedLocation)
-
 			if checker.Location == importedLocation {
 				return nil, &sema.CheckerError{
 					Errors: []error{fmt.Errorf("cannot import current file: %s", importedLocation)},
 				}
 			}
 		}
-
-		importedChecker, ok := s.checkers[importedLocation]
-		if !ok {
-			importedProgram, err := s.resolveImport(importedLocation)
-
-			if err != nil {
-				return nil, err
-			}
-			if importedProgram == nil {
-				return nil, &sema.CheckerError{
-					Errors: []error{fmt.Errorf("cannot import %s", importedLocation)},
-				}
-			}
-
-			importedChecker, err = checker.SubChecker(importedProgram, importedLocation)
-			if err != nil {
-				return nil, err
-			}
-			s.checkers[importedLocation] = importedChecker
-			err = importedChecker.Check()
-			if err != nil {
-				return nil, err
-			}
+		cacheKey := CheckerKey{ProjectID: projectID, Location: importedLocation}
+		if c, ok := s.checkerCache.Get(cacheKey); ok && c != nil {
+			return sema.ElaborationImport{Elaboration: c.Elaboration}, nil
 		}
-
-		return sema.ElaborationImport{
-			Elaboration: importedChecker.Elaboration,
-		}, nil
+		importedProgram, err := s.resolveImport(projectID, checker, importedLocation)
+		if err != nil {
+			return nil, err
+		}
+		if importedProgram == nil {
+			return nil, &sema.CheckerError{Errors: []error{fmt.Errorf("cannot import %s", importedLocation)}}
+		}
+		importedChecker, err := checker.SubChecker(importedProgram, importedLocation)
+		if err != nil {
+			return nil, err
+		}
+		if err := importedChecker.Check(); err != nil {
+			return nil, err
+		}
+		s.checkerCache.Put(cacheKey, importedChecker)
+		return sema.ElaborationImport{Elaboration: importedChecker.Elaboration}, nil
 	}
 }
 

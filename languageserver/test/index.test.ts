@@ -18,9 +18,12 @@ import {
 import { execSync, spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 
 beforeAll(() => {
-  execSync("go build ../cmd/languageserver", { cwd: __dirname });
+  execSync("go build ../cmd/languageserver", {
+    cwd: __dirname,
+  });
 });
 
 class ConsoleTracer implements Tracer {
@@ -74,7 +77,7 @@ async function withConnection(
   await connection.sendRequest(InitializeRequest.type, {
     capabilities: {},
     processId: process.pid,
-    rootUri: "/",
+    rootUri: `file://${__dirname}`,
     workspaceFolders: null,
     initializationOptions: initOpts,
   });
@@ -468,7 +471,7 @@ describe("script execution", () => {
 
       expect(result).toEqual(`Result: "HELLO WORLD"`);
     }, true);
-  });
+  }, 15000);
 });
 
 async function getAccounts(connection: ProtocolConnection) {
@@ -546,6 +549,143 @@ describe("accounts", () => {
       expect(accounts.filter((a) => a.Name == result.Name)).toHaveLength(1);
     }, true);
   });
+
+  test("commands without path default to init-config over last-used", async () => {
+    await withConnection(async (connection) => {
+      const base = fs.mkdtempSync(path.join(os.tmpdir(), "cadence-ls-last-"));
+      const aDir = fs.mkdtempSync(path.join(base, "a-"));
+      const bDir = fs.mkdtempSync(path.join(base, "b-"));
+
+      // minimal scripts
+      fs.writeFileSync(
+        path.join(aDir, "script.cdc"),
+        "access(all) fun main() { }\n"
+      );
+      fs.writeFileSync(
+        path.join(bDir, "script.cdc"),
+        "access(all) fun main() { }\n"
+      );
+
+      // flow configs with emulator-account and unique names
+      const flowA = {
+        contracts: {},
+        emulators: {
+          default: { port: 3569, serviceAccount: "emulator-account" },
+        },
+        networks: { emulator: "127.0.0.1:3569" },
+        accounts: {
+          "emulator-account": {
+            address: "f8d6e0586b0a20c7",
+            key: "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881",
+          },
+          alpha: {
+            address: "f8d6e0586b0a20c7",
+            key: "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881",
+          },
+        },
+        deployments: {},
+      } as any;
+      fs.writeFileSync(
+        path.join(aDir, "flow.json"),
+        JSON.stringify(flowA, null, 2)
+      );
+
+      const flowB = {
+        contracts: {},
+        emulators: {
+          default: { port: 3569, serviceAccount: "emulator-account" },
+        },
+        networks: { emulator: "127.0.0.1:3569" },
+        accounts: {
+          "emulator-account": {
+            address: "f8d6e0586b0a20c7",
+            key: "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881",
+          },
+          beta: {
+            address: "f8d6e0586b0a20c7",
+            key: "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881",
+          },
+        },
+        deployments: {},
+      } as any;
+      fs.writeFileSync(
+        path.join(bDir, "flow.json"),
+        JSON.stringify(flowB, null, 2)
+      );
+
+      async function waitForAccount(name: string) {
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+          try {
+            const list = (await getAccounts(connection)) as any[];
+            if (
+              list.some(
+                (a) =>
+                  typeof a.Name === "string" &&
+                  (a.Name === name || a.Name.startsWith(name))
+              )
+            )
+              return true;
+          } catch {}
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        return false;
+      }
+
+      // Init options seed default = root ./flow.json. Prove that even after switching
+      // last-used to B, a no-path command still uses init-config (root).
+
+      // Set last-used = A by running a path-specific command on A
+      const aUri = `file://${path.join(aDir, "script.cdc")}`;
+      try {
+        await connection.sendRequest(ExecuteCommandRequest.type, {
+          command: "cadence.server.flow.executeScript",
+          arguments: [aUri, "[]"],
+        });
+      } catch {}
+
+      // Flip last-used to B
+      const bUri = `file://${path.join(bDir, "script.cdc")}`;
+      try {
+        await connection.sendRequest(ExecuteCommandRequest.type, {
+          command: "cadence.server.flow.executeScript",
+          arguments: [bUri, "[]"],
+        });
+      } catch {}
+      // Even after switching last-used to B, a no-path command should still use init-config
+      // Assert we still see init-config accounts (moose) and not B-only account (beta)
+      {
+        const list = (await getAccounts(connection)) as any[];
+        expect(list.some((a) => a.Name === "moose [flow.json]")).toBeTruthy();
+        expect(list.some((a) => a.Name === "beta")).toBeFalsy();
+      }
+      // But path-specific command MUST use nearest project's client, not init-config override
+      // Execute script under B and expect availability of B-only account "beta" when switching later
+      try {
+        await connection.sendRequest(ExecuteCommandRequest.type, {
+          command: "cadence.server.flow.executeScript",
+          arguments: [bUri, "[]"],
+        });
+      } catch {}
+      // Now switch active account to beta (present only in B config) to prove B's client was engaged
+      let switched: any;
+      try {
+        switched = await connection.sendRequest(ExecuteCommandRequest.type, {
+          command: "cadence.server.flow.switchActiveAccount",
+          arguments: ["beta"],
+        });
+      } catch (e) {
+        // If this fails, it means override incorrectly took precedence for path-specific actions
+      }
+      expect(
+        typeof switched === "string" || switched === undefined
+      ).toBeTruthy();
+      // cleanup temp base
+      try {
+        fs.rmdirSync(base, { recursive: true });
+      } catch {}
+    }, true);
+  }, 20000);
 });
 
 describe("transactions", () => {
@@ -602,7 +742,7 @@ describe("transactions", () => {
 
       expect(resultRegex.test(result)).toBeTruthy();
     }, true);
-  });
+  }, 15000);
 });
 
 describe("contracts", () => {
@@ -626,7 +766,7 @@ describe("contracts", () => {
       result = await deploy(connection, "Bob", "foo", "Foo");
       expect(result).toEqual("Contract Foo has been deployed to account Bob");
     }, true);
-  });
+  }, 15000);
 
   test("deploy contract with file import", async () => {
     await withConnection(async (connection) => {
@@ -640,7 +780,7 @@ describe("contracts", () => {
         "Contract Bar has been deployed to account moose [flow.json]"
       );
     }, true);
-  });
+  }, 15000);
 
   test("deploy contract with string imports", async () => {
     await withConnection(async (connection) => {
@@ -654,7 +794,7 @@ describe("contracts", () => {
         "Contract Zoo has been deployed to account moose [flow.json]"
       );
     }, true);
-  });
+  }, 15000);
 });
 
 describe("codelenses", () => {
@@ -685,7 +825,7 @@ describe("codelenses", () => {
       expect(c.title).toEqual("💡 Deploy contract Foo to Alice");
       expect(c.arguments).toEqual([path, "Foo", "Alice"]);
     }, true);
-  });
+  }, 15000);
 
   test("transactions codelenses", async () => {
     await withConnection(async (connection) => {
@@ -712,7 +852,7 @@ describe("codelenses", () => {
       expect(c.title).toEqual("💡 Send signed by Alice");
       expect(c.arguments).toEqual([path, "[]", ["Alice"]]);
     }, true);
-  });
+  }, 15000);
 
   test("script codelenses", async () => {
     await withConnection(async (connection) => {

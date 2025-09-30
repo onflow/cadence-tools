@@ -40,8 +40,23 @@ const (
 )
 
 type commands struct {
-	client flowClient
-	state  flowState
+	cfg *ConfigManager
+}
+
+// clientForPath returns the client resolved for the given path, or the default client.
+func (c *commands) clientForPath(path string) flowClient {
+	if c.cfg == nil {
+		return nil
+	}
+	// If no specific path is provided, do not attempt resolution; use the default client
+	// (which itself prefers the last-used project when available).
+	if path == "" {
+		return c.cfg.DefaultClient()
+	}
+	if cl, err := c.cfg.ResolveClientForPath(path); err == nil && cl != nil {
+		return cl
+	}
+	return c.cfg.DefaultClient()
 }
 
 func (c *commands) getAll() []server.Command {
@@ -51,35 +66,33 @@ func (c *commands) getAll() []server.Command {
 		Handler: c.reloadConfig,
 	}}
 
-	// Commands only available when client is enabled
-	if c.client != nil {
-		commands = append(commands, []server.Command{
-			{
-				Name:    CommandSendTransaction,
-				Handler: c.sendTransaction,
-			},
-			{
-				Name:    CommandExecuteScript,
-				Handler: c.executeScript,
-			},
-			{
-				Name:    CommandDeployContract,
-				Handler: c.deployContract,
-			},
-			{
-				Name:    CommandSwitchActiveAccount,
-				Handler: c.switchActiveAccount,
-			},
-			{
-				Name:    CommandCreateAccount,
-				Handler: c.createAccount,
-			},
-			{
-				Name:    CommandGetAccounts,
-				Handler: c.getAccounts,
-			},
-		}...)
-	}
+	// Always register flow commands; handlers will error if client is not initialized
+	commands = append(commands, []server.Command{
+		{
+			Name:    CommandSendTransaction,
+			Handler: c.sendTransaction,
+		},
+		{
+			Name:    CommandExecuteScript,
+			Handler: c.executeScript,
+		},
+		{
+			Name:    CommandDeployContract,
+			Handler: c.deployContract,
+		},
+		{
+			Name:    CommandSwitchActiveAccount,
+			Handler: c.switchActiveAccount,
+		},
+		{
+			Name:    CommandCreateAccount,
+			Handler: c.createAccount,
+		},
+		{
+			Name:    CommandGetAccounts,
+			Handler: c.getAccounts,
+		},
+	}...)
 
 	return commands
 }
@@ -119,9 +132,15 @@ func (c *commands) sendTransaction(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid signer list: %s", args[2])
 	}
 
+	// Resolve appropriate client based on the file's closest flow.json
+	client := c.clientForPath(location.Path)
+	if client == nil {
+		return nil, fmt.Errorf("flow client is not initialized")
+	}
+
 	signerAddresses := make([]flow.Address, 0)
 	for _, name := range signerList {
-		account := c.client.GetClientAccount(name)
+		account := client.GetClientAccount(name)
 		if account == nil {
 			return nil, fmt.Errorf("signer account with name %s doesn't exist", name)
 		}
@@ -129,7 +148,7 @@ func (c *commands) sendTransaction(args ...json.RawMessage) (any, error) {
 		signerAddresses = append(signerAddresses, account.Address)
 	}
 
-	tx, txResult, err := c.client.SendTransaction(signerAddresses, location, txArgs)
+	tx, txResult, err := client.SendTransaction(signerAddresses, location, txArgs)
 	if err != nil {
 		return nil, fmt.Errorf("transaction error: %w", err)
 	}
@@ -169,7 +188,12 @@ func (c *commands) executeScript(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid script arguments cadence encoding format: %s, error: %s", argsJSON, err)
 	}
 
-	scriptResult, err := c.client.ExecuteScript(location, scriptArgs)
+	client := c.clientForPath(location.Path)
+	if client == nil {
+		return nil, fmt.Errorf("flow client is not initialized")
+	}
+
+	scriptResult, err := client.ExecuteScript(location, scriptArgs)
 	if err != nil {
 		return nil, fmt.Errorf("script error: %w", err)
 	}
@@ -194,7 +218,11 @@ func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid name argument value: %s", args[0])
 	}
 
-	err = c.client.SetActiveClientAccount(name)
+	client := c.clientForPath("")
+	if client == nil {
+		return nil, fmt.Errorf("flow client is not initialized")
+	}
+	err = client.SetActiveClientAccount(name)
 	if err != nil {
 		return nil, err
 	}
@@ -204,17 +232,28 @@ func (c *commands) switchActiveAccount(args ...json.RawMessage) (any, error) {
 
 // reloadConfig when the client detects changes in flow.json so we have an updated state.
 func (c *commands) reloadConfig(_ ...json.RawMessage) (any, error) {
-	return nil, c.state.Reload()
+	if c.cfg != nil {
+		return nil, c.cfg.ReloadAll()
+	}
+	return nil, nil
 }
 
 // getAccounts return the client account list with information about the active client.
 func (c *commands) getAccounts(_ ...json.RawMessage) (any, error) {
-	return c.client.GetClientAccounts(), nil
+	client := c.clientForPath("")
+	if client == nil {
+		return nil, fmt.Errorf("flow client is not initialized")
+	}
+	return client.GetClientAccounts(), nil
 }
 
 // createAccount creates a new account and returns its address.
 func (c *commands) createAccount(_ ...json.RawMessage) (any, error) {
-	account, err := c.client.CreateAccount()
+	client := c.clientForPath("")
+	if client == nil {
+		return nil, fmt.Errorf("flow client is not initialized")
+	}
+	account, err := client.CreateAccount()
 	if err != nil {
 		return nil, fmt.Errorf("create account error: %w", err)
 	}
@@ -252,17 +291,23 @@ func (c *commands) deployContract(args ...json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("invalid signer name: %s", args[2])
 	}
 
+	// Resolve client for this location
+	client := c.clientForPath(location.Path)
+	if client == nil {
+		return nil, fmt.Errorf("flow client is not initialized")
+	}
+
 	var account *clientAccount
 	if signerName == "" { // choose default active account
-		account = c.client.GetActiveClientAccount()
+		account = client.GetActiveClientAccount()
 	} else {
-		account = c.client.GetClientAccount(signerName)
+		account = client.GetClientAccount(signerName)
 		if account == nil {
 			return nil, fmt.Errorf("signer account with name %s doesn't exist", signerName)
 		}
 	}
 
-	deployError := c.client.DeployContract(account.Address, name, location)
+	deployError := client.DeployContract(account.Address, name, location)
 	if deployError != nil {
 		return nil, fmt.Errorf("error deploying contract: %w", deployError)
 	}
