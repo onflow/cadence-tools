@@ -1,4 +1,4 @@
-{ 
+{
   "name": "@onflow/cadence-language-server",
   "version": "1.6.0",
   "description": "The Cadence Language Server",
