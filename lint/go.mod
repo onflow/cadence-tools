@@ -4,10 +4,10 @@ go 1.23.7
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.7.0
-	github.com/onflow/flow-go-sdk v1.8.1
+	github.com/onflow/cadence v1.7.1
+	github.com/onflow/flow-go-sdk v1.8.4
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/grpc v1.75.0
+	google.golang.org/grpc v1.75.1
 )
 
 require (
@@ -31,7 +31,7 @@ require (
 	github.com/onflow/atree v0.10.1 // indirect
 	github.com/onflow/crypto v0.25.3 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.11 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.16 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -49,6 +49,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
-	google.golang.org/protobuf v1.36.7 // indirect
+	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
