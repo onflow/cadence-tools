@@ -1149,7 +1149,10 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{
+			"TestHandler": firstAccountAddress,
+		})
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5299,7 +5302,8 @@ func TestImportingHelperFile(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver)
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{"TestHandler": firstAccountAddress})
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5571,6 +5575,157 @@ func TestRandomizedTestExecution(t *testing.T) {
 `
 
 	assert.Equal(t, expected, resultsStr)
+}
+
+func TestScheduledTransactions(t *testing.T) {
+	t.Parallel()
+
+	const handlerContract = `
+		import "FlowTransactionScheduler"
+		access(all) contract ScheduledHandler {
+			access(contract) var count: Int
+			access(all) view fun getCount(): Int { return self.count }
+			access(all) resource Handler: FlowTransactionScheduler.TransactionHandler {
+				access(FlowTransactionScheduler.Execute) fun executeTransaction(id: UInt64, data: AnyStruct?) {
+					ScheduledHandler.count = ScheduledHandler.count + 1
+				}
+			}
+			access(all) fun createHandler(): @Handler { return <- create Handler() }
+			init() { self.count = 0 }
+		}
+	`
+
+	const scheduleTx = `
+		import "FlowTransactionScheduler"
+		import "ScheduledHandler"
+		import "FungibleToken"
+		import "FlowToken"
+		transaction {
+			prepare(acct: auth(Storage, Capabilities) &Account) {
+				if acct.storage.borrow<&ScheduledHandler.Handler>(from: /storage/counterHandler) == nil {
+					let h <- ScheduledHandler.createHandler()
+					acct.storage.save(<-h, to: /storage/counterHandler)
+				}
+				let issued: Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}> =
+					acct.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(/storage/counterHandler)
+				let estimate = FlowTransactionScheduler.estimate(
+					data: nil,
+					timestamp: getCurrentBlock().timestamp + 1000.0,
+					priority: FlowTransactionScheduler.Priority.High,
+					executionEffort: UInt64(5000)
+				)
+				let feeAmount: UFix64 = estimate.flowFee ?? 0.001
+				let vaultRef = acct.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("missing FlowToken vault")
+				let fees <- (vaultRef.withdraw(amount: feeAmount) as! @FlowToken.Vault)
+				destroy <- FlowTransactionScheduler.schedule(
+					handlerCap: issued,
+					data: nil,
+					timestamp: getCurrentBlock().timestamp + 1000.0,
+					priority: FlowTransactionScheduler.Priority.High,
+					executionEffort: UInt64(5000),
+					fees: <-fees
+				)
+			}
+		}
+	`
+
+	const verifyScript = `
+		import "ScheduledHandler"
+		access(all) fun main(): Int { return ScheduledHandler.getCount() }
+	`
+
+	const testCode = `
+		import Test
+		import BlockchainHelpers
+
+		access(all)
+		let account = Test.getAccount(0x0000000000000006)
+
+		access(all)
+		fun setup() {
+			let err = Test.deployContract(
+				name: "ScheduledHandler",
+				path: "ScheduledHandler.cdc",
+				arguments: []
+			)
+			Test.expect(err, Test.beNil())
+
+			let mintResult = mintFlow(to: account, amount: 1.0)
+			Test.expect(mintResult, Test.beSucceeded())
+		}
+
+		access(all)
+		fun testScheduleAndExecuteCallback() {
+			let code = Test.readFile("schedule_callback.cdc")
+			let tx = Test.Transaction(
+				code: code,
+				authorizers: [account.address],
+				signers: [account],
+				arguments: []
+			)
+			var result = Test.executeTransaction(tx)
+			Test.expect(result, Test.beSucceeded())
+
+			// Advance time to trigger scheduled execution and commit
+			Test.commitBlock()
+			Test.commitBlock()
+
+			// Test that the transaction did not execute as the time is not advanced
+			let verify = Test.readFile("verify_counter.cdc")
+			result = Test.executeScript(verify, [])
+			Test.expect(result, Test.beSucceeded())
+			Test.assertEqual(0, result.returnValue! as! Int)
+
+			// Advance time to trigger scheduled execution and commit
+			Test.moveTime(by: 1000.0)
+			Test.commitBlock()
+
+			result = Test.executeScript(verify, [])
+			Test.expect(result, Test.beSucceeded())
+			Test.assertEqual(1, result.returnValue! as! Int)
+		}
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "ScheduledHandler.cdc":
+			return handlerContract, nil
+		case "schedule_callback.cdc":
+			return scheduleTx, nil
+		case "verify_counter.cdc":
+			return verifyScript, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "ScheduledHandler" {
+				return handlerContract, nil
+			}
+		case common.StringLocation:
+			if location == "ScheduledHandler.cdc" {
+				return handlerContract, nil
+			}
+		}
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{
+			"ScheduledHandler": firstAccountAddress,
+		})
+
+	results, err := runner.RunTests(testCode)
+	require.NoError(t, err)
+	for _, result := range results {
+		require.NoError(t, result.Error)
+	}
 }
 
 func TestReferenceDeployedContractTypes(t *testing.T) {
