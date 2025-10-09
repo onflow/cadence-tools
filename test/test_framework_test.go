@@ -5664,8 +5664,8 @@ func TestScheduledTransactions(t *testing.T) {
 				signers: [account],
 				arguments: []
 			)
-			var result = Test.executeTransaction(tx)
-			Test.expect(result, Test.beSucceeded())
+			var transactionResult = Test.executeTransaction(tx)
+			Test.expect(transactionResult, Test.beSucceeded())
 
 			// Advance time to trigger scheduled execution and commit
 			Test.commitBlock()
@@ -5673,17 +5673,17 @@ func TestScheduledTransactions(t *testing.T) {
 
 			// Test that the transaction did not execute as the time is not advanced
 			let verify = Test.readFile("verify_counter.cdc")
-			result = Test.executeScript(verify, [])
-			Test.expect(result, Test.beSucceeded())
-			Test.assertEqual(0, result.returnValue! as! Int)
+			var scriptResult = Test.executeScript(verify, [])
+			Test.expect(scriptResult, Test.beSucceeded())
+			Test.assertEqual(0, scriptResult.returnValue! as! Int)
 
 			// Advance time to trigger scheduled execution and commit
 			Test.moveTime(by: 1000.0)
 			Test.commitBlock()
 
-			result = Test.executeScript(verify, [])
-			Test.expect(result, Test.beSucceeded())
-			Test.assertEqual(1, result.returnValue! as! Int)
+			scriptResult = Test.executeScript(verify, [])
+			Test.expect(scriptResult, Test.beSucceeded())
+			Test.assertEqual(1, scriptResult.returnValue! as! Int)
 		}
 	`
 
