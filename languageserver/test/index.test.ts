@@ -1,6 +1,7 @@
 import {
   createProtocolConnection,
   DidOpenTextDocumentNotification,
+  DidChangeTextDocumentNotification,
   ExecuteCommandRequest,
   ExitNotification,
   InitializeRequest,
@@ -11,6 +12,7 @@ import {
   StreamMessageReader,
   StreamMessageWriter,
   TextDocumentItem,
+  VersionedTextDocumentIdentifier,
   Trace,
   Tracer,
 } from "vscode-languageserver-protocol";
@@ -458,6 +460,86 @@ describe("diagnostics", () => {
       .notification;
     expect(script.uri).toEqual(`file://${scriptName}.cdc`);
     expect(script.diagnostics).toHaveLength(0);
+  });
+
+  test("imported checker cache invalidates when dependency changes", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cadence-ls-cache-"));
+
+    // Minimal project config mapping identifier import "A" to ./A.cdc
+    const flow = {
+      contracts: { A: "./A.cdc" },
+      emulators: {
+        default: { port: 3569, serviceAccount: "emulator-account" },
+      },
+      networks: { emulator: "127.0.0.1:3569" },
+      accounts: {
+        "emulator-account": {
+          address: "f8d6e0586b0a20c7",
+          key: "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881",
+        },
+      },
+      deployments: {},
+    } as any;
+    fs.writeFileSync(
+      path.join(dir, "flow.json"),
+      JSON.stringify(flow, null, 2)
+    );
+
+    // Initial A provides Int result
+    const aV1 = `access(all) contract A { access(all) fun f(): Int { return 42 } }`;
+    fs.writeFileSync(path.join(dir, "A.cdc"), aV1);
+
+    // B depends on A.f(): Int
+    const b = `import "A"\naccess(all) fun main(): Int { return A.f() }`;
+    const bUri = `file://${dir}/B.cdc`;
+    fs.writeFileSync(path.join(dir, "B.cdc"), b);
+
+    await withConnection(async (connection) => {
+      // Helper: open and wait diagnostics for a specific URI
+      const openAndWait = (uri: string, text: string) => {
+        return new Promise<PublishDiagnosticsParams>((resolve) => {
+          connection.onNotification(
+            PublishDiagnosticsNotification.type,
+            (n) => {
+              if (n.uri === uri) resolve(n);
+            }
+          );
+          connection.sendNotification(DidOpenTextDocumentNotification.type, {
+            textDocument: TextDocumentItem.create(uri, "cadence", 1, text),
+          });
+        });
+      };
+      const changeAndWait = (uri: string, version: number, text: string) => {
+        return new Promise<PublishDiagnosticsParams>((resolve) => {
+          connection.onNotification(
+            PublishDiagnosticsNotification.type,
+            (n) => {
+              if (n.uri === uri) resolve(n);
+            }
+          );
+          connection.sendNotification(DidChangeTextDocumentNotification.type, {
+            textDocument: VersionedTextDocumentIdentifier.create(uri, version),
+            contentChanges: [{ text }],
+          });
+        });
+      };
+
+      // Open B -> should be OK initially
+      const first = await openAndWait(bUri, b);
+      expect(first.diagnostics).toHaveLength(0);
+
+      // Open A (so we can send a proper LSP change notification)
+      const aUri = `file://${dir}/A.cdc`;
+      await openAndWait(aUri, aV1);
+
+      // Modify A to become incompatible: f(): String
+      const aV2 = `access(all) contract A { access(all) fun f(): String { return "oops" } }`;
+      await changeAndWait(aUri, 2, aV2);
+
+      // Trigger re-check of B; diagnostics should change (no stale cache)
+      const second = await changeAndWait(bUri, 2, b);
+      expect(second.diagnostics.length).toBeGreaterThan(0);
+    });
   });
 });
 

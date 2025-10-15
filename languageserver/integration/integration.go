@@ -28,6 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flowkit/v2"
@@ -157,8 +158,8 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 	// Always create a config manager so per-file config discovery works even without init options
 	integration.cfgManager = NewConfigManager(loader, enableFlowClient, 0, "")
 
-	// Provide a project identity provider keyed by nearest flow.json for checker cache scoping
-	projectProvider := projectIdentityProvider{cfg: integration.cfgManager}
+	// Provide a project resolver for identity and location canonicalization
+	projectResolver := flowProjectResolver{cfg: integration.cfgManager}
 
 	resolve := resolvers{
 		loader:     loader,
@@ -171,7 +172,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithInitializationOptionsHandler(integration.initialize),
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
 		server.WithIdentifierImportResolver(resolve.identifierImportProject),
-		server.WithProjectIdentityProvider(projectProvider),
+		server.WithProjectResolver(projectResolver),
 	}
 
 	// Prompt to create flow.json when opening an existing .cdc file without a config.
@@ -223,11 +224,11 @@ type FlowIntegration struct {
 	invalidWarnedRoots map[string]struct{}
 }
 
-// projectIdentityProvider implements server.ProjectIdentityProvider using ConfigManager.
-// It returns the absolute flow.json path as the project ID, or empty if none is found.
-type projectIdentityProvider struct{ cfg *ConfigManager }
+// flowProjectResolver implements server.ProjectResolver using ConfigManager.
+// It provides both project identity and location canonicalization.
+type flowProjectResolver struct{ cfg *ConfigManager }
 
-func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) string {
+func (p flowProjectResolver) ProjectIDForURI(uri protocol.DocumentURI) string {
 	if p.cfg == nil {
 		return ""
 	}
@@ -260,6 +261,41 @@ func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) strin
 		cfgPath = abs
 	}
 	return stableProjectID(p.cfg.loader, cfgPath)
+}
+
+func (p flowProjectResolver) CanonicalLocation(projectID string, location common.Location) common.Location {
+	if p.cfg == nil {
+		return location
+	}
+
+	switch loc := location.(type) {
+	case common.StringLocation:
+		name := string(loc)
+		// File path: ensure absolute
+		if strings.Contains(name, ".cdc") {
+			filename := deURI(cleanWindowsPath(name))
+			if abs, err := filepath.Abs(filename); err == nil {
+				return common.StringLocation(abs)
+			}
+			return location
+		}
+		// Identifier: resolve via flowkit state to source path
+		if projectID != "" {
+			if st, _ := p.cfg.ResolveStateForProject(projectID); st != nil {
+				if c, err := st.getState().Contracts().ByName(name); err == nil && c.Location != "" {
+					abs := filepath.Join(filepath.Dir(st.getConfigPath()), c.Location)
+					if p, err := filepath.Abs(abs); err == nil {
+						abs = p
+					}
+					return common.StringLocation(abs)
+				}
+			}
+		}
+		return location
+	default:
+		// Address locations, etc. have no file backing
+		return location
+	}
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {

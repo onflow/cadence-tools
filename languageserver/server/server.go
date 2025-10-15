@@ -205,10 +205,8 @@ type Server struct {
 
 	// onDidOpen, if set, is invoked after a document is opened
 	onDidOpen func(conn protocol.Conn, uri protocol.DocumentURI, text string)
-	// keyResolver builds cache keys for root/imported checkers
-	keyResolver CheckerKeyResolver
-	// projectIdentity provides a project-scoped identity for a given document URI
-	projectIdentity ProjectIdentityProvider
+	// projectResolver provides project-scoped identity and location canonicalization
+	projectResolver ProjectResolver
 }
 
 // checkerKey scopes a cached checker by its originating document URI and the imported location.
@@ -219,15 +217,15 @@ type CheckerKey struct {
 	Location  common.Location
 }
 
-// ProjectIdentityProvider maps a document URI to a stable project identity (e.g., abs flow.json path).
-type ProjectIdentityProvider interface {
+// ProjectResolver provides project-scoped identity and location canonicalization.
+// It establishes both "what project am I in?" and "what is the canonical FileID for this import?"
+type ProjectResolver interface {
+	// ProjectIDForURI maps a document URI to a stable project identity (e.g., abs flow.json path)
 	ProjectIDForURI(uri protocol.DocumentURI) string
-}
-
-// CheckerKeyResolver composes keys for root and imported checkers.
-type CheckerKeyResolver interface {
-	KeyForRoot(projectID string, rootURI protocol.DocumentURI) CheckerKey
-	KeyForImport(parent CheckerKey, imported common.Location) CheckerKey
+	// CanonicalLocation returns the canonical location for any location within a project.
+	// For file-backed locations, this should return an absolute file path.
+	// For non-file locations (address, identifier without mapping), return the original location.
+	CanonicalLocation(projectID string, location common.Location) common.Location
 }
 
 // CheckerCache is a storage for checkers keyed by CheckerKey.
@@ -238,20 +236,14 @@ type CheckerCache interface {
 }
 
 // Default implementations
-type defaultProjectIdentity struct{}
+type defaultProjectResolver struct{}
 
-func (defaultProjectIdentity) ProjectIDForURI(uri protocol.DocumentURI) string {
+func (defaultProjectResolver) ProjectIDForURI(uri protocol.DocumentURI) string {
 	return ""
 }
 
-type defaultKeyResolver struct{}
-
-func (defaultKeyResolver) KeyForRoot(projectID string, rootURI protocol.DocumentURI) CheckerKey {
-	return CheckerKey{ProjectID: projectID, Location: uriToLocation(rootURI)}
-}
-
-func (defaultKeyResolver) KeyForImport(parent CheckerKey, imported common.Location) CheckerKey {
-	return CheckerKey{ProjectID: parent.ProjectID, Location: imported}
+func (defaultProjectResolver) CanonicalLocation(projectID string, location common.Location) common.Location {
+	return location
 }
 
 type mapCheckerCache struct{ m map[CheckerKey]*sema.Checker }
@@ -282,21 +274,11 @@ func WithDidOpenHook(hook func(conn protocol.Conn, uri protocol.DocumentURI, tex
 	}
 }
 
-// WithProjectIdentityProvider sets the project identity provider used for cache scoping
-func WithProjectIdentityProvider(p ProjectIdentityProvider) Option {
+// WithProjectResolver sets the project resolver for identity and canonicalization
+func WithProjectResolver(p ProjectResolver) Option {
 	return func(s *Server) error {
 		if p != nil {
-			s.projectIdentity = p
-		}
-		return nil
-	}
-}
-
-// WithCheckerKeyResolver sets the resolver that builds checker cache keys
-func WithCheckerKeyResolver(r CheckerKeyResolver) Option {
-	return func(s *Server) error {
-		if r != nil {
-			s.keyResolver = r
+			s.projectResolver = p
 		}
 		return nil
 	}
@@ -434,8 +416,7 @@ func NewServer() (*Server, error) {
 		codeActionsResolvers: make(map[protocol.DocumentURI]map[uuid.UUID]CodeActionResolver),
 		commands:             make(map[string]CommandHandler),
 		accessCheckMode:      sema.AccessCheckModeStrict,
-		keyResolver:          defaultKeyResolver{},
-		projectIdentity:      defaultProjectIdentity{},
+		projectResolver:      defaultProjectResolver{},
 	}
 	server.protocolServer = protocol.NewServer(server)
 
@@ -503,9 +484,16 @@ func (s *Server) Stop() error {
 	return s.protocolServer.Stop()
 }
 
+// canonicalKeyForURI constructs a canonical cache key for a document URI
+func (s *Server) canonicalKeyForURI(uri protocol.DocumentURI) CheckerKey {
+	projectID := s.projectResolver.ProjectIDForURI(uri)
+	location := uriToLocation(uri)
+	canonicalLocation := s.projectResolver.CanonicalLocation(projectID, location)
+	return CheckerKey{ProjectID: projectID, Location: canonicalLocation}
+}
+
 func (s *Server) checkerForDocument(uri protocol.DocumentURI) *sema.Checker {
-	projectID := s.projectIdentity.ProjectIDForURI(uri)
-	key := s.keyResolver.KeyForRoot(projectID, uri)
+	key := s.canonicalKeyForURI(uri)
 	if chk, ok := s.checkerCache.Get(key); ok {
 		return chk
 	}
@@ -760,7 +748,7 @@ func (s *Server) DidChangeTextDocument(
 	// todo implement smarter cache invalidation with dependency resolution using https://github.com/onflow/cadence/pull/1634
 	// we should build dependency tree upfront and then based on the changes only reset checkers contained in that tree
 	// Clear only the root checker for this document; sub-checkers are scoped by project
-	rootKey := s.keyResolver.KeyForRoot(s.projectIdentity.ProjectIDForURI(uri), uri)
+	rootKey := s.canonicalKeyForURI(uri)
 	s.checkerCache.Delete(rootKey)
 
 	s.checkAndPublishDiagnostics(conn, uri, text, version)
@@ -2065,13 +2053,13 @@ func (s *Server) getDiagnostics(
 	location := uriToLocation(uri)
 
 	if program == nil {
-		rootKey := s.keyResolver.KeyForRoot(s.projectIdentity.ProjectIDForURI(uri), uri)
+		rootKey := s.canonicalKeyForURI(uri)
 		s.checkerCache.Delete(rootKey)
 		return
 	}
 
 	// Build checker with a config that captures the root project ID for all nested imports
-	projID := s.projectIdentity.ProjectIDForURI(uri)
+	projID := s.projectResolver.ProjectIDForURI(uri)
 	cfgCopy := s.decideCheckerConfig(projID, program)
 	var checker *sema.Checker
 	checker, diagnosticsErr = sema.NewChecker(
@@ -2095,8 +2083,8 @@ func (s *Server) getDiagnostics(
 		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
 	})
 
-	// Cache the root checker by project-aware key
-	rootKey := s.keyResolver.KeyForRoot(projID, uri)
+	// Cache the root checker by canonical key
+	rootKey := s.canonicalKeyForURI(uri)
 	s.checkerCache.Put(rootKey, checker)
 
 	if checkError != nil {
@@ -3134,8 +3122,8 @@ func (s *Server) handleImport(projectID string, checker *sema.Checker, importedL
 			Elaboration: helpersChecker.Elaboration,
 		}, nil
 	default:
+		// First, normalize relative path imports against parent location
 		if isPathLocation(importedLocation) {
-			// import may be a relative path and therefore should be normalized against current location
 			importedLocation = normalizePathLocation(checker.Location, importedLocation)
 			if checker.Location == importedLocation {
 				return nil, &sema.CheckerError{
@@ -3143,10 +3131,17 @@ func (s *Server) handleImport(projectID string, checker *sema.Checker, importedL
 				}
 			}
 		}
-		cacheKey := CheckerKey{ProjectID: projectID, Location: importedLocation}
+
+		// Then canonicalize the location (absolute path for files, identifier→file mapping, etc.)
+		canonicalLocation := s.projectResolver.CanonicalLocation(projectID, importedLocation)
+
+		// Check cache with canonical location
+		cacheKey := CheckerKey{ProjectID: projectID, Location: canonicalLocation}
 		if c, ok := s.checkerCache.Get(cacheKey); ok && c != nil {
 			return sema.ElaborationImport{Elaboration: c.Elaboration}, nil
 		}
+
+		// Resolve and parse the import
 		importedProgram, err := s.resolveImport(projectID, checker, importedLocation)
 		if err != nil {
 			return nil, err
@@ -3154,13 +3149,17 @@ func (s *Server) handleImport(projectID string, checker *sema.Checker, importedL
 		if importedProgram == nil {
 			return nil, &sema.CheckerError{Errors: []error{fmt.Errorf("cannot import %s", importedLocation)}}
 		}
-		importedChecker, err := checker.SubChecker(importedProgram, importedLocation)
+
+		// Create sub-checker using canonical location
+		importedChecker, err := checker.SubChecker(importedProgram, canonicalLocation)
 		if err != nil {
 			return nil, err
 		}
 		if err := importedChecker.Check(); err != nil {
 			return nil, err
 		}
+
+		// Cache with canonical location
 		s.checkerCache.Put(cacheKey, importedChecker)
 		return sema.ElaborationImport{Elaboration: importedChecker.Elaboration}, nil
 	}

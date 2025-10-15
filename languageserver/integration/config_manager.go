@@ -221,8 +221,8 @@ func (m *ConfigManager) findNearestFlowJSON(filePath string) string {
 	p := cleanWindowsPath(filePath)
 	dir := filepath.Dir(p)
 	prev := ""
-    for dir != prev {
-        candidate := filepath.Join(dir, flowConfigFilename)
+	for dir != prev {
+		candidate := filepath.Join(dir, flowConfigFilename)
 		// Use loader to check for existence
 		if _, err := m.loader.Stat(candidate); err == nil {
 			return candidate
@@ -274,9 +274,9 @@ func (m *ConfigManager) ConfigPathForProject(projectID string) string {
 	if err != nil {
 		return cfgPath
 	}
-    // If a directory was provided, prefer flow.json within it
-    if filepath.Base(absCfgPath) != flowConfigFilename {
-        candidate := filepath.Join(absCfgPath, flowConfigFilename)
+	// If a directory was provided, prefer flow.json within it
+	if filepath.Base(absCfgPath) != flowConfigFilename {
+		candidate := filepath.Join(absCfgPath, flowConfigFilename)
 		if _, err := m.loader.Stat(candidate); err == nil {
 			return candidate
 		}
@@ -529,10 +529,10 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 				debounce.Reset(debounceWindow)
 				continue
 			}
-            // Handle rename/create of flow.json in the same directory (atomic save semantics)
+			// Handle rename/create of flow.json in the same directory (atomic save semantics)
 			dir := filepath.Dir(cfgPath)
-            if filepath.Dir(ev.Name) == dir && filepath.Base(ev.Name) == flowConfigFilename {
-                newCfg := filepath.Join(dir, flowConfigFilename)
+			if filepath.Dir(ev.Name) == dir && filepath.Base(ev.Name) == flowConfigFilename {
+				newCfg := filepath.Join(dir, flowConfigFilename)
 				if newCfg != cfgPath {
 					m.mu.Lock()
 					// Move state/client to new key if present
@@ -624,14 +624,14 @@ func (m *ConfigManager) watchDirLoop(dir string, watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-            // Only react to flow.json in this directory
+			// Only react to flow.json in this directory
 			base := filepath.Base(ev.Name)
-            if base != flowConfigFilename || filepath.Dir(ev.Name) != dir {
+			if base != flowConfigFilename || filepath.Dir(ev.Name) != dir {
 				continue
 			}
 			debounce.Reset(debounceWindow)
 		case <-debounce.C:
-            cfgPath := filepath.Join(dir, flowConfigFilename)
+			cfgPath := filepath.Join(dir, flowConfigFilename)
 			// If file exists now, reload state/client and attach file watcher
 			if _, err := m.loader.Stat(cfgPath); err == nil {
 				m.mu.RLock()
