@@ -32,7 +32,7 @@ type standardLibrary struct {
 
 var _ stdlib.StandardLibraryHandler = standardLibrary{}
 
-func (standardLibrary) ProgramLog(_ string, _ interpreter.LocationRange) error {
+func (standardLibrary) ProgramLog(_ string) error {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())
@@ -106,7 +106,6 @@ func (standardLibrary) GetAccountContractCode(_ common.AddressLocation) ([]byte,
 
 func (standardLibrary) EmitEvent(
 	_ interpreter.ValueExportContext,
-	_ interpreter.LocationRange,
 	_ *sema.CompositeType,
 	_ []interpreter.Value,
 ) {
