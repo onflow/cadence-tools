@@ -2632,7 +2632,8 @@ func TestInterpretFailFunction(t *testing.T) {
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &stdlib.AssertionError{})
+		var assertionErr *stdlib.AssertionError
+		assert.ErrorAs(t, result.Error, &assertionErr)
 	})
 
 	t.Run("with message", func(t *testing.T) {
@@ -2650,7 +2651,7 @@ func TestInterpretFailFunction(t *testing.T) {
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assertionErr := stdlib.AssertionError{}
+		var assertionErr *stdlib.AssertionError
 		require.ErrorAs(t, result.Error, &assertionErr)
 		assert.Contains(t, assertionErr.Message, "some error")
 	})
@@ -3009,7 +3010,8 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &stdlib.AssertionError{})
+		var assertionErr *stdlib.AssertionError
+		assert.ErrorAs(t, result.Error, &assertionErr)
 	})
 
 	t.Run("matcher and", func(t *testing.T) {
@@ -3032,7 +3034,8 @@ func TestInterpretEqualMatcher(t *testing.T) {
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &stdlib.AssertionError{})
+		var assertionErr *stdlib.AssertionError
+		assert.ErrorAs(t, result.Error, &assertionErr)
 	})
 
 	t.Run("chained matchers", func(t *testing.T) {
@@ -3161,7 +3164,8 @@ func TestInterpretExpectFunction(t *testing.T) {
 		result, err := runner.RunTest(script, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &stdlib.AssertionError{})
+		var assertionErr *stdlib.AssertionError
+		assert.ErrorAs(t, result.Error, &assertionErr)
 	})
 
 	t.Run("different types", func(t *testing.T) {

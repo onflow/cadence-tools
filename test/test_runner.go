@@ -483,7 +483,6 @@ func (r *TestRunner) initializeEnvironment() (
 		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
 		r.coverageReport.ExcludeLocation(helpers.BlockchainHelpersLocation)
 		r.coverageReport.ExcludeLocation(testScriptLocation)
-		ctx.CoverageReport = r.coverageReport
 	}
 
 	// Checker configs
@@ -504,7 +503,6 @@ func (r *TestRunner) initializeEnvironment() (
 		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
 		nil,
 		nil,
-		r.coverageReport,
 	)
 
 	err := setupEVMEnvironment(fvmEnv, env)
@@ -580,17 +578,16 @@ func (r *TestRunner) interpreterContractValueHandler(
 		inter *interpreter.Interpreter,
 		compositeType *sema.CompositeType,
 		constructorGenerator func(common.Address) *interpreter.HostFunctionValue,
-		invocationRange ast.Range,
 	) interpreter.ContractValue {
 
 		switch compositeType.Location {
 		case stdlib.TestContractLocation:
+			constructor := constructorGenerator(common.Address{})
 			contract, err := stdlib.GetTestContractType().
 				NewTestContract(
 					inter,
 					r.testFramework,
-					constructorGenerator(common.Address{}),
-					invocationRange,
+					constructor,
 				)
 			if err != nil {
 				panic(err)
