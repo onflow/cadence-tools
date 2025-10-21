@@ -265,7 +265,7 @@ func (e *EmulatorBackend) RunScript(
 
 	arguments := make([][]byte, 0, len(args))
 	for _, arg := range args {
-		exportedValue, err := runtime.ExportValue(arg, context, interpreter.EmptyLocationRange)
+		exportedValue, err := runtime.ExportValue(arg, context)
 		if err != nil {
 			return &stdlib.ScriptResult{
 				Error: err,
@@ -306,7 +306,6 @@ func (e *EmulatorBackend) RunScript(
 	}
 	value, err := runtime.ImportValue(
 		context,
-		interpreter.EmptyLocationRange,
 		e.stdlibHandler,
 		e.locationHandler,
 		result.Value,
@@ -415,7 +414,7 @@ func (e *EmulatorBackend) AddTransaction(
 	tx := e.newTransaction(code, authorizers)
 
 	for _, arg := range args {
-		exportedValue, err := runtime.ExportValue(arg, context, interpreter.EmptyLocationRange)
+		exportedValue, err := runtime.ExportValue(arg, context)
 		if err != nil {
 			return err
 		}
@@ -505,7 +504,7 @@ func (e *EmulatorBackend) DeployContract(
 	var txArgsBuilder, addArgsBuilder strings.Builder
 
 	for i, arg := range args {
-		cadenceArg, err := runtime.ExportValue(arg, context, interpreter.EmptyLocationRange)
+		cadenceArg, err := runtime.ExportValue(arg, context)
 		if err != nil {
 			return err
 		}
@@ -625,7 +624,6 @@ func (e *EmulatorBackend) Events(
 		for _, event := range sdkEvents {
 			value, err := runtime.ImportValue(
 				context,
-				interpreter.EmptyLocationRange,
 				e.stdlibHandler,
 				e.locationHandler,
 				event.Value,
@@ -650,7 +648,6 @@ func (e *EmulatorBackend) Events(
 
 	return interpreter.NewArrayValue(
 		context,
-		interpreter.EmptyLocationRange,
 		arrayType,
 		common.ZeroAddress,
 		values...,
