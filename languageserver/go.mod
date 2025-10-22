@@ -13,7 +13,7 @@ require (
 	github.com/onflow/cadence-tools/test v1.7.0
 	github.com/onflow/flow-go v0.43.3-0.20251021182938-b0fef2c5ca47
 	github.com/onflow/flow-go-sdk v1.9.0
-	github.com/onflow/flowkit/v2 v2.6.1
+	github.com/onflow/flowkit/v2 v2.7.0
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/pflag v1.0.9
@@ -238,9 +238,9 @@ require (
 	google.golang.org/api v0.247.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
-	google.golang.org/grpc v1.75.1 // indirect
+	google.golang.org/grpc v1.76.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
