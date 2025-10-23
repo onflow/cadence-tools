@@ -210,6 +210,8 @@ type Server struct {
 
 	// store holds checkers and their dependency relationships
 	store *CheckerStore
+	// fileWatcher handles watching .cdc files and invalidating caches
+	fileWatcher *FileWatcher
 
 	// single-flight guard for sub-checker creation keyed by (projectID, canonical child)
 	subCheckerFlightMu sync.Mutex
@@ -390,6 +392,8 @@ func NewServer() (*Server, error) {
 	// initialize checker store (cache + graph)
 	server.store = NewCheckerStore()
 	server.subCheckerFlight = make(map[CheckerKey]chan struct{})
+	// initialize file watcher for cache invalidation
+	server.fileWatcher = NewFileWatcher(server)
 
 	// init crash reporting
 	defer sentry.Flush(2 * time.Second)
@@ -2302,16 +2306,11 @@ func (s *Server) GetAllDocuments() map[protocol.DocumentURI]Document {
 	return docs
 }
 
-// Expose minimal hooks for integration without import cycles
-func (s *Server) Store() *CheckerStore             { return s.store }
+// FileWatcher returns the server's file watcher for external file change notifications
+func (s *Server) FileWatcher() *FileWatcher { return s.fileWatcher }
+
+// ProjectResolver returns the server's project resolver
 func (s *Server) ProjectResolver() ProjectResolver { return s.projectResolver }
-func (s *Server) CollectAffectedOpenRootURIs(key CheckerKey, excludeURI protocol.DocumentURI) []protocol.DocumentURI {
-	return s.collectAffectedOpenRootURIs(key, excludeURI)
-}
-func (s *Server) Conn() protocol.Conn { return s.conn }
-func (s *Server) CheckAndPublishDiagnostics(conn protocol.Conn, uri protocol.DocumentURI, text string, version int32) {
-	s.checkAndPublishDiagnostics(conn, uri, text, version)
-}
 
 func (s *Server) defaultCommands() []Command {
 	return []Command{

@@ -24,22 +24,19 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
-
 	"github.com/onflow/flowkit/v2"
 	"github.com/spf13/afero"
 
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 	"github.com/onflow/cadence-tools/languageserver/server"
-
-	"path/filepath"
-	"strings"
 )
 
 func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, protocol.DocumentURI, string) {
@@ -87,8 +84,10 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 			return
 		}
 		dir := filepath.Dir(path)
-		if root := s.WorkspaceFolderRootForPath(path); root != "" {
-			dir = root
+		if s != nil {
+			if root := s.WorkspaceFolderRootForPath(path); root != "" {
+				dir = root
+			}
 		}
 		// If we've already prompted for this root in this session, skip
 		skip := false
@@ -143,7 +142,7 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 	}
 }
 
-func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegration, error) {
+func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegration, []server.Option, error) {
 	loader := &afero.Afero{Fs: afero.NewOsFs()}
 	state := newFlowkitState(loader)
 
@@ -155,27 +154,19 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		state:              state,
 		promptedRoots:      make(map[string]struct{}),
 		invalidWarnedRoots: make(map[string]struct{}),
-		server:             s,
 	}
 
-	// Setup config manager with file change handlers
+	// Setup config manager with file change handlers that call into server's FileWatcher
 	integration.cfgManager = NewConfigManager(loader, enableFlowClient, 0, "")
-	
-	// Debounce file changes to coalesce rapid successive events
-	fileDebouncer := newDebouncer(500 * time.Millisecond)
-	integration.cfgManager.SetOnFileChanged(func(absPath string) {
-		fileDebouncer.schedule(absPath, func() {
-			integration.handleFileChanged(absPath)
+	if s != nil && s.FileWatcher() != nil {
+		fw := s.FileWatcher()
+		integration.cfgManager.SetOnFileChanged(func(absPath string) {
+			fw.HandleFileChanged(absPath)
 		})
-	})
-	
-	// Debounce project-wide changes (file creation/deletion)
-	projectDebouncer := newDebouncer(500 * time.Millisecond)
-	integration.cfgManager.SetOnProjectFilesChanged(func(cfgPath string) {
-		projectDebouncer.schedule(cfgPath, func() {
-			integration.handleProjectFilesChanged(cfgPath)
+		integration.cfgManager.SetOnProjectFilesChanged(func(cfgPath string) {
+			fw.HandleProjectFilesChanged(cfgPath)
 		})
-	})
+	}
 
 	// Provide a project resolver for identity and location canonicalization
 	projectResolver := flowProjectResolver{cfg: integration.cfgManager}
@@ -219,12 +210,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		}
 	}
 
-	err := s.SetOptions(options...)
-	if err != nil {
-		return nil, err
-	}
-
-	return integration, nil
+	return integration, options, nil
 }
 
 type FlowIntegration struct {
@@ -241,90 +227,6 @@ type FlowIntegration struct {
 	promptedRoots      map[string]struct{}
 	invalidWarnedMu    sync.Mutex
 	invalidWarnedRoots map[string]struct{}
-	server             *server.Server
-}
-
-// debouncer handles debouncing of repeated events by key
-type debouncer struct {
-	mu      sync.Mutex
-	timers  map[string]*time.Timer
-	delay   time.Duration
-}
-
-func newDebouncer(delay time.Duration) *debouncer {
-	return &debouncer{
-		timers: make(map[string]*time.Timer),
-		delay:  delay,
-	}
-}
-
-func (d *debouncer) schedule(key string, fn func()) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	
-	if t, ok := d.timers[key]; ok && t != nil {
-		t.Stop()
-	}
-	
-	d.timers[key] = time.AfterFunc(d.delay, func() {
-		fn()
-		d.mu.Lock()
-		delete(d.timers, key)
-		d.mu.Unlock()
-	})
-}
-
-// handleFileChanged invalidates cached checkers and re-checks dependent files when a .cdc file changes
-func (i *FlowIntegration) handleFileChanged(absPath string) {
-	if i.server == nil {
-		return
-	}
-	
-	uri := protocol.DocumentURI("file://" + absPath)
-	proj := i.server.ProjectResolver().ProjectIDForURI(uri)
-	canonical := i.server.ProjectResolver().CanonicalLocation(proj, common.StringLocation(absPath))
-	key := server.CheckerKey{ProjectID: proj, Location: canonical}
-	
-	// Clear outgoing edges since imports will be rebuilt, but preserve incoming edges
-	i.server.Store().ClearChildren(key)
-	i.server.Store().RemoveCheckerOnly(key)
-	
-	// Invalidate all transitive parent checkers (they reference types from this file)
-	allParents := i.server.Store().AffectedParents(key)
-	for _, parent := range allParents {
-		i.server.Store().RemoveCheckerOnly(parent)
-	}
-	
-	// Re-check any open documents that depend on this file
-	affected := i.server.CollectAffectedOpenRootURIs(key, "")
-	for _, depURI := range affected {
-		if doc, ok := i.server.GetDocument(depURI); ok {
-			i.server.CheckAndPublishDiagnostics(i.server.Conn(), depURI, doc.Text, doc.Version)
-		}
-	}
-}
-
-// handleProjectFilesChanged re-checks all open files in a project when .cdc files are created/deleted
-func (i *FlowIntegration) handleProjectFilesChanged(cfgPath string) {
-	defer func() {
-		if r := recover(); r != nil {
-			// Log panic but don't crash the server
-			// This can happen if state reload fails and checking encounters issues
-		}
-	}()
-	
-	if i.server == nil {
-		return
-	}
-	
-	// Re-check all open documents in this project
-	allDocs := i.server.GetAllDocuments()
-	for uri, doc := range allDocs {
-		proj := i.server.ProjectResolver().ProjectIDForURI(uri)
-		if proj == cfgPath {
-			i.server.CheckAndPublishDiagnostics(i.server.Conn(), uri, doc.Text, doc.Version)
-		}
-	}
 }
 
 // flowProjectResolver implements server.ProjectResolver
