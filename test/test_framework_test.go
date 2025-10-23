@@ -3626,7 +3626,7 @@ func TestReplacingImports(t *testing.T) {
 func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
-	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil)
+	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
 	emulatorBackend.contracts = map[string]common.Address{
 		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
 		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
@@ -3871,7 +3871,7 @@ func TestServiceAccount(t *testing.T) {
 	t.Run("retrieve from EmulatorBackend", func(t *testing.T) {
 		t.Parallel()
 
-		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil)
+		emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
 
 		serviceAccount, err := emulatorBackend.ServiceAccount()
 

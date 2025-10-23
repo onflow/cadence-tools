@@ -37,6 +37,9 @@ type TestFrameworkProvider struct {
 	coverageReport *runtime.CoverageReport
 
 	emulatorBackend *EmulatorBackend
+
+	// options passed to backend creation (fork config and emulator opts)
+	backendOptions *BackendOptions
 }
 
 func (tf *TestFrameworkProvider) ReadFile(path string) (string, error) {
@@ -72,6 +75,7 @@ func NewTestFrameworkProvider(
 	fileResolver FileResolver,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
+	backendOptions *BackendOptions,
 ) stdlib.TestFramework {
 	return &TestFrameworkProvider{
 		fileResolver:   fileResolver,
@@ -81,6 +85,8 @@ func NewTestFrameworkProvider(
 			logger,
 			stdlibHandler,
 			coverageReport,
+			backendOptions,
 		),
+		backendOptions: backendOptions,
 	}
 }
