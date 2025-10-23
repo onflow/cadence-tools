@@ -155,91 +155,26 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		state:              state,
 		promptedRoots:      make(map[string]struct{}),
 		invalidWarnedRoots: make(map[string]struct{}),
+		server:             s,
 	}
 
-	// Always create a config manager so per-file config discovery works even without init options
+	// Setup config manager with file change handlers
 	integration.cfgManager = NewConfigManager(loader, enableFlowClient, 0, "")
-	// Debounce per-file rechecks to coalesce rapid successive events
-	var debounceMu sync.Mutex
-	debounce := make(map[string]*time.Timer)
-	// When any .cdc under a watched project changes on disk, ask the server to invalidate and recheck
+	
+	// Debounce file changes to coalesce rapid successive events
+	fileDebouncer := newDebouncer(500 * time.Millisecond)
 	integration.cfgManager.SetOnFileChanged(func(absPath string) {
-		debounceMu.Lock()
-		if t, ok := debounce[absPath]; ok && t != nil {
-			_ = t.Stop()
-		}
-		debounce[absPath] = time.AfterFunc(500*time.Millisecond, func() {
-			defer func() {
-				debounceMu.Lock()
-				delete(debounce, absPath)
-				debounceMu.Unlock()
-			}()
-			if s == nil {
-				return
-			}
-			// Build a canonical location for the changed file and remove cached checker
-			uri := protocol.DocumentURI("file://" + absPath)
-			proj := s.ProjectResolver().ProjectIDForURI(uri)
-			canonical := s.ProjectResolver().CanonicalLocation(proj, common.StringLocation(absPath))
-			key := server.CheckerKey{ProjectID: proj, Location: canonical}
-			// Clear outgoing edges since imports will be rebuilt, but preserve incoming edges
-			s.Store().ClearChildren(key)
-			s.Store().RemoveCheckerOnly(key)
-
-			// Invalidate all transitive parent checkers (they reference types from this file)
-			allParents := s.Store().AffectedParents(key)
-			for _, parent := range allParents {
-				s.Store().RemoveCheckerOnly(parent)
-			}
-
-			// Re-check any open documents that depend on this file immediately
-			parentKey := server.CheckerKey{ProjectID: proj, Location: canonical}
-			affected := s.CollectAffectedOpenRootURIs(parentKey, "")
-			for _, depURI := range affected {
-				if doc, ok := s.GetDocument(depURI); ok {
-					// Use retained connection to publish fresh diagnostics
-					text := doc.Text
-					version := doc.Version
-					s.CheckAndPublishDiagnostics(s.Conn(), depURI, text, version)
-				}
-			}
+		fileDebouncer.schedule(absPath, func() {
+			integration.handleFileChanged(absPath)
 		})
-		debounceMu.Unlock()
 	})
-
-	// When .cdc files are created/deleted, re-check all open files in the project
-	// (not just dependents, since any file might have had a failed import)
-	var projectDebounceMu sync.Mutex
-	projectDebounce := make(map[string]*time.Timer)
+	
+	// Debounce project-wide changes (file creation/deletion)
+	projectDebouncer := newDebouncer(500 * time.Millisecond)
 	integration.cfgManager.SetOnProjectFilesChanged(func(cfgPath string) {
-		projectDebounceMu.Lock()
-		if t, ok := projectDebounce[cfgPath]; ok && t != nil {
-			_ = t.Stop()
-		}
-		projectDebounce[cfgPath] = time.AfterFunc(500*time.Millisecond, func() {
-			defer func() {
-				if r := recover(); r != nil {
-					// Log panic but don't crash the server
-					// This can happen if state reload fails and checking encounters issues
-				}
-				projectDebounceMu.Lock()
-				delete(projectDebounce, cfgPath)
-				projectDebounceMu.Unlock()
-			}()
-			if s == nil {
-				return
-			}
-			// Re-check all open documents in this project
-			allDocs := s.GetAllDocuments()
-			for uri, doc := range allDocs {
-				// Check if this document belongs to this project
-				proj := s.ProjectResolver().ProjectIDForURI(uri)
-				if proj == cfgPath {
-					s.CheckAndPublishDiagnostics(s.Conn(), uri, doc.Text, doc.Version)
-				}
-			}
+		projectDebouncer.schedule(cfgPath, func() {
+			integration.handleProjectFilesChanged(cfgPath)
 		})
-		projectDebounceMu.Unlock()
 	})
 
 	// Provide a project resolver for identity and location canonicalization
@@ -306,6 +241,90 @@ type FlowIntegration struct {
 	promptedRoots      map[string]struct{}
 	invalidWarnedMu    sync.Mutex
 	invalidWarnedRoots map[string]struct{}
+	server             *server.Server
+}
+
+// debouncer handles debouncing of repeated events by key
+type debouncer struct {
+	mu      sync.Mutex
+	timers  map[string]*time.Timer
+	delay   time.Duration
+}
+
+func newDebouncer(delay time.Duration) *debouncer {
+	return &debouncer{
+		timers: make(map[string]*time.Timer),
+		delay:  delay,
+	}
+}
+
+func (d *debouncer) schedule(key string, fn func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	if t, ok := d.timers[key]; ok && t != nil {
+		t.Stop()
+	}
+	
+	d.timers[key] = time.AfterFunc(d.delay, func() {
+		fn()
+		d.mu.Lock()
+		delete(d.timers, key)
+		d.mu.Unlock()
+	})
+}
+
+// handleFileChanged invalidates cached checkers and re-checks dependent files when a .cdc file changes
+func (i *FlowIntegration) handleFileChanged(absPath string) {
+	if i.server == nil {
+		return
+	}
+	
+	uri := protocol.DocumentURI("file://" + absPath)
+	proj := i.server.ProjectResolver().ProjectIDForURI(uri)
+	canonical := i.server.ProjectResolver().CanonicalLocation(proj, common.StringLocation(absPath))
+	key := server.CheckerKey{ProjectID: proj, Location: canonical}
+	
+	// Clear outgoing edges since imports will be rebuilt, but preserve incoming edges
+	i.server.Store().ClearChildren(key)
+	i.server.Store().RemoveCheckerOnly(key)
+	
+	// Invalidate all transitive parent checkers (they reference types from this file)
+	allParents := i.server.Store().AffectedParents(key)
+	for _, parent := range allParents {
+		i.server.Store().RemoveCheckerOnly(parent)
+	}
+	
+	// Re-check any open documents that depend on this file
+	affected := i.server.CollectAffectedOpenRootURIs(key, "")
+	for _, depURI := range affected {
+		if doc, ok := i.server.GetDocument(depURI); ok {
+			i.server.CheckAndPublishDiagnostics(i.server.Conn(), depURI, doc.Text, doc.Version)
+		}
+	}
+}
+
+// handleProjectFilesChanged re-checks all open files in a project when .cdc files are created/deleted
+func (i *FlowIntegration) handleProjectFilesChanged(cfgPath string) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Log panic but don't crash the server
+			// This can happen if state reload fails and checking encounters issues
+		}
+	}()
+	
+	if i.server == nil {
+		return
+	}
+	
+	// Re-check all open documents in this project
+	allDocs := i.server.GetAllDocuments()
+	for uri, doc := range allDocs {
+		proj := i.server.ProjectResolver().ProjectIDForURI(uri)
+		if proj == cfgPath {
+			i.server.CheckAndPublishDiagnostics(i.server.Conn(), uri, doc.Text, doc.Version)
+		}
+	}
 }
 
 // flowProjectResolver implements server.ProjectResolver
