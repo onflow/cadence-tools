@@ -67,15 +67,19 @@ func (r *resolvers) resolveStringIdentifierImport(projectID string, name string)
 	if r.cfgManager == nil || projectID == "" {
 		return "", fmt.Errorf("no project context available for identifier import")
 	}
-	if st, _ := r.cfgManager.ResolveStateForProject(projectID); st != nil {
-		if code, err := st.GetCodeByName(name); err == nil {
-			return code, nil
-		}
+	// State-backed resolution only to ensure canonicalization and imports share identity
+	st, stateErr := r.cfgManager.ResolveStateForProject(projectID)
+	if stateErr != nil {
+		return "", fmt.Errorf("failed to load project state for %q: %w", projectID, stateErr)
 	}
-	if mapped, _ := r.cfgManager.GetContractSourceForProject(projectID, name); mapped != "" {
-		return mapped, nil
+	if st == nil {
+		return "", fmt.Errorf("project state is nil for %q", projectID)
 	}
-	return "", fmt.Errorf("failed to resolve project state")
+	code, err := st.GetCodeByName(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to get code for %q: %w", name, err)
+	}
+	return code, nil
 }
 
 // resolveFileImport resolves a file import path relative to the project root if necessary.
@@ -120,9 +124,7 @@ func (r *resolvers) addressImport(projectID string, location common.AddressLocat
 	if err != nil || cl == nil {
 		return "", errors.New("client is not initialized")
 	}
-	if cl == nil {
-		return "", errors.New("client is not initialized")
-	}
+	// cl already checked; no need to re-check nil
 
 	account, err := cl.GetAccount(flow.HexToAddress(location.Address.String()))
 	if err != nil {
@@ -137,6 +139,16 @@ func (r *resolvers) identifierImportProject(projectID string, location common.Id
 	if location == stdlib.CryptoContractLocation {
 		return string(coreContracts.Crypto()), nil
 	}
+	// Resolve via state
+	if r.cfgManager != nil && projectID != "" {
+		if st, err := r.cfgManager.ResolveStateForProject(projectID); err == nil && st != nil {
+			if code, err := st.GetCodeByName(string(location)); err == nil {
+				return code, nil
+			}
+		}
+		return "", fmt.Errorf("failed to resolve identifier location %q from project state", location)
+	}
+
 	return "", fmt.Errorf("unknown identifier location: %s", location)
 }
 

@@ -27,17 +27,19 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flowkit/v2"
 	"github.com/spf13/afero"
 
-	"path/filepath"
-	"strings"
-
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 	"github.com/onflow/cadence-tools/languageserver/server"
+
+	"path/filepath"
+	"strings"
 )
 
 func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, protocol.DocumentURI, string) {
@@ -62,7 +64,8 @@ func (i *FlowIntegration) didOpenInitHook(s *server.Server) func(protocol.Conn, 
 		// Do not validate init-config here; rely on ConfigManager load errors instead
 		if cfg := i.cfgManager.NearestConfigPath(path); cfg != "" {
 			// Attempt to load; if flowkit fails, remember and show the error and skip prompt
-			if _, err := i.cfgManager.ResolveStateForPath(cfg); err != nil {
+			// Use ResolveStateForProject since cfg is already a config path (flow.json)
+			if _, err := i.cfgManager.ResolveStateForProject(cfg); err != nil {
 				conn.ShowMessage(&protocol.ShowMessageParams{
 					Type:    protocol.Error,
 					Message: fmt.Sprintf("Failed to load flow.json: %s", err.Error()),
@@ -156,9 +159,91 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 
 	// Always create a config manager so per-file config discovery works even without init options
 	integration.cfgManager = NewConfigManager(loader, enableFlowClient, 0, "")
+	// Debounce per-file rechecks to coalesce rapid successive events
+	var debounceMu sync.Mutex
+	debounce := make(map[string]*time.Timer)
+	// When any .cdc under a watched project changes on disk, ask the server to invalidate and recheck
+	integration.cfgManager.SetOnFileChanged(func(absPath string) {
+		debounceMu.Lock()
+		if t, ok := debounce[absPath]; ok && t != nil {
+			_ = t.Stop()
+		}
+		debounce[absPath] = time.AfterFunc(500*time.Millisecond, func() {
+			defer func() {
+				debounceMu.Lock()
+				delete(debounce, absPath)
+				debounceMu.Unlock()
+			}()
+			if s == nil {
+				return
+			}
+			// Build a canonical location for the changed file and remove cached checker
+			uri := protocol.DocumentURI("file://" + absPath)
+			proj := s.ProjectResolver().ProjectIDForURI(uri)
+			canonical := s.ProjectResolver().CanonicalLocation(proj, common.StringLocation(absPath))
+			key := server.CheckerKey{ProjectID: proj, Location: canonical}
+			// Clear outgoing edges since imports will be rebuilt, but preserve incoming edges
+			s.Store().ClearChildren(key)
+			s.Store().RemoveCheckerOnly(key)
 
-	// Provide a project identity provider keyed by nearest flow.json for checker cache scoping
-	projectProvider := projectIdentityProvider{cfg: integration.cfgManager}
+			// Invalidate all transitive parent checkers (they reference types from this file)
+			allParents := s.Store().AffectedParents(key)
+			for _, parent := range allParents {
+				s.Store().RemoveCheckerOnly(parent)
+			}
+
+			// Re-check any open documents that depend on this file immediately
+			parentKey := server.CheckerKey{ProjectID: proj, Location: canonical}
+			affected := s.CollectAffectedOpenRootURIs(parentKey, "")
+			for _, depURI := range affected {
+				if doc, ok := s.GetDocument(depURI); ok {
+					// Use retained connection to publish fresh diagnostics
+					text := doc.Text
+					version := doc.Version
+					s.CheckAndPublishDiagnostics(s.Conn(), depURI, text, version)
+				}
+			}
+		})
+		debounceMu.Unlock()
+	})
+
+	// When .cdc files are created/deleted, re-check all open files in the project
+	// (not just dependents, since any file might have had a failed import)
+	var projectDebounceMu sync.Mutex
+	projectDebounce := make(map[string]*time.Timer)
+	integration.cfgManager.SetOnProjectFilesChanged(func(cfgPath string) {
+		projectDebounceMu.Lock()
+		if t, ok := projectDebounce[cfgPath]; ok && t != nil {
+			_ = t.Stop()
+		}
+		projectDebounce[cfgPath] = time.AfterFunc(500*time.Millisecond, func() {
+			defer func() {
+				if r := recover(); r != nil {
+					// Log panic but don't crash the server
+					// This can happen if state reload fails and checking encounters issues
+				}
+				projectDebounceMu.Lock()
+				delete(projectDebounce, cfgPath)
+				projectDebounceMu.Unlock()
+			}()
+			if s == nil {
+				return
+			}
+			// Re-check all open documents in this project
+			allDocs := s.GetAllDocuments()
+			for uri, doc := range allDocs {
+				// Check if this document belongs to this project
+				proj := s.ProjectResolver().ProjectIDForURI(uri)
+				if proj == cfgPath {
+					s.CheckAndPublishDiagnostics(s.Conn(), uri, doc.Text, doc.Version)
+				}
+			}
+		})
+		projectDebounceMu.Unlock()
+	})
+
+	// Provide a project resolver for identity and location canonicalization
+	projectResolver := flowProjectResolver{cfg: integration.cfgManager}
 
 	resolve := resolvers{
 		loader:     loader,
@@ -171,7 +256,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithInitializationOptionsHandler(integration.initialize),
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
 		server.WithIdentifierImportResolver(resolve.identifierImportProject),
-		server.WithProjectIdentityProvider(projectProvider),
+		server.WithProjectResolver(projectResolver),
 	}
 
 	// Prompt to create flow.json when opening an existing .cdc file without a config.
@@ -223,11 +308,11 @@ type FlowIntegration struct {
 	invalidWarnedRoots map[string]struct{}
 }
 
-// projectIdentityProvider implements server.ProjectIdentityProvider using ConfigManager.
-// It returns the absolute flow.json path as the project ID, or empty if none is found.
-type projectIdentityProvider struct{ cfg *ConfigManager }
+// flowProjectResolver implements server.ProjectResolver
+type flowProjectResolver struct{ cfg *ConfigManager }
 
-func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) string {
+// ProjectIDForURI returns the project ID for a given URI
+func (p flowProjectResolver) ProjectIDForURI(uri protocol.DocumentURI) string {
 	if p.cfg == nil {
 		return ""
 	}
@@ -235,31 +320,82 @@ func (p projectIdentityProvider) ProjectIDForURI(uri protocol.DocumentURI) strin
 	if p.cfg.initConfigPath != "" {
 		return stableProjectID(p.cfg.loader, p.cfg.initConfigPath)
 	}
-	u := string(uri)
-	var path string
-	if strings.HasPrefix(u, "file://") {
-		// Decode URI and normalize Windows paths (handles %20, etc.)
-		path = deURI(cleanWindowsPath(strings.TrimPrefix(u, "file://")))
-	} else {
-		// Assume raw filesystem path
-		path = deURI(cleanWindowsPath(u))
+	// Otherwise, find the nearest flow.json and use its path (with mtime suffix)
+	path := deURI(cleanWindowsPath(strings.TrimPrefix(string(uri), "file://")))
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
 	}
-	cfgPath := p.cfg.NearestConfigPath(path)
-	// If no on-disk config is found, but an init-config override exists, use it for project scoping
-	if cfgPath == "" && p.cfg.initConfigPath != "" {
-		cfgPath = p.cfg.initConfigPath
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
 	}
-	if cfgPath == "" {
-		if abs, err := filepath.Abs(path); err == nil {
-			return filepath.Dir(abs)
+	if cfgPath := p.cfg.NearestConfigPath(path); cfgPath != "" {
+		// Ensure state is loaded for this project synchronously so downstream
+		// canonicalization can rely on cache/state without races.
+		_, _ = p.cfg.ResolveStateForProject(cfgPath)
+		return stableProjectID(p.cfg.loader, cfgPath)
+	}
+	return ""
+}
+
+// CanonicalLocation returns a canonical file-backed location for string imports
+func (p flowProjectResolver) CanonicalLocation(projectID string, location common.Location) common.Location {
+	if p.cfg == nil {
+		return location
+	}
+	switch loc := location.(type) {
+	case common.StringLocation:
+		name := string(loc)
+		// If it looks like a file path, normalize to absolute path
+		if strings.Contains(name, ".cdc") {
+			filename := deURI(cleanWindowsPath(name))
+			abs, err := filepath.Abs(filename)
+			if err != nil {
+				// If absolute path resolution fails, return original location
+				return location
+			}
+			// Resolve symlinks for consistent canonical file identity (e.g. /var -> /private/var on macOS)
+			if real, err := filepath.EvalSymlinks(abs); err == nil {
+				abs = real
+			}
+			return common.StringLocation(abs)
 		}
-		return filepath.Dir(path)
+		// String Identifier: resolve via loaded state only
+		if projectID != "" {
+			if st, err := p.cfg.ResolveStateForProject(projectID); err == nil && st != nil {
+				if c, err := st.getState().Contracts().ByName(name); err == nil && c.Location != "" {
+					abs := filepath.Join(filepath.Dir(st.getConfigPath()), c.Location)
+					if absPath, err := filepath.Abs(abs); err == nil {
+						abs = absPath
+					}
+					if real, err := filepath.EvalSymlinks(abs); err == nil {
+						abs = real
+					}
+					return common.StringLocation(abs)
+				}
+			}
+		}
+		return location
+	case common.IdentifierLocation:
+		// Convert identifier to file-backed path using loaded state only
+		if projectID != "" {
+			name := string(loc)
+			if st, err := p.cfg.ResolveStateForProject(projectID); err == nil && st != nil {
+				if c, err := st.getState().Contracts().ByName(name); err == nil && c.Location != "" {
+					abs := filepath.Join(filepath.Dir(st.getConfigPath()), c.Location)
+					if absPath, err := filepath.Abs(abs); err == nil {
+						abs = absPath
+					}
+					if real, err := filepath.EvalSymlinks(abs); err == nil {
+						abs = real
+					}
+					return common.StringLocation(abs)
+				}
+			}
+		}
+		return location
+	default:
+		return location
 	}
-	// Normalize to absolute path for stability and include modtime to bust global cache on config edits
-	if abs, err := filepath.Abs(cfgPath); err == nil {
-		cfgPath = abs
-	}
-	return stableProjectID(p.cfg.loader, cfgPath)
 }
 
 func (i *FlowIntegration) initialize(initializationOptions any) error {
@@ -436,14 +572,14 @@ func (i *FlowIntegration) codeLenses(
 	return actions, nil
 }
 
-// stableProjectID composes a stable project identifier using an absolute config path and its modtime.
-// The format is: <absConfigPath>@<unix_nanos>. If stat fails, returns the absolute path without suffix.
+// stableProjectID composes a stable project identifier using the canonical absolute config path.
+// No modtime suffix is used to ensure identity is consistent across a session.
 func stableProjectID(loader flowkit.ReaderWriter, cfgPath string) string {
 	if abs, err := filepath.Abs(cfgPath); err == nil {
 		cfgPath = abs
 	}
-	if fi, err := loader.Stat(cfgPath); err == nil {
-		return fmt.Sprintf("%s@%d", cfgPath, fi.ModTime().UnixNano())
+	if real, err := filepath.EvalSymlinks(cfgPath); err == nil {
+		cfgPath = real
 	}
 	return cfgPath
 }
