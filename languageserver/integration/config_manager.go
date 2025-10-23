@@ -19,7 +19,8 @@
 package integration
 
 import (
-	"encoding/json"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -64,21 +65,48 @@ type ConfigManager struct {
 
 	// loadErrors keeps the last load/reload error per config path (abs)
 	loadErrors map[string]string
+
+	// onFileChanged, if set, is called with the absolute path of a changed .cdc file
+	onFileChanged func(string)
+
+	// onProjectFilesChanged, if set, is called with the config path when .cdc files are created/deleted
+	// This allows re-checking all open files in the project, not just dependents
+	onProjectFilesChanged func(string)
+
+	// single-flight guards for state loads keyed by abs cfg path
+	sfMu              sync.Mutex
+	stateLoadInFlight map[string]chan struct{}
 }
 
 func NewConfigManager(loader flowkit.ReaderWriter, enableFlowClient bool, numberOfAccounts int, initConfigPath string) *ConfigManager {
 	return &ConfigManager{
-		loader:           loader,
-		enableFlowClient: enableFlowClient,
-		numberOfAccounts: numberOfAccounts,
-		initConfigPath:   initConfigPath,
-		states:           make(map[string]flowState),
-		clients:          make(map[string]flowClient),
-		watchers:         make(map[string]*fsnotify.Watcher),
-		docToConfig:      make(map[string]string),
-		dirWatchers:      make(map[string]*fsnotify.Watcher),
-		loadErrors:       make(map[string]string),
+		loader:            loader,
+		enableFlowClient:  enableFlowClient,
+		numberOfAccounts:  numberOfAccounts,
+		initConfigPath:    initConfigPath,
+		states:            make(map[string]flowState),
+		clients:           make(map[string]flowClient),
+		watchers:          make(map[string]*fsnotify.Watcher),
+		docToConfig:       make(map[string]string),
+		dirWatchers:       make(map[string]*fsnotify.Watcher),
+		loadErrors:        make(map[string]string),
+		stateLoadInFlight: make(map[string]chan struct{}),
 	}
+}
+
+// SetOnFileChanged registers a callback for .cdc file changes under watched directories.
+func (m *ConfigManager) SetOnFileChanged(cb func(string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onFileChanged = cb
+}
+
+// SetOnProjectFilesChanged registers a callback for when .cdc files are created/deleted in a project.
+// The callback receives the absolute path to the project's flow.json.
+func (m *ConfigManager) SetOnProjectFilesChanged(cb func(string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onProjectFilesChanged = cb
 }
 
 // ResolveStateForChecker returns the state associated with the closest flow.json for the given checker.
@@ -221,8 +249,8 @@ func (m *ConfigManager) findNearestFlowJSON(filePath string) string {
 	p := cleanWindowsPath(filePath)
 	dir := filepath.Dir(p)
 	prev := ""
-    for dir != prev {
-        candidate := filepath.Join(dir, flowConfigFilename)
+	for dir != prev {
+		candidate := filepath.Join(dir, flowConfigFilename)
 		// Use loader to check for existence
 		if _, err := m.loader.Stat(candidate); err == nil {
 			return candidate
@@ -274,10 +302,18 @@ func (m *ConfigManager) ConfigPathForProject(projectID string) string {
 	if err != nil {
 		return cfgPath
 	}
-    // If a directory was provided, prefer flow.json within it
-    if filepath.Base(absCfgPath) != flowConfigFilename {
-        candidate := filepath.Join(absCfgPath, flowConfigFilename)
+	// Canonicalize symlinks for consistent identity across /var vs /private/var on macOS
+	if real, err := filepath.EvalSymlinks(absCfgPath); err == nil {
+		absCfgPath = real
+	}
+	// If a directory was provided, prefer flow.json within it
+	if filepath.Base(absCfgPath) != flowConfigFilename {
+		candidate := filepath.Join(absCfgPath, flowConfigFilename)
 		if _, err := m.loader.Stat(candidate); err == nil {
+			// Return canonicalized candidate path as well
+			if real, err := filepath.EvalSymlinks(candidate); err == nil {
+				return real
+			}
 			return candidate
 		}
 	}
@@ -292,6 +328,13 @@ func (m *ConfigManager) IsPathInProject(projectID string, absPath string) bool {
 	}
 	absRoot, _ := filepath.Abs(filepath.Dir(cfgPath))
 	absFile, _ := filepath.Abs(absPath)
+	// Canonicalize both sides to avoid false negatives due to symlinks
+	if real, err := filepath.EvalSymlinks(absRoot); err == nil {
+		absRoot = real
+	}
+	if real, err := filepath.EvalSymlinks(absFile); err == nil {
+		absFile = real
+	}
 	if rel, err := filepath.Rel(absRoot, absFile); err == nil {
 		return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 	}
@@ -309,36 +352,15 @@ func (m *ConfigManager) IsSameProject(projectID string, absPath string) bool {
 		return true
 	}
 	absDst, _ := filepath.Abs(cleanWindowsPath(dst))
-	return absDst == cfgPath
-}
-
-// GetContractSourceForProject reads the project's flow.json and returns the code for the given contract name if mapped
-func (m *ConfigManager) GetContractSourceForProject(projectID string, name string) (string, error) {
-	cfgPath := m.ConfigPathForProject(projectID)
-	if cfgPath == "" || name == "" {
-		return "", nil
+	// Canonicalize both config paths for stable comparison
+	absCfg := cfgPath
+	if real, err := filepath.EvalSymlinks(absDst); err == nil {
+		absDst = real
 	}
-	data, err := m.loader.ReadFile(cfgPath)
-	if err != nil {
-		return "", err
+	if real, err := filepath.EvalSymlinks(absCfg); err == nil {
+		absCfg = real
 	}
-	var parsed struct {
-		Contracts map[string]string `json:"contracts"`
-	}
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		return "", err
-	}
-	rel, ok := parsed.Contracts[name]
-	if !ok || rel == "" {
-		return "", nil
-	}
-	dir := filepath.Dir(cfgPath)
-	path := filepath.Join(dir, rel)
-	code, err := m.loader.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(code), nil
+	return absDst == absCfg
 }
 
 // ResolveStateForProject returns the state associated with the given project ID (flow.json path)
@@ -349,7 +371,7 @@ func (m *ConfigManager) ResolveStateForProject(projectID string) (flowState, err
 		fallback := m.lastUsedConfigPath
 		m.mu.RUnlock()
 		if fallback != "" {
-			return m.loadState(fallback)
+			return m.loadStateSingleFlight(fallback)
 		}
 		return nil, nil
 	}
@@ -361,11 +383,51 @@ func (m *ConfigManager) ResolveStateForProject(projectID string) (flowState, err
 		m.setLastUsed(absCfgPath)
 		return st, nil
 	}
-	st, err := m.loadState(absCfgPath)
+	st, err := m.loadStateSingleFlight(absCfgPath)
 	if err == nil && st != nil {
 		m.setLastUsed(absCfgPath)
 	}
 	return st, err
+}
+
+// loadStateSingleFlight ensures only one goroutine loads state for cfgPath at a time.
+func (m *ConfigManager) loadStateSingleFlight(cfgPath string) (flowState, error) {
+	absCfgPath, err := filepath.Abs(cleanWindowsPath(cfgPath))
+	if err != nil {
+		return nil, err
+	}
+	m.sfMu.Lock()
+	if ch, ok := m.stateLoadInFlight[absCfgPath]; ok {
+		// Another goroutine is loading; wait
+		m.sfMu.Unlock()
+		<-ch
+		// After load completes, return existing (or nil) state
+		m.mu.RLock()
+		st := m.states[absCfgPath]
+		m.mu.RUnlock()
+		if st != nil && st.IsLoaded() {
+			return st, nil
+		}
+		// Return last error if captured
+		if msg := m.loadErrors[absCfgPath]; msg != "" {
+			return nil, errors.New(msg)
+		}
+		return nil, fmt.Errorf("failed to load state for %s", absCfgPath)
+	}
+	ch := make(chan struct{})
+	m.stateLoadInFlight[absCfgPath] = ch
+	m.sfMu.Unlock()
+
+	// Perform the load
+	st, loadErr := m.loadState(absCfgPath)
+
+	// Signal completion
+	m.sfMu.Lock()
+	delete(m.stateLoadInFlight, absCfgPath)
+	close(ch)
+	m.sfMu.Unlock()
+
+	return st, loadErr
 }
 
 // ResolveClientForProject returns the Flow client for the given project ID (flow.json path)
@@ -529,10 +591,10 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 				debounce.Reset(debounceWindow)
 				continue
 			}
-            // Handle rename/create of flow.json in the same directory (atomic save semantics)
+			// Handle rename/create of flow.json in the same directory (atomic save semantics)
 			dir := filepath.Dir(cfgPath)
-            if filepath.Dir(ev.Name) == dir && filepath.Base(ev.Name) == flowConfigFilename {
-                newCfg := filepath.Join(dir, flowConfigFilename)
+			if filepath.Dir(ev.Name) == dir && filepath.Base(ev.Name) == flowConfigFilename {
+				newCfg := filepath.Join(dir, flowConfigFilename)
 				if newCfg != cfgPath {
 					m.mu.Lock()
 					// Move state/client to new key if present
@@ -552,6 +614,43 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 					// Ensure we're watching the new path
 					_ = watcher.Add(newCfg)
 					debounce.Reset(debounceWindow)
+				}
+				continue
+			}
+			// Detect .cdc file changes in the config directory and notify
+			if filepath.Dir(ev.Name) == dir && strings.HasSuffix(strings.ToLower(ev.Name), ".cdc") {
+				abs := ev.Name
+				if a, err := filepath.Abs(abs); err == nil {
+					abs = a
+				}
+				// For remove/delete events, the file may not exist, so skip symlink resolution
+				if ev.Op&fsnotify.Remove == 0 {
+					if real, err := filepath.EvalSymlinks(abs); err == nil {
+						abs = real
+					}
+				}
+				// On Create/Remove, trigger project-wide re-check without reloading state
+				// The import resolver will naturally fail when trying to read a deleted file
+				if ev.Op&(fsnotify.Create|fsnotify.Remove) != 0 {
+					m.mu.RLock()
+					projectCb := m.onProjectFilesChanged
+					m.mu.RUnlock()
+
+					// Trigger project-wide re-check (all open files might have failed imports)
+					// Don't reload state here - let the import resolver discover missing files naturally
+					if projectCb != nil {
+						go projectCb(cfgPath)
+					}
+				}
+
+				m.mu.RLock()
+				cb := m.onFileChanged
+				m.mu.RUnlock()
+				if cb != nil {
+					// Notify on write/create/rename/remove events for dependency tracking
+					if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove) != 0 {
+						go cb(abs)
+					}
 				}
 			}
 		case <-debounce.C:
@@ -624,14 +723,14 @@ func (m *ConfigManager) watchDirLoop(dir string, watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-            // Only react to flow.json in this directory
+			// Only react to flow.json in this directory
 			base := filepath.Base(ev.Name)
-            if base != flowConfigFilename || filepath.Dir(ev.Name) != dir {
+			if base != flowConfigFilename || filepath.Dir(ev.Name) != dir {
 				continue
 			}
 			debounce.Reset(debounceWindow)
 		case <-debounce.C:
-            cfgPath := filepath.Join(dir, flowConfigFilename)
+			cfgPath := filepath.Join(dir, flowConfigFilename)
 			// If file exists now, reload state/client and attach file watcher
 			if _, err := m.loader.Stat(cfgPath); err == nil {
 				m.mu.RLock()

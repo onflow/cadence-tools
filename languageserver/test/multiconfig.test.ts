@@ -49,7 +49,12 @@ async function withConnection(
   try {
     await f(connection);
   } finally {
-    await connection.sendNotification(ExitNotification.type);
+    try {
+      await connection.sendNotification(ExitNotification.type);
+    } catch (e) {
+      // Connection may already be closed
+    }
+    child.kill();
   }
 }
 
@@ -245,11 +250,8 @@ describe("multi-config routing (no flow client)", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "tmp-"));
     const aDir = fs.mkdtempSync(path.join(root, "dir-"));
     const bDir = fs.mkdtempSync(path.join(root, "dir-"));
-    writeFlow(aDir, "moose");
-    writeFlow(bDir, "elk");
 
-    // flow.json expects contracts mapping; reuse base and override path names
-    // We'll write files matching those paths
+    // Write contract files first
     fs.writeFileSync(
       path.join(aDir, "fooA.cdc"),
       "access(all) contract Foo { access(all) let bar: Int; init(){ self.bar = 1 } }"
@@ -259,19 +261,33 @@ describe("multi-config routing (no flow client)", () => {
       "access(all) contract Foo { access(all) let bar: Int; init(){ self.bar = 2 } }"
     );
 
-    // Overwrite the flow.json contracts mapping to point to the specific files
-    const aFlow = JSON.parse(
-      fs.readFileSync(path.join(aDir, FLOW_JSON), "utf8")
-    );
+    // Write flow.json files with correct contracts mapping - only write ONCE
+    // For aDir, keep account as "moose"
+    const aFlow = JSON.parse(JSON.stringify(baseFlow));
     aFlow.contracts = { Foo: "./fooA.cdc" };
+    // Update deployments to only include Foo (remove Bar which doesn't exist)
+    if (aFlow.deployments && aFlow.deployments.emulator && aFlow.deployments.emulator.moose) {
+      aFlow.deployments.emulator.moose = ["Foo"];
+    }
+    fs.mkdirSync(aDir, { recursive: true });
     fs.writeFileSync(
       path.join(aDir, FLOW_JSON),
       JSON.stringify(aFlow, null, 2)
     );
-    const bFlow = JSON.parse(
-      fs.readFileSync(path.join(bDir, FLOW_JSON), "utf8")
-    );
+
+    // For bDir, rename account from "moose" to "elk"
+    const bFlow = JSON.parse(JSON.stringify(baseFlow));
+    if (bFlow.accounts && bFlow.accounts.moose) {
+      bFlow.accounts["elk"] = bFlow.accounts.moose;
+      delete bFlow.accounts.moose;
+    }
     bFlow.contracts = { Foo: "./fooB.cdc" };
+    // Update deployments: rename moose to elk and only deploy Foo
+    if (bFlow.deployments && bFlow.deployments.emulator && bFlow.deployments.emulator.moose) {
+      bFlow.deployments.emulator["elk"] = ["Foo"];
+      delete bFlow.deployments.emulator.moose;
+    }
+    fs.mkdirSync(bDir, { recursive: true });
     fs.writeFileSync(
       path.join(bDir, FLOW_JSON),
       JSON.stringify(bFlow, null, 2)
@@ -281,10 +297,16 @@ describe("multi-config routing (no flow client)", () => {
     fs.writeFileSync(path.join(aDir, "script.cdc"), script);
     fs.writeFileSync(path.join(bDir, "script.cdc"), script);
 
+    // Give filesystem time to flush writes before starting language server
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
     try {
       await withConnection(async (connection) => {
         const aUri = `file://${aDir}/script.cdc`;
         const bUri = `file://${bDir}/script.cdc`;
+
+        // Give language server time to initialize and discover flow.json files
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         const got = new Map<string, PublishDiagnosticsParams>();
         const both = new Promise<void>((resolve) => {

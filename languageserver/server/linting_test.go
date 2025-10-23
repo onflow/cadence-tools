@@ -30,7 +30,7 @@ import (
 func checkProgram(t *testing.T, text string) []protocol.Diagnostic {
 	server, err := NewServer()
 	assert.NoError(t, err)
-	diagnostics, err := server.getDiagnostics("", text, 0, func(_ *protocol.LogMessageParams) {})
+	diagnostics, err := server.getDiagnostics("", text, 0, func(_ *protocol.LogMessageParams) {}, false)
 	assert.NoError(t, err)
 	return diagnostics
 }

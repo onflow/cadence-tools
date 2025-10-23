@@ -48,7 +48,13 @@ func RunWithStdio(enableFlowClient bool) {
 		panic(err)
 	}
 
-	_, err = integration.NewFlowIntegration(languageServer, enableFlowClient)
+	_, options, err := integration.NewFlowIntegration(languageServer, enableFlowClient)
+	if err != nil {
+		panic(err)
+	}
+
+	// Apply server options from integration
+	err = languageServer.SetOptions(options...)
 	if err != nil {
 		panic(err)
 	}

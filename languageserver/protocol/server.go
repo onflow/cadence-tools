@@ -91,6 +91,7 @@ type Handler interface {
 	Initialize(conn Conn, params *InitializeParams) (*InitializeResult, error)
 	DidOpenTextDocument(conn Conn, params *DidOpenTextDocumentParams) error
 	DidChangeTextDocument(conn Conn, params *DidChangeTextDocumentParams) error
+	DidCloseTextDocument(conn Conn, params *DidCloseTextDocumentParams) error
 	Hover(conn Conn, params *TextDocumentPositionParams) (*Hover, error)
 	Definition(conn Conn, params *TextDocumentPositionParams) (*Location, error)
 	SignatureHelp(conn Conn, params *TextDocumentPositionParams) (*SignatureHelp, error)
@@ -130,6 +131,9 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["textDocument/didChange"] =
 		server.handleDidChangeTextDocument
+
+	jsonrpc2Server.Methods["textDocument/didClose"] =
+		server.handleDidCloseTextDocument
 
 	jsonrpc2Server.Methods["textDocument/hover"] =
 		server.handleHover
