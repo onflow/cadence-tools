@@ -211,15 +211,16 @@ func systemAddressLocationsForChain(ch flow.Chain) []common.AddressLocation {
 func configureForkMode(
 	backendOptions *BackendOptions,
 	testLogger *zerolog.Logger,
-) (flow.Chain, []emulator.Option) {
+) (flow.Chain, []emulator.Option, error) {
 	// Configure remote-backed storage so emulator sources state from remote Access node
 	baseProvider, err := util.NewSqliteStorage(sqlite.InMemory)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
+
 	sqliteStore, ok := baseProvider.(*sqlite.Store)
 	if !ok {
-		panic(fmt.Errorf("unexpected sqlite storage type"))
+		return nil, nil, fmt.Errorf("unexpected sqlite storage type")
 	}
 
 	// Create remote storage provider
@@ -230,7 +231,7 @@ func configureForkMode(
 		remote.WithForkHeight(backendOptions.ForkHeight),
 	)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
 	// Determine chain ID for fork mode
@@ -242,7 +243,7 @@ func configureForkMode(
 		// Auto-detect chain ID from remote network
 		chID, err := detectRemoteChainID(backendOptions.ForkHost)
 		if err != nil {
-			panic(fmt.Errorf("failed to detect remote chain ID: %w", err))
+			return nil, nil, fmt.Errorf("failed to detect remote chain ID: %w", err)
 		}
 		selectedChain = chID.Chain()
 	}
@@ -255,7 +256,7 @@ func configureForkMode(
 		emulator.WithTransactionValidationEnabled(false),
 	}
 
-	return selectedChain, forkOpts
+	return selectedChain, forkOpts, nil
 }
 
 func NewEmulatorBackend(
@@ -265,14 +266,6 @@ func NewEmulatorBackend(
 	backendOptions *BackendOptions,
 ) *EmulatorBackend {
 	logCollectionHook := newLogCollectionHook()
-
-	// Determine selected chain from options
-	selectedChain := DetermineChainFromOptions(backendOptions)
-
-	// Exclude system/common contracts from coverage before passing to emulator
-	if coverageReport != nil {
-		excludeCommonLocationsForChain(coverageReport, selectedChain)
-	}
 
 	// Build emulator options
 	opts := make([]emulator.Option, 0)
@@ -290,13 +283,28 @@ func NewEmulatorBackend(
 
 	// Configure fork mode or non-fork mode
 	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
+	var selectedChain flow.Chain
 	if forkEnabled {
 		var forkOpts []emulator.Option
-		selectedChain, forkOpts = configureForkMode(backendOptions, &testLogger)
+		var err error
+		selectedChain, forkOpts, err = configureForkMode(backendOptions, &testLogger)
+		if err != nil {
+			panic(fmt.Errorf("failed to configure fork mode: %w", err))
+		}
 		opts = append(opts, forkOpts...)
 	} else {
+		if backendOptions != nil && backendOptions.ChainID != "" {
+			selectedChain = backendOptions.ChainID.Chain()
+		} else {
+			selectedChain = flow.MonotonicEmulator.Chain()
+		}
 		// Only inject common contracts in non-fork mode (fresh bootstrapping)
 		opts = append(opts, emulator.Contracts(emulator.NewCommonContracts(selectedChain)))
+	}
+
+	// Exclude system/common contracts from coverage after determining chain
+	if coverageReport != nil {
+		excludeCommonLocationsForChain(coverageReport, selectedChain)
 	}
 
 	// Set chain ID after fork mode may have updated selectedChain
@@ -306,17 +314,6 @@ func NewEmulatorBackend(
 
 	clock := newSystemClock()
 	blockchain.SetClock(clock)
-
-	// CRITICAL for fork mode: Create an initial local block to establish a valid reference
-	// block ID in the forked remote store. This is required before any script execution or
-	// transaction processing. The emulator library requires the application to prime the
-	// first block when using remote-backed storage.
-	if forkEnabled {
-		_, _, err := blockchain.ExecuteAndCommitBlock()
-		if err != nil {
-			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
-		}
-	}
 
 	sc := systemcontracts.SystemContractsForChain(selectedChain.ChainID())
 	cryptoContractAddress := common.Address(sc.Crypto.Address)
@@ -349,8 +346,15 @@ func NewEmulatorBackend(
 		forkEnabled:     forkEnabled,
 	}
 
-	// Bootstrap accounts only in non-fork mode, for fork mode transaction signatures are not validated & any account can be used.
-	if !forkEnabled {
+	// Initialize state depending on fork mode:
+	// - In fork mode, create an initial local block to establish a valid reference block ID in the remote store
+	// - In non-fork mode, bootstrap test accounts
+	if forkEnabled {
+		_, _, err := blockchain.ExecuteAndCommitBlock()
+		if err != nil {
+			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
+		}
+	} else {
 		emulatorBackend.bootstrapAccounts()
 	}
 
@@ -364,32 +368,17 @@ func detectRemoteChainID(url string) (flow.ChainID, error) {
 		return "", err
 	}
 	defer func() { _ = conn.Close() }()
+
 	client := flowaccess.NewAccessAPIClient(conn)
-	resp, err := client.GetNetworkParameters(context.Background(), &flowaccess.GetNetworkParametersRequest{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := client.GetNetworkParameters(ctx, &flowaccess.GetNetworkParametersRequest{})
 	if err != nil {
 		return "", err
 	}
-	// Return the chain ID directly; caller can use chainID.Chain() to convert
 	return flow.ChainID(resp.GetChainId()), nil
-}
-
-// DetermineChainFromOptions returns the target chain based on BackendOptions.
-// Defaults to emulator chain; if ChainID is set it is used directly.
-// Otherwise tries to detect chain ID from ForkHost. No side effects.
-func DetermineChainFromOptions(backendOptions *BackendOptions) flow.Chain {
-	selectedChain := flow.MonotonicEmulator.Chain()
-	if backendOptions == nil {
-		return selectedChain
-	}
-	if backendOptions.ChainID != "" {
-		return backendOptions.ChainID.Chain()
-	}
-	if backendOptions.ForkHost != "" {
-		if chID, err := detectRemoteChainID(backendOptions.ForkHost); err == nil {
-			return chID.Chain()
-		}
-	}
-	return selectedChain
 }
 
 func accountContractNames(blockchain *emulator.Blockchain, address flow.Address) ([]string, error) {
@@ -558,7 +547,7 @@ func (e *EmulatorBackend) GetAccount(
 
 	key, ok := e.keys[address.ToAddress()]
 	if !ok {
-		return nil, fmt.Errorf("account with address: %s not found", address.ToAddress())
+		return nil, fmt.Errorf("account with address %s not found", address.Hex())
 	}
 	return &stdlib.Account{
 		Address:   address.ToAddress(),
