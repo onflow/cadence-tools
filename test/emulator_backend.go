@@ -378,6 +378,7 @@ func detectRemoteChainID(url string) (flow.ChainID, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return flow.ChainID(resp.GetChainId()), nil
 }
 
