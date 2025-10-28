@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
+	"github.com/onflow/flow-emulator/emulator"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/model/flow"
@@ -142,6 +143,9 @@ type TestRunner struct {
 	testFramework stdlib.TestFramework
 
 	backend *EmulatorBackend
+
+	// fork configuration
+	forkConfig *ForkConfig
 }
 
 func NewTestRunner() *TestRunner {
@@ -182,6 +186,19 @@ func (r *TestRunner) WithContracts(contracts map[string]common.Address) *TestRun
 		// which includes the mapping for system/common contracts.
 		r.contracts[contract] = address
 	}
+	return r
+}
+
+// ForkConfig configures a single forked environment for the entire test run.
+type ForkConfig struct {
+	ForkHost   string
+	ForkHeight uint64       // Block height to fork from (lastest sealed if empty)
+	ChainID    flow.ChainID // Chain ID to use (optional, will auto-detect if empty)
+}
+
+// WithFork enables fork mode with the given configuration.
+func (r *TestRunner) WithFork(cfg ForkConfig) *TestRunner {
+	r.forkConfig = &cfg
 	return r
 }
 
@@ -458,11 +475,21 @@ func (r *TestRunner) initializeEnvironment() (
 
 	r.testRuntime = runtime.NewRuntime(config)
 
+	var backendOptions *BackendOptions
+	if r.forkConfig != nil {
+		backendOptions = &BackendOptions{
+			ForkHost:   r.forkConfig.ForkHost,
+			ForkHeight: r.forkConfig.ForkHeight,
+			ChainID:    r.forkConfig.ChainID,
+		}
+	}
+
 	r.testFramework = NewTestFrameworkProvider(
 		r.logger,
 		r.fileResolver,
 		env,
 		r.coverageReport,
+		backendOptions,
 	)
 	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
 	if !ok {
@@ -479,6 +506,8 @@ func (r *TestRunner) initializeEnvironment() (
 		Environment: env,
 	}
 	if r.coverageReport != nil {
+		// Ensure system/common contracts are excluded before any parsing/instrumentation
+		excludeCommonLocationsForChain(r.coverageReport, r.backend.chain)
 		r.coverageReport.ExcludeLocation(stdlib.CryptoContractLocation)
 		r.coverageReport.ExcludeLocation(stdlib.TestContractLocation)
 		r.coverageReport.ExcludeLocation(helpers.BlockchainHelpersLocation)
@@ -505,7 +534,7 @@ func (r *TestRunner) initializeEnvironment() (
 		nil,
 	)
 
-	err := setupEVMEnvironment(fvmEnv, env)
+	err := setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 	if err != nil {
 		panic(err)
 	}
@@ -771,7 +800,7 @@ func (r *TestRunner) parseAndCheckImport(
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve FVM Environment"))
 	}
-	err = setupEVMEnvironment(fvmEnv, env)
+	err = setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 	if err != nil {
 		panic(err)
 	}
@@ -787,11 +816,12 @@ func (r *TestRunner) parseAndCheckImport(
 }
 
 func setupEVMEnvironment(
+	ch flow.Chain,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
 ) error {
 	return evm.SetupEnvironment(
-		chain.ChainID(),
+		ch.ChainID(),
 		fvmEnv,
 		runtimeEnv,
 	)
@@ -799,16 +829,17 @@ func setupEVMEnvironment(
 
 func baseContracts() map[string]common.Address {
 	contracts := make(map[string]common.Address, 0)
-	serviceAddress := common.Address(chain.ServiceAddress())
+	ch := flow.MonotonicEmulator.Chain()
+	serviceAddress := common.Address(ch.ServiceAddress())
 	contracts["NonFungibleToken"] = serviceAddress
 	contracts["MetadataViews"] = serviceAddress
 	contracts["ViewResolver"] = serviceAddress
-	for _, addressLocation := range systemContracts {
+	for _, addressLocation := range systemAddressLocationsForChain(ch) {
 		contract := addressLocation.Name
 		address := addressLocation.Address
 		contracts[contract] = address
 	}
-	for _, contractDescription := range commonContracts {
+	for _, contractDescription := range emulator.NewCommonContracts(ch) {
 		contract := contractDescription.Name
 		address := common.Address(contractDescription.Address)
 		contracts[contract] = address

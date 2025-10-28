@@ -39,6 +39,9 @@ import (
 	"github.com/onflow/flow-emulator/adapters"
 	"github.com/onflow/flow-emulator/convert"
 	"github.com/onflow/flow-emulator/emulator"
+	"github.com/onflow/flow-emulator/storage/remote"
+	"github.com/onflow/flow-emulator/storage/sqlite"
+	"github.com/onflow/flow-emulator/storage/util"
 	"github.com/onflow/flow-emulator/types"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -47,8 +50,24 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	flowaccess "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
+
+// BackendOptions configures how the emulator backend should be created.
+// When ForkHost is provided, the backend will run in fork mode, skipping emulator
+// common-contract injection and using the ChainID of the forked network.
+type BackendOptions struct {
+	// ForkHost is the Access node RPC host:port to fork from. If empty, fork mode is disabled.
+	ForkHost string
+	// ForkHeight indicates the block height to fork from (0 means latest sealed block).
+	ForkHeight uint64
+	// ChainID is the chain ID to use for the emulator. If empty, the emulator will use the default chain ID.
+	// For fork mode, the ChainID will use the ChainID of the forked network.
+	ChainID flow.ChainID
+}
 
 // The "\x00helper/" prefix is used in order to prevent
 // conflicts with user-defined scripts/transactions.
@@ -95,7 +114,7 @@ type EmulatorBackend struct {
 
 	// accounts is a mapping of account addresses to the underlying
 	// stdlib.Account value.
-	accounts map[common.Address]*stdlib.Account
+	keys map[common.Address]*stdlib.PublicKey
 
 	// fileResolver is used to retrieve the Cadence source code,
 	// given a relative path.
@@ -107,6 +126,12 @@ type EmulatorBackend struct {
 
 	// locationHandler is used for resolving locations
 	locationHandler sema.LocationHandlerFunc
+
+	// chain is the selected chain configuration for this backend (emulator/testnet/mainnet).
+	chain flow.Chain
+
+	// fork configuration
+	forkEnabled bool
 }
 
 type keyInfo struct {
@@ -114,14 +139,11 @@ type keyInfo struct {
 	signer     crypto.Signer
 }
 
-var chain = flow.MonotonicEmulator.Chain()
-var chainContracts = systemcontracts.SystemContractsForChain(chain.ChainID())
-
-var commonContracts = emulator.NewCommonContracts(chain)
-
-// TODO: refactor, use chainContracts.All instead
-var systemContracts = func() []common.AddressLocation {
-	serviceAddress := chain.ServiceAddress().HexWithPrefix()
+// systemAddressLocationsForChain returns well-known system contract locations for a given chain.
+// TODO: refactor, use chainContracts.All when available in the dependency.
+func systemAddressLocationsForChain(ch flow.Chain) []common.AddressLocation {
+	chainContracts := systemcontracts.SystemContractsForChain(ch.ChainID())
+	serviceAddress := ch.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
 		"FlowServiceAccount":             serviceAddress,
 		"FlowToken":                      chainContracts.FlowToken.Address.HexWithPrefix(),
@@ -181,34 +203,119 @@ var systemContracts = func() []common.AddressLocation {
 			Name:    name,
 		})
 	}
-
 	return locations
-}()
+}
+
+// configureForkMode sets up remote-backed storage and returns the detected chain
+// and fork-specific emulator options.
+func configureForkMode(
+	backendOptions *BackendOptions,
+	testLogger *zerolog.Logger,
+) (flow.Chain, []emulator.Option, error) {
+	// Configure remote-backed storage so emulator sources state from remote Access node
+	baseProvider, err := util.NewSqliteStorage(sqlite.InMemory)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sqliteStore, ok := baseProvider.(*sqlite.Store)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected sqlite storage type")
+	}
+
+	// Create remote storage provider
+	provider, err := remote.New(
+		sqliteStore,
+		testLogger,
+		remote.WithForkHost(backendOptions.ForkHost),
+		remote.WithForkHeight(backendOptions.ForkHeight),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Determine chain ID for fork mode
+	var selectedChain flow.Chain
+	if backendOptions.ChainID != "" {
+		// Use explicitly provided ChainID as override
+		selectedChain = backendOptions.ChainID.Chain()
+	} else {
+		// Auto-detect chain ID from remote network
+		chID, err := detectRemoteChainID(backendOptions.ForkHost)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to detect remote chain ID: %w", err)
+		}
+		selectedChain = chID.Chain()
+	}
+
+	// Fork-specific emulator options
+	forkOpts := []emulator.Option{
+		emulator.WithStore(provider),
+		// In fork mode, disable tx validation so tests can act as any account
+		// without needing the real private keys or correct sequence numbers.
+		emulator.WithTransactionValidationEnabled(false),
+	}
+
+	return selectedChain, forkOpts, nil
+}
 
 func NewEmulatorBackend(
 	logger zerolog.Logger,
 	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
+	backendOptions *BackendOptions,
 ) *EmulatorBackend {
 	logCollectionHook := newLogCollectionHook()
-	var blockchain *emulator.Blockchain
+
+	// Build emulator options
+	opts := make([]emulator.Option, 0)
 	if coverageReport != nil {
-		excludeCommonLocations(coverageReport)
-		blockchain = newBlockchain(
-			logger,
-			logCollectionHook,
-			emulator.WithCoverageReport(coverageReport),
-		)
-	} else {
-		blockchain = newBlockchain(
-			logger,
-			logCollectionHook,
-		)
+		opts = append(opts, emulator.WithCoverageReport(coverageReport))
 	}
+
+	testLogger := logger.With().Timestamp().
+		Logger().Hook(logCollectionHook).Level(zerolog.InfoLevel)
+
+	opts = append(opts,
+		emulator.WithStorageLimitEnabled(false),
+		emulator.WithServerLogger(testLogger),
+	)
+
+	// Configure fork mode or non-fork mode
+	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
+	var selectedChain flow.Chain
+	if forkEnabled {
+		var forkOpts []emulator.Option
+		var err error
+		selectedChain, forkOpts, err = configureForkMode(backendOptions, &testLogger)
+		if err != nil {
+			panic(fmt.Errorf("failed to configure fork mode: %w", err))
+		}
+		opts = append(opts, forkOpts...)
+	} else {
+		if backendOptions != nil && backendOptions.ChainID != "" {
+			selectedChain = backendOptions.ChainID.Chain()
+		} else {
+			selectedChain = flow.MonotonicEmulator.Chain()
+		}
+		// Only inject common contracts in non-fork mode (fresh bootstrapping)
+		opts = append(opts, emulator.Contracts(emulator.NewCommonContracts(selectedChain)))
+	}
+
+	// Exclude system/common contracts from coverage after determining chain
+	if coverageReport != nil {
+		excludeCommonLocationsForChain(coverageReport, selectedChain)
+	}
+
+	// Set chain ID after fork mode may have updated selectedChain
+	opts = append(opts, emulator.WithChainID(selectedChain.ChainID()))
+
+	blockchain := newBlockchain(opts...)
+
 	clock := newSystemClock()
 	blockchain.SetClock(clock)
 
-	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	sc := systemcontracts.SystemContractsForChain(selectedChain.ChainID())
 	cryptoContractAddress := common.Address(sc.Crypto.Address)
 
 	locationHandler := func(
@@ -233,12 +340,46 @@ func NewEmulatorBackend(
 		logCollection:   logCollectionHook,
 		clock:           clock,
 		contracts:       map[string]common.Address{},
-		accounts:        map[common.Address]*stdlib.Account{},
+		keys:            map[common.Address]*stdlib.PublicKey{},
 		locationHandler: locationHandler,
+		chain:           selectedChain,
+		forkEnabled:     forkEnabled,
 	}
-	emulatorBackend.bootstrapAccounts()
+
+	// Initialize state depending on fork mode:
+	// - In fork mode, create an initial local block to establish a valid reference block ID in the remote store
+	// - In non-fork mode, bootstrap test accounts
+	if forkEnabled {
+		_, _, err := blockchain.ExecuteAndCommitBlock()
+		if err != nil {
+			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
+		}
+	} else {
+		emulatorBackend.bootstrapAccounts()
+	}
 
 	return emulatorBackend
+}
+
+// detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.
+func detectRemoteChainID(url string) (flow.ChainID, error) {
+	conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = conn.Close() }()
+
+	client := flowaccess.NewAccessAPIClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := client.GetNetworkParameters(ctx, &flowaccess.GetNetworkParametersRequest{})
+	if err != nil {
+		return "", err
+	}
+
+	return flow.ChainID(resp.GetChainId()), nil
 }
 
 func accountContractNames(blockchain *emulator.Blockchain, address flow.Address) ([]string, error) {
@@ -386,7 +527,7 @@ func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 			SignAlgo:  fvmCrypto.CryptoToRuntimeSigningAlgorithm(accountKey.PublicKey.Algorithm()),
 		},
 	}
-	e.accounts[account.Address] = account
+	e.keys[account.Address] = account.PublicKey
 
 	return account, nil
 }
@@ -394,11 +535,25 @@ func (e *EmulatorBackend) CreateAccount() (*stdlib.Account, error) {
 func (e *EmulatorBackend) GetAccount(
 	address interpreter.AddressValue,
 ) (*stdlib.Account, error) {
-	account, ok := e.accounts[address.ToAddress()]
-	if !ok {
-		return nil, fmt.Errorf("account with address: %s not found", address.Hex())
+	if e.forkEnabled {
+		// In fork mode, allow any account with a dummy public key
+		return &stdlib.Account{
+			Address: address.ToAddress(),
+			PublicKey: &stdlib.PublicKey{
+				PublicKey: []byte{0x00},
+				SignAlgo:  sema.SignatureAlgorithmUnknown,
+			},
+		}, nil
 	}
-	return account, nil
+
+	key, ok := e.keys[address.ToAddress()]
+	if !ok {
+		return nil, fmt.Errorf("account with address %s not found", address.Hex())
+	}
+	return &stdlib.Account{
+		Address:   address.ToAddress(),
+		PublicKey: key,
+	}, nil
 }
 
 func (e *EmulatorBackend) AddTransaction(
@@ -408,7 +563,6 @@ func (e *EmulatorBackend) AddTransaction(
 	signers []*stdlib.Account,
 	args []interpreter.Value,
 ) error {
-
 	code = e.replaceImports(code)
 
 	tx := e.newTransaction(code, authorizers)
@@ -481,11 +635,14 @@ func (e *EmulatorBackend) DeployContract(
 	path string,
 	args []interpreter.Value,
 ) error {
-
 	const deployContractTransactionTemplate = `
         transaction(%s) {
-            prepare(signer: auth(AddContract) &Account) {
-                signer.contracts.add(name: "%s", code: "%s".decodeHex()%s)
+            prepare(signer: auth(AddContract, UpdateContract) &Account) {
+                if signer.contracts.get(name: "%s") == nil {
+                    signer.contracts.add(name: "%s", code: "%s".decodeHex()%s)
+                } else {
+                    signer.contracts.update(name: "%s", code: "%s".decodeHex())
+                }
             }
         }
 	`
@@ -523,17 +680,20 @@ func (e *EmulatorBackend) DeployContract(
 		deployContractTransactionTemplate,
 		txArgsBuilder.String(),
 		name,
+		name,
 		hexEncodedCode,
 		addArgsBuilder.String(),
+		name,
+		hexEncodedCode,
 	)
 
 	address, ok := e.contracts[name]
 	if !ok {
 		return fmt.Errorf("could not find the address of contract: %s", name)
 	}
-	account, ok := e.accounts[address]
-	if !ok {
-		return fmt.Errorf("could not find an account with address: %s", address)
+	account, err := e.GetAccount(interpreter.AddressValue(address))
+	if err != nil {
+		return err
 	}
 	tx := e.newTransaction(script, []common.Address{account.Address})
 
@@ -686,7 +846,7 @@ func (e *EmulatorBackend) bootstrapAccounts() {
 	if err != nil {
 		panic(err)
 	}
-	e.accounts[serviceAcc.Address] = serviceAcc
+	e.keys[serviceAcc.Address] = serviceAcc.PublicKey
 
 	for i := 0; i < initialAccountsNumber; i++ {
 		_, err := e.CreateAccount()
@@ -717,30 +877,31 @@ func (e *EmulatorBackend) signTransaction(
 	tx *sdk.Transaction,
 	signerAccounts []*stdlib.Account,
 ) error {
-
-	// Sign transaction with each signer
-	// Note: Following logic is borrowed from the flow-ft.
-
 	serviceKey := e.blockchain.ServiceKey()
 
-	for i := len(signerAccounts) - 1; i >= 0; i-- {
-		signerAccount := signerAccounts[i]
-		if signerAccount.Address == common.Address(serviceKey.Address) {
-			// skip payload signing for service account, since we always
-			// sign the envelope with the service account just below
-			continue
-		}
+	// In fork mode, skip payload signing but still sign envelope for unique transaction IDs
+	if !e.forkEnabled {
+		for i := len(signerAccounts) - 1; i >= 0; i-- {
+			signerAccount := signerAccounts[i]
+			if signerAccount.Address == common.Address(serviceKey.Address) {
+				// Skip payload signing for service account, since we always
+				// sign the envelope with the service account below
+				continue
+			}
 
-		publicKey := signerAccount.PublicKey.PublicKey
-		accountKeys := e.accountKeys[signerAccount.Address]
-		keyInfo := accountKeys[string(publicKey)]
+			publicKey := signerAccount.PublicKey.PublicKey
+			accountKeys := e.accountKeys[signerAccount.Address]
+			keyInfo := accountKeys[string(publicKey)]
 
-		err := tx.SignPayload(sdk.Address(signerAccount.Address), 0, keyInfo.signer)
-		if err != nil {
-			return err
+			err := tx.SignPayload(sdk.Address(signerAccount.Address), 0, keyInfo.signer)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
+	// Always sign envelope with service account
+	// We must sign in fork mode to ensure a unique proposer sequence number for each transaction
 	serviceSigner, err := serviceKey.Signer()
 	if err != nil {
 		return err
@@ -807,25 +968,8 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 }
 
 // newBlockchain returns an emulator blockchain for testing.
-func newBlockchain(
-	logger zerolog.Logger,
-	hook *logCollectionHook,
-	opts ...emulator.Option,
-) *emulator.Blockchain {
-	testLogger := logger.With().Timestamp().
-		Logger().Hook(hook).Level(zerolog.InfoLevel)
-
-	b, err := emulator.New(
-		append(
-			[]emulator.Option{
-				emulator.WithStorageLimitEnabled(false),
-				emulator.WithServerLogger(testLogger),
-				emulator.Contracts(commonContracts),
-				emulator.WithChainID(chain.ChainID()),
-			},
-			opts...,
-		)...,
-	)
+func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
+	b, err := emulator.New(opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -833,13 +977,13 @@ func newBlockchain(
 	return b
 }
 
-// excludeCommonLocations excludes the common contracts from appearing
+// excludeCommonLocationsForChain excludes the common contracts from appearing
 // in the coverage report, as they skew the coverage metrics.
-func excludeCommonLocations(coverageReport *runtime.CoverageReport) {
-	for _, location := range systemContracts {
+func excludeCommonLocationsForChain(coverageReport *runtime.CoverageReport, ch flow.Chain) {
+	for _, location := range systemAddressLocationsForChain(ch) {
 		coverageReport.ExcludeLocation(location)
 	}
-	for _, contract := range commonContracts {
+	for _, contract := range emulator.NewCommonContracts(ch) {
 		address, _ := common.HexToAddress(contract.Address.String())
 		location := common.AddressLocation{
 			Address: address,
