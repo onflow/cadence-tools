@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	flowmodel "github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,8 +67,11 @@ func TestForkTestnet_FlowTokenSupply(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "FlowToken" {
+				return flowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
 		WithFork(ForkConfig{ForkHost: testnetForkURL, ChainID: flowmodel.Testnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -99,8 +103,11 @@ func TestForkMainnet_WriteAndReadState(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "FlowToken" {
+				return flowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -181,9 +188,15 @@ func TestForkMainnet_DeployAndCallContract(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
-			"Counter":   testAccount,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "Counter":
+				return testAccount, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -300,9 +313,15 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
-			"Counter":   testAccount,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "Counter":
+				return testAccount, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -359,9 +378,15 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 	currentContract = counterV2
 	runner2 := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
-			"Counter":   testAccount,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "Counter":
+				return testAccount, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -441,9 +466,15 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken":    flowTokenAddr,
-			"TestContract": arbitraryAddr,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "TestContract":
+				return arbitraryAddr, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -497,4 +528,116 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
+}
+
+// TestFork_ImportResolverAlias verifies that after loadFork in setup(),
+// imports are resolved using the correct network string (e.g., "testnet").
+func TestFork_ImportResolverAlias(t *testing.T) {
+	var observedNetwork string
+
+	importResolver := func(network string, location common.Location) (string, error) {
+		observedNetwork = network
+		if loc, ok := location.(common.StringLocation); ok && string(loc) == "Helper" {
+			return `access(all) contract Helper {}`, nil
+		}
+		if loc, ok := location.(common.AddressLocation); ok && loc.Name == "Helper" {
+			return `access(all) contract Helper {}`, nil
+		}
+		return "", fmt.Errorf("unknown import: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithImportResolver(importResolver).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			return common.Address{0x5}, nil
+		})
+
+	script := `
+        import Test
+        import "Helper"
+
+        access(all) fun setup() {
+            Test.loadFork(network: "testnet", height: nil)
+        }
+
+        access(all) fun test() {
+            Test.assertEqual(Type<Helper>(), Type<Helper>())
+        }
+    `
+
+	res, err := runner.RunTest(script, "test")
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+
+	// Verify import resolver received "testnet" after loadFork pre-execution
+	require.Equal(t, "testnet", observedNetwork)
+
+	backend, ok := runner.testFramework.EmulatorBackend().(*EmulatorBackend)
+	require.True(t, ok)
+	require.Equal(t, "testnet", backend.NetworkLabel())
+}
+
+// TestFork_ContractAddressResolver verifies dynamic address resolution based on network.
+func TestFork_ContractAddressResolver(t *testing.T) {
+	testnetAddr := common.MustBytesToAddress([]byte{0x9a, 0x07, 0x66, 0xd9, 0x3b, 0x66, 0x08, 0xb7})
+
+	var capturedNetwork string
+	addressResolver := func(network string, contractName string) (common.Address, error) {
+		capturedNetwork = network
+		if contractName == "FungibleToken" {
+			if network == "testnet" {
+				return testnetAddr, nil
+			}
+			return common.Address{0xee}, nil
+		}
+		return common.Address{}, fmt.Errorf("unknown contract: %s", contractName)
+	}
+
+	backend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
+	backend.contractAddressResolver = addressResolver
+
+	// Test emulator mode
+	result := backend.replaceImports(`import "FungibleToken"`)
+	require.Equal(t, "emulator", capturedNetwork)
+	require.Contains(t, result, "0xee")
+
+	// Test fork mode
+	backend.forkEnabled = true
+	backend.forkLabel = "testnet"
+	result = backend.replaceImports(`import "FungibleToken"`)
+	require.Equal(t, "testnet", capturedNetwork)
+	require.Contains(t, result, testnetAddr.Hex())
+}
+
+// TestFork_LoadForkOutsideSetupErrors verifies loadFork must be in setup().
+func TestFork_LoadForkOutsideSetupErrors(t *testing.T) {
+	script := `
+        import Test
+        access(all) fun testInvalid() {
+            Test.loadFork(network: "testnet", height: nil)
+        }
+    `
+
+	_, err := NewTestRunner().RunTest(script, "testInvalid")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Test.loadFork() must be called in setup() function only")
+}
+
+// TestFork_LoadForkVariableArguments verifies that using variables in loadFork arguments produces a clear error.
+func TestFork_LoadForkVariableArguments(t *testing.T) {
+	script := `
+        import Test
+        
+        access(all) fun setup() {
+            let network = "testnet"
+            Test.loadFork(network: network, height: nil)
+        }
+        
+        access(all) fun test() {}
+    `
+
+	_, err := NewTestRunner().RunTest(script, "test")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "network argument must be a string literal")
+	require.Contains(t, err.Error(), "Variables are not supported because loadFork is pre-executed via AST analysis")
 }

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/onflow/atree"
@@ -33,7 +34,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
-	"github.com/onflow/flow-emulator/emulator"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/model/flow"
@@ -109,9 +109,14 @@ func (h *logCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg strin
 	}
 }
 
-// ImportResolver resolves and returns the source code for imports.
-// Receives the current ChainID to allow network-aware resolution.
-type ImportResolver func(chainID flow.ChainID, location common.Location) (string, error)
+// ImportResolver resolves imports by providing source code for a given location.
+// The network parameter indicates the current network context ("emulator", "testnet", "mainnet", etc.).
+type ImportResolver func(network string, location common.Location) (code string, error error)
+
+// ContractAddressResolver resolves contract names to addresses based on the current network.
+// This is used during import rewriting to convert string imports like `import "Foo"`
+// into address imports like `import Foo from 0xADDRESS`.
+type ContractAddressResolver func(network string, contractName string) (address common.Address, error error)
 
 // FileResolver is used to resolve and get local files.
 // Returns the content of the file as a string.
@@ -128,6 +133,10 @@ type TestRunner struct {
 	// Users need to use configurations to set the import mapping for the testing code.
 	importResolver ImportResolver
 
+	// contractAddressResolver is used to resolve contract names to addresses based on network.
+	// This is called during import rewriting to convert string imports to address imports.
+	contractAddressResolver ContractAddressResolver
+
 	// fileResolver is used to resolve local files.
 	fileResolver FileResolver
 
@@ -137,8 +146,6 @@ type TestRunner struct {
 
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
-
-	contracts map[string]common.Address
 
 	testFramework stdlib.TestFramework
 
@@ -150,8 +157,7 @@ type TestRunner struct {
 
 func NewTestRunner() *TestRunner {
 	return &TestRunner{
-		logger:    zerolog.Nop(),
-		contracts: baseContracts(),
+		logger: zerolog.Nop(),
 	}
 }
 
@@ -180,12 +186,10 @@ func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
 	return r
 }
 
-func (r *TestRunner) WithContracts(contracts map[string]common.Address) *TestRunner {
-	for contract, address := range contracts {
-		// We do not want to override the base configuration,
-		// which includes the mapping for system/common contracts.
-		r.contracts[contract] = address
-	}
+// WithContractAddressResolver sets a resolver to dynamically determine contract addresses
+// based on the current network. This is used during import rewriting.
+func (r *TestRunner) WithContractAddressResolver(resolver ContractAddressResolver) *TestRunner {
+	r.contractAddressResolver = resolver
 	return r
 }
 
@@ -418,11 +422,32 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	*interpreter.Interpreter,
 	error,
 ) {
+	// Parse AST first to detect Test.loadFork calls in setup() (hoisted before check/interpret)
+	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// TODO: move this eventually to the `NewTestRunner`
 	env, ctx := r.initializeEnvironment()
 
-	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
-	if err != nil {
+	// Pre-execute: extract and execute any Test.loadFork(...) calls in setup() before type-checking
+	// This ensures the fork is loaded before imports are resolved
+	if host, height, err := extractTopLevelLoadFork(astProgram); err != nil {
+		return nil, nil, err
+	} else if host != "" {
+		r.backend.forkLabel = host
+		var h uint64
+		if height != nil {
+			h = *height
+		}
+		if err := r.backend.applyFork(host, h); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Validate: ensure loadFork is only called in setup() where it will be pre-executed
+	if err := validateNoLoadForkOutsideSetup(astProgram); err != nil {
 		return nil, nil, err
 	}
 
@@ -478,25 +503,35 @@ func (r *TestRunner) initializeEnvironment() (
 	var backendOptions *BackendOptions
 	if r.forkConfig != nil {
 		backendOptions = &BackendOptions{
-			ForkHost:   r.forkConfig.ForkHost,
-			ForkHeight: r.forkConfig.ForkHeight,
-			ChainID:    r.forkConfig.ChainID,
+			ForkHost:                r.forkConfig.ForkHost,
+			ForkHeight:              r.forkConfig.ForkHeight,
+			ChainID:                 r.forkConfig.ChainID,
+			ContractAddressResolver: r.contractAddressResolver,
+		}
+	} else if r.contractAddressResolver != nil {
+		// Even without fork config, pass resolver if provided
+		backendOptions = &BackendOptions{
+			ContractAddressResolver: r.contractAddressResolver,
 		}
 	}
 
-	r.testFramework = NewTestFrameworkProvider(
-		r.logger,
-		r.fileResolver,
-		env,
-		r.coverageReport,
-		backendOptions,
-	)
+	// Reuse existing framework/backend across test scripts to preserve fork state
+	if r.testFramework == nil {
+		r.testFramework = NewTestFrameworkProvider(
+			r.logger,
+			r.fileResolver,
+			env,
+			r.coverageReport,
+			backendOptions,
+		)
+	}
 	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
 	}
 	backend.fileResolver = r.fileResolver
-	backend.contracts = r.contracts
+	// Update resolver in case it was set after initial backend creation
+	backend.contractAddressResolver = r.contractAddressResolver
 	r.backend = backend
 
 	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
@@ -737,8 +772,13 @@ func (r *TestRunner) parseAndCheckImport(
 		return nil, nil, ImportResolverNotProvidedError{}
 	}
 
-	// Resolve code using current chain ID
-	code, err := r.importResolver(r.backend.chain.ChainID(), location)
+	// Resolve code using current network label (raw string passed by caller for fork) or "emulator"
+	network := "emulator"
+	if r.backend.forkEnabled && r.backend.NetworkLabel() != "" {
+		network = r.backend.NetworkLabel()
+	}
+	code, err := r.importResolver(network, location)
+
 	if err != nil {
 		addressLocation, ok := location.(common.AddressLocation)
 		if ok {
@@ -829,25 +869,160 @@ func setupEVMEnvironment(
 	)
 }
 
-func baseContracts() map[string]common.Address {
-	contracts := make(map[string]common.Address, 0)
-	ch := flow.MonotonicEmulator.Chain()
-	serviceAddress := common.Address(ch.ServiceAddress())
-	contracts["NonFungibleToken"] = serviceAddress
-	contracts["MetadataViews"] = serviceAddress
-	contracts["ViewResolver"] = serviceAddress
-	for _, addressLocation := range systemAddressLocationsForChain(ch) {
-		contract := addressLocation.Name
-		address := addressLocation.Address
-		contracts[contract] = address
-	}
-	for _, contractDescription := range emulator.NewCommonContracts(ch) {
-		contract := contractDescription.Name
-		address := common.Address(contractDescription.Address)
-		contracts[contract] = address
+// extractTopLevelLoadFork walks the AST to find loadFork calls in the setup() function:
+//
+//	access(all) fun setup() {
+//	    Test.loadFork(network: "mainnet", height: nil)
+//	}
+//
+// Returns the network string, optional height pointer, and true if found.
+// The detected loadFork call is executed before type-checking to ensure the fork
+// is loaded before imports are resolved (similar to jest.mock() preprocessing).
+func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
+	// Find the setup() function
+	var setupFunc *ast.FunctionDeclaration
+	for _, funcDecl := range program.FunctionDeclarations() {
+		if funcDecl.Identifier.Identifier == "setup" {
+			setupFunc = funcDecl
+			break
+		}
 	}
 
-	return contracts
+	if setupFunc == nil {
+		return "", nil, nil
+	}
+
+	// Find loadFork call within setup()
+	var foundInvocation *ast.InvocationExpression
+	ast.Inspect(setupFunc, func(element ast.Element) bool {
+		invocation, ok := element.(*ast.InvocationExpression)
+		if !ok {
+			return true
+		}
+
+		memberExpr, ok := invocation.InvokedExpression.(*ast.MemberExpression)
+		if !ok {
+			return true
+		}
+
+		identExpr, ok := memberExpr.Expression.(*ast.IdentifierExpression)
+		if !ok || identExpr.Identifier.Identifier != "Test" {
+			return true
+		}
+		if memberExpr.Identifier.Identifier != "loadFork" {
+			return true
+		}
+
+		foundInvocation = invocation
+		return false
+	})
+
+	if foundInvocation == nil {
+		return "", nil, nil
+	}
+
+	// Extract arguments: network (string) and height (optional uint or nil)
+	var network string
+	var heightPtr *uint64
+	var networkFound bool
+	var heightFound bool
+
+	for _, arg := range foundInvocation.Arguments {
+		switch arg.Label {
+		case "network":
+			networkFound = true
+			// Expect a string literal
+			if strExpr, ok := arg.Expression.(*ast.StringExpression); ok {
+				network = strExpr.Value
+			} else {
+				return "", nil, fmt.Errorf(
+					"Test.loadFork() network argument must be a string literal, got %T. "+
+						"Variables are not supported because loadFork is pre-executed via AST analysis",
+					arg.Expression,
+				)
+			}
+		case "height":
+			heightFound = true
+			// Can be nil or an integer literal
+			if _, ok := arg.Expression.(*ast.NilExpression); ok {
+				// heightPtr stays nil
+			} else if intExpr, ok := arg.Expression.(*ast.IntegerExpression); ok {
+				if val, err := strconv.ParseUint(intExpr.Value.String(), 10, 64); err == nil {
+					h := val
+					heightPtr = &h
+				} else {
+					return "", nil, fmt.Errorf("Test.loadFork() height argument is not a valid uint64: %w", err)
+				}
+			} else {
+				return "", nil, fmt.Errorf(
+					"Test.loadFork() height argument must be an integer literal or nil, got %T. "+
+						"Variables are not supported because loadFork is pre-executed via AST analysis",
+					arg.Expression,
+				)
+			}
+		}
+	}
+
+	if !networkFound || !heightFound {
+		return "", nil, fmt.Errorf(
+			"Test.loadFork() requires both 'network' and 'height' arguments",
+		)
+	}
+
+	if network == "" {
+		return "", nil, fmt.Errorf("Test.loadFork() network argument cannot be empty")
+	}
+
+	return network, heightPtr, nil
+}
+
+// validateNoLoadForkOutsideSetup ensures Test.loadFork() is only called in setup()
+// where it will be pre-executed. Calling it elsewhere (e.g., in test functions) will
+// cause import binding issues since imports are resolved before the test runs.
+func validateNoLoadForkOutsideSetup(program *ast.Program) error {
+	for _, funcDecl := range program.FunctionDeclarations() {
+		// Skip setup() - it's allowed
+		if funcDecl.Identifier.Identifier == "setup" {
+			continue
+		}
+
+		// Check all other functions for loadFork calls
+		var foundForbiddenCall *ast.InvocationExpression
+		ast.Inspect(funcDecl, func(element ast.Element) bool {
+			invocation, ok := element.(*ast.InvocationExpression)
+			if !ok {
+				return true
+			}
+
+			memberExpr, ok := invocation.InvokedExpression.(*ast.MemberExpression)
+			if !ok {
+				return true
+			}
+
+			identExpr, ok := memberExpr.Expression.(*ast.IdentifierExpression)
+			if !ok || identExpr.Identifier.Identifier != "Test" {
+				return true
+			}
+
+			if memberExpr.Identifier.Identifier == "loadFork" {
+				foundForbiddenCall = invocation
+				return false
+			}
+
+			return true
+		})
+
+		if foundForbiddenCall != nil {
+			return fmt.Errorf(
+				"Test.loadFork() must be called in setup() function only (found in %s). "+
+					"Calling loadFork outside setup() will not execute before type-checking, "+
+					"causing imports to resolve against the wrong network",
+				funcDecl.Identifier.Identifier,
+			)
+		}
+	}
+
+	return nil
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.

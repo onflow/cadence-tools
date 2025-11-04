@@ -67,6 +67,8 @@ type BackendOptions struct {
 	// ChainID is the chain ID to use for the emulator. If empty, the emulator will use the default chain ID.
 	// For fork mode, the ChainID will use the ChainID of the forked network.
 	ChainID flow.ChainID
+	// ContractAddressResolver is an optional resolver for dynamic contract address resolution
+	ContractAddressResolver ContractAddressResolver
 }
 
 // The "\x00helper/" prefix is used in order to prevent
@@ -120,10 +122,6 @@ type EmulatorBackend struct {
 	// given a relative path.
 	fileResolver FileResolver
 
-	// contracts is a mapping of contract identifiers to their
-	// deployed account address.
-	contracts map[string]common.Address
-
 	// locationHandler is used for resolving locations
 	locationHandler sema.LocationHandlerFunc
 
@@ -139,8 +137,11 @@ type EmulatorBackend struct {
 	// coverage report passed at construction (optional)
 	coverageReport *runtime.CoverageReport
 
-	// fork host for context (empty when not in fork mode)
-	forkHost string
+	// fork label as provided by caller (alias or host); empty when not forked
+	forkLabel string
+
+	// contractAddressResolver is an optional callback to resolve contract addresses dynamically
+	contractAddressResolver ContractAddressResolver
 }
 
 type keyInfo struct {
@@ -358,17 +359,6 @@ func (e *EmulatorBackend) applyChain(
 	e.locationHandler = locationHandler
 	e.chain = selectedChain
 	e.forkEnabled = forkEnabled
-
-	if forkEnabled {
-		// Merge system/common contracts for the selected chain into import map
-		for _, loc := range systemAddressLocationsForChain(selectedChain) {
-			e.contracts[loc.Name] = loc.Address
-		}
-		for _, contract := range emulator.NewCommonContracts(selectedChain) {
-			address, _ := common.HexToAddress(contract.Address.String())
-			e.contracts[contract.Name] = address
-		}
-	}
 }
 
 func NewEmulatorBackend(
@@ -380,20 +370,26 @@ func NewEmulatorBackend(
 	logHook := newLogCollectionHook()
 	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
 
+	// Extract ContractAddressResolver from options (if provided)
+	var contractAddressResolver ContractAddressResolver
+	if backendOptions != nil {
+		contractAddressResolver = backendOptions.ContractAddressResolver
+	}
+
 	// Create backend struct with shared fields
 	emulatorBackend := &EmulatorBackend{
-		blockchain:     nil,
-		blockOffset:    0,
-		accountKeys:    map[common.Address]map[string]keyInfo{},
-		stdlibHandler:  stdlibHandler,
-		logCollection:  logHook,
-		clock:          newSystemClock(),
-		contracts:      map[string]common.Address{},
-		keys:           map[common.Address]*stdlib.PublicKey{},
-		chain:          nil,
-		forkEnabled:    false,
-		logger:         logger,
-		coverageReport: coverageReport,
+		blockchain:              nil,
+		blockOffset:             0,
+		accountKeys:             map[common.Address]map[string]keyInfo{},
+		stdlibHandler:           stdlibHandler,
+		logCollection:           logHook,
+		clock:                   newSystemClock(),
+		keys:                    map[common.Address]*stdlib.PublicKey{},
+		chain:                   nil,
+		forkEnabled:             false,
+		logger:                  logger,
+		coverageReport:          coverageReport,
+		contractAddressResolver: contractAddressResolver,
 	}
 
 	if forkEnabled {
@@ -420,12 +416,10 @@ func NewEmulatorBackend(
 	return emulatorBackend
 }
 
-// ReloadWithFork reconfigures the emulator backend to fork from a remote network.
-// It preserves the existing logger hook, file resolver, contracts map, and clock.
-
 // applyFork configures the current backend to fork from host at height.
 func (e *EmulatorBackend) applyFork(host string, height uint64) error {
-	e.forkHost = host
+    // Allow passing network aliases (e.g., "mainnet", "testnet") and map them to default hosts
+    host = resolveForkHost(host)
 	selectedChain, newChain, locationHandler, err := buildEmulator(
 		e.logger,
 		e.coverageReport,
@@ -442,18 +436,33 @@ func (e *EmulatorBackend) applyFork(host string, height uint64) error {
 	return nil
 }
 
-// ForkHost returns the configured fork host (empty if not in fork mode)
-func (e *EmulatorBackend) ForkHost() string { return e.forkHost }
+// NetworkLabel returns the raw label used to load the fork (alias or host), or empty if not forked
+func (e *EmulatorBackend) NetworkLabel() string { return e.forkLabel }
 
-// LoadFork implements stdlib.Blockchain for backward-compatibility with the current Cadence stdlib.
-// It delegates to applyFork; when the stdlib shifts LoadFork to the TestFramework only,
-// this method can be removed.
+// LoadFork is a noop when called at runtime from Cadence code.
+// Fork loading is handled via AST-based pre-execution in parseCheckAndInterpret(),
+// which extracts Test.loadFork() calls from setup() and calls applyFork() before type-checking.
+// This ensures imports are resolved against the correct network context.
+//
+// This method exists to satisfy the stdlib.Blockchain interface, but does nothing when
+// invoked during test execution (after type-checking has already occurred).
 func (e *EmulatorBackend) LoadFork(host string, height *uint64) error {
-	var h uint64
-	if height != nil {
-		h = *height
-	}
-	return e.applyFork(host, h)
+	// Noop - the real work happens via AST pre-execution
+	return nil
+}
+
+// resolveForkHost maps known aliases to default Access node hosts, otherwise returns the input as-is.
+func resolveForkHost(hostOrAlias string) string {
+    if strings.Contains(hostOrAlias, ":") {
+        return hostOrAlias
+    }
+    switch strings.ToLower(hostOrAlias) {
+    case "mainnet":
+        return "access.mainnet.nodes.onflow.org:9000"
+    case "testnet":
+        return "access.testnet.nodes.onflow.org:9000"
+    }
+    return hostOrAlias
 }
 
 // detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.
@@ -782,10 +791,21 @@ func (e *EmulatorBackend) DeployContract(
 		hexEncodedCode,
 	)
 
-	address, ok := e.contracts[name]
-	if !ok {
-		return fmt.Errorf("could not find the address of contract: %s", name)
+	// Resolve contract address using the resolver
+	if e.contractAddressResolver == nil {
+		return fmt.Errorf("could not find the address of contract: %s (no resolver provided)", name)
 	}
+	
+	network := "emulator"
+	if e.forkEnabled && e.forkLabel != "" {
+		network = e.forkLabel
+	}
+	
+	address, err := e.contractAddressResolver(network, name)
+	if err != nil {
+		return fmt.Errorf("could not resolve address of contract %s: %w", name, err)
+	}
+	
 	account, err := e.GetAccount(interpreter.AddressValue(address))
 	if err != nil {
 		return err
@@ -1024,20 +1044,34 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 		location, ok := importDeclaration.Location.(common.StringLocation)
 		if !ok {
-			// keep the import statement it as-is
+			// keep the import statement as-is
 			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
 			continue
 		}
 
-		var address common.Address
-		var found bool
+		// Determine contract name to look up
+		var contractName string
 		if len(importDeclaration.Imports) > 0 {
-			address, found = e.contracts[importDeclaration.Imports[0].Identifier.Identifier]
+			contractName = importDeclaration.Imports[0].Identifier.Identifier
 		} else {
-			address, found = e.contracts[location.String()]
+			contractName = location.String()
 		}
-		if !found {
-			// keep import statement it as-is
+
+		// Resolve address using ContractAddressResolver
+		if e.contractAddressResolver == nil {
+			// No resolver provided, keep import statement as-is
+			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+			continue
+		}
+		
+		network := "emulator"
+		if e.forkEnabled && e.forkLabel != "" {
+			network = e.forkLabel
+		}
+		
+		address, err := e.contractAddressResolver(network, contractName)
+		if err != nil {
+			// Cannot resolve, keep import statement as-is
 			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
 			continue
 		}

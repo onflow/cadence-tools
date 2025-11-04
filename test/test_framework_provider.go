@@ -90,12 +90,3 @@ func NewTestFrameworkProvider(
 		backendOptions: backendOptions,
 	}
 }
-
-// Note: blockchain.LoadFork is implemented on the emulator backend.
-func (tf *TestFrameworkProvider) LoadFork(host string, height *uint64) error {
-	var h uint64
-	if height != nil {
-		h = *height
-	}
-	return tf.emulatorBackend.applyFork(host, h)
-}
