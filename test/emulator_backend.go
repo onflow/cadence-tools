@@ -132,6 +132,15 @@ type EmulatorBackend struct {
 
 	// fork configuration
 	forkEnabled bool
+
+	// logger used for server logging and preserved on reload
+	logger zerolog.Logger
+
+	// coverage report passed at construction (optional)
+	coverageReport *runtime.CoverageReport
+
+	// fork host for context (empty when not in fork mode)
+	forkHost string
 }
 
 type keyInfo struct {
@@ -259,22 +268,23 @@ func configureForkMode(
 	return selectedChain, forkOpts, nil
 }
 
-func NewEmulatorBackend(
+// buildEmulator constructs an emulator blockchain, determines the chain,
+// prepares common emulator options, and returns a fresh blockchain and
+// a location handler for that chain. The provided log hook is attached
+// to the server logger.
+func buildEmulator(
 	logger zerolog.Logger,
-	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 	backendOptions *BackendOptions,
-) *EmulatorBackend {
-	logCollectionHook := newLogCollectionHook()
-
+	logHook *logCollectionHook,
+) (flow.Chain, *emulator.Blockchain, sema.LocationHandlerFunc, error) {
 	// Build emulator options
 	opts := make([]emulator.Option, 0)
 	if coverageReport != nil {
 		opts = append(opts, emulator.WithCoverageReport(coverageReport))
 	}
 
-	testLogger := logger.With().Timestamp().
-		Logger().Hook(logCollectionHook).Level(zerolog.InfoLevel)
+	testLogger := logger.With().Timestamp().Logger().Hook(logHook).Level(zerolog.InfoLevel)
 
 	opts = append(opts,
 		emulator.WithStorageLimitEnabled(false),
@@ -289,7 +299,7 @@ func NewEmulatorBackend(
 		var err error
 		selectedChain, forkOpts, err = configureForkMode(backendOptions, &testLogger)
 		if err != nil {
-			panic(fmt.Errorf("failed to configure fork mode: %w", err))
+			return nil, nil, nil, fmt.Errorf("failed to configure fork mode: %w", err)
 		}
 		opts = append(opts, forkOpts...)
 	} else {
@@ -307,17 +317,15 @@ func NewEmulatorBackend(
 		excludeCommonLocationsForChain(coverageReport, selectedChain)
 	}
 
-	// Set chain ID after fork mode may have updated selectedChain
+	// Ensure emulator has correct chain ID
 	opts = append(opts, emulator.WithChainID(selectedChain.ChainID()))
 
+	// Create blockchain
 	blockchain := newBlockchain(opts...)
 
-	clock := newSystemClock()
-	blockchain.SetClock(clock)
-
+	// Build location handler for the selected chain
 	sc := systemcontracts.SystemContractsForChain(selectedChain.ChainID())
 	cryptoContractAddress := common.Address(sc.Crypto.Address)
-
 	locationHandler := func(
 		identifiers []ast.Identifier,
 		location common.Location,
@@ -332,33 +340,120 @@ func NewEmulatorBackend(
 		)
 	}
 
+	return selectedChain, blockchain, locationHandler, nil
+}
+
+// applyChain centralizes switching the backend to a new blockchain and chain config.
+// It reuses the existing clock and optionally merges system/common contracts in fork mode.
+func (e *EmulatorBackend) applyChain(
+	newChain *emulator.Blockchain,
+	selectedChain flow.Chain,
+	locationHandler sema.LocationHandlerFunc,
+	forkEnabled bool,
+) {
+	// Reuse clock and update fields
+	newChain.SetClock(e.clock)
+	e.blockchain = newChain
+	e.blockOffset = 0
+	e.locationHandler = locationHandler
+	e.chain = selectedChain
+	e.forkEnabled = forkEnabled
+
+	if forkEnabled {
+		// Merge system/common contracts for the selected chain into import map
+		for _, loc := range systemAddressLocationsForChain(selectedChain) {
+			e.contracts[loc.Name] = loc.Address
+		}
+		for _, contract := range emulator.NewCommonContracts(selectedChain) {
+			address, _ := common.HexToAddress(contract.Address.String())
+			e.contracts[contract.Name] = address
+		}
+	}
+}
+
+func NewEmulatorBackend(
+	logger zerolog.Logger,
+	stdlibHandler stdlib.StandardLibraryHandler,
+	coverageReport *runtime.CoverageReport,
+	backendOptions *BackendOptions,
+) *EmulatorBackend {
+	logHook := newLogCollectionHook()
+	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
+
+	// Create backend struct with shared fields
 	emulatorBackend := &EmulatorBackend{
-		blockchain:      blockchain,
-		blockOffset:     0,
-		accountKeys:     map[common.Address]map[string]keyInfo{},
-		stdlibHandler:   stdlibHandler,
-		logCollection:   logCollectionHook,
-		clock:           clock,
-		contracts:       map[string]common.Address{},
-		keys:            map[common.Address]*stdlib.PublicKey{},
-		locationHandler: locationHandler,
-		chain:           selectedChain,
-		forkEnabled:     forkEnabled,
+		blockchain:     nil,
+		blockOffset:    0,
+		accountKeys:    map[common.Address]map[string]keyInfo{},
+		stdlibHandler:  stdlibHandler,
+		logCollection:  logHook,
+		clock:          newSystemClock(),
+		contracts:      map[string]common.Address{},
+		keys:           map[common.Address]*stdlib.PublicKey{},
+		chain:          nil,
+		forkEnabled:    false,
+		logger:         logger,
+		coverageReport: coverageReport,
 	}
 
-	// Initialize state depending on fork mode:
-	// - In fork mode, create an initial local block to establish a valid reference block ID in the remote store
-	// - In non-fork mode, bootstrap test accounts
 	if forkEnabled {
-		_, _, err := blockchain.ExecuteAndCommitBlock()
+		// In fork mode, reuse loadFork for setup so all paths share the same logic
+		err := emulatorBackend.LoadFork(backendOptions.ForkHost, &backendOptions.ForkHeight)
 		if err != nil {
-			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
+			panic(err)
 		}
 	} else {
+		// Build a non-fork emulator and bootstrap accounts
+		selectedChain, blockchain, locationHandler, err := buildEmulator(
+			logger,
+			coverageReport,
+			backendOptions,
+			logHook,
+		)
+		if err != nil {
+			panic(err)
+		}
+		emulatorBackend.applyChain(blockchain, selectedChain, locationHandler, false)
 		emulatorBackend.bootstrapAccounts()
 	}
 
 	return emulatorBackend
+}
+
+// ReloadWithFork reconfigures the emulator backend to fork from a remote network.
+// It preserves the existing logger hook, file resolver, contracts map, and clock.
+
+// applyFork configures the current backend to fork from host at height.
+func (e *EmulatorBackend) applyFork(host string, height uint64) error {
+	e.forkHost = host
+	selectedChain, newChain, locationHandler, err := buildEmulator(
+		e.logger,
+		e.coverageReport,
+		&BackendOptions{ForkHost: host, ForkHeight: height},
+		e.logCollection,
+	)
+	if err != nil {
+		return err
+	}
+	e.applyChain(newChain, selectedChain, locationHandler, true)
+	if _, _, err := e.blockchain.ExecuteAndCommitBlock(); err != nil {
+		return fmt.Errorf("failed to commit initial block in fork mode: %w", err)
+	}
+	return nil
+}
+
+// ForkHost returns the configured fork host (empty if not in fork mode)
+func (e *EmulatorBackend) ForkHost() string { return e.forkHost }
+
+// LoadFork implements stdlib.Blockchain for backward-compatibility with the current Cadence stdlib.
+// It delegates to applyFork; when the stdlib shifts LoadFork to the TestFramework only,
+// this method can be removed.
+func (e *EmulatorBackend) LoadFork(host string, height *uint64) error {
+	var h uint64
+	if height != nil {
+		h = *height
+	}
+	return e.applyFork(host, h)
 }
 
 // detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.

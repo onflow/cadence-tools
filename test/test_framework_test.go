@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var firstAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 6}
@@ -366,7 +367,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithFileResolver(fileResolver).
 			WithContracts(contracts)
 
@@ -446,7 +447,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithFileResolver(fileResolver).
 			WithContracts(contracts)
 
@@ -471,7 +472,7 @@ func TestImportContract(t *testing.T) {
 			return "", errors.New("cannot import location")
 		}
 
-		runner := NewTestRunner().WithImportResolver(importResolver)
+		runner := NewTestRunner().WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) })
 
 		_, err := runner.RunTest(code, "test")
 		require.Error(t, err)
@@ -631,7 +632,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithContracts(contracts).
 			WithFileResolver(fileResolver)
 
@@ -869,7 +870,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithContracts(contracts).
 			WithFileResolver(fileResolver)
 
@@ -932,7 +933,7 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithContracts(contracts).
 			WithFileResolver(fileResolver)
 
@@ -1023,7 +1024,7 @@ func TestImportCryptoContract(t *testing.T) {
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(contracts).
 		WithFileResolver(fileResolver)
 
@@ -1149,7 +1150,7 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(map[string]common.Address{
 			"TestHandler": firstAccountAddress,
 		})
@@ -1273,7 +1274,7 @@ func TestUsingEnv(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithFileResolver(fileResolver).
 			WithContracts(contracts)
 
@@ -1383,7 +1384,7 @@ func TestCreateAccount(t *testing.T) {
 		return "", nil
 	}
 
-	runner := NewTestRunner().WithImportResolver(importResolver)
+	runner := NewTestRunner().WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) })
 	result, err := runner.RunTest(code, "test")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
@@ -1416,7 +1417,7 @@ func TestGetAccount(t *testing.T) {
 		return "", nil
 	}
 
-	runner := NewTestRunner().WithImportResolver(importResolver)
+	runner := NewTestRunner().WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) })
 	result, err := runner.RunTest(code, "testMissingAccount")
 	require.NoError(t, err)
 	require.ErrorContains(
@@ -4081,7 +4082,7 @@ func TestServiceAccount(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithFileResolver(fileResolver).
 			WithContracts(contracts)
 
@@ -4218,7 +4219,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	})
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithCoverageReport(coverageReport).
 		WithContracts(contracts)
 
@@ -4661,7 +4662,7 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithFileResolver(fileResolver).
 		WithContracts(contracts)
 
@@ -4773,7 +4774,7 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithFileResolver(fileResolver).
 		WithContracts(contracts)
 
@@ -5224,7 +5225,7 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
@@ -5306,7 +5307,7 @@ func TestImportingHelperFile(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(map[string]common.Address{"TestHandler": firstAccountAddress})
 
 	results, err := runner.RunTests(testCode)
@@ -5532,7 +5533,7 @@ func TestBlockchainMoveTime(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(contracts)
 
 	results, err := runner.RunTests(testCode)
@@ -5720,7 +5721,7 @@ func TestScheduledTransactions(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(map[string]common.Address{
 			"ScheduledHandler": firstAccountAddress,
 		})
@@ -5844,7 +5845,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithContracts(contracts)
 
 		results, err := runner.RunTests(testCode)
@@ -5972,7 +5973,7 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithImportResolver(importResolver).
+			WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 			WithContracts(contracts)
 
 		results, err := runner.RunTests(testCode)
@@ -6139,7 +6140,7 @@ func TestEnvironmentForUnitTests(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithContracts(contracts)
 
 	results, err := runner.RunTests(code)
@@ -6201,7 +6202,7 @@ func TestEVMContract(t *testing.T) {
 	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
 	log := zerolog.New(output).With().Timestamp().Logger()
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(func(chainID flow.ChainID, location common.Location) (string, error) { return importResolver(location) }).
 		WithLogger(log)
 
 	results, err := runner.RunTests(testCode)

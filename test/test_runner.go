@@ -109,9 +109,9 @@ func (h *logCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg strin
 	}
 }
 
-// ImportResolver is used to resolve and get the source code for imports.
-// Must be provided by the user of the TestRunner.
-type ImportResolver func(location common.Location) (string, error)
+// ImportResolver resolves and returns the source code for imports.
+// Receives the current ChainID to allow network-aware resolution.
+type ImportResolver func(chainID flow.ChainID, location common.Location) (string, error)
 
 // FileResolver is used to resolve and get local files.
 // Returns the content of the file as a string.
@@ -529,7 +529,7 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
+		runtime.NewStorage(ctx.Interface.(environment.Environment), nil, nil, runtime.StorageConfig{}),
 		nil,
 		nil,
 	)
@@ -633,7 +633,8 @@ func (r *TestRunner) interpreterContractValueHandler(
 				// its ledger.
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
-					inter,
+					nil,
+					nil,
 					runtime.StorageConfig{},
 				)
 				storageMap := blockchainStorage.GetDomainStorageMap(
@@ -736,7 +737,8 @@ func (r *TestRunner) parseAndCheckImport(
 		return nil, nil, ImportResolverNotProvidedError{}
 	}
 
-	code, err := r.importResolver(location)
+	// Resolve code using current chain ID
+	code, err := r.importResolver(r.backend.chain.ChainID(), location)
 	if err != nil {
 		addressLocation, ok := location.(common.AddressLocation)
 		if ok {
@@ -754,7 +756,7 @@ func (r *TestRunner) parseAndCheckImport(
 		}
 	}
 
-	// Create a new (child) context, with new environment.
+	// Create a new (child) context, reuse the provided interface
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
