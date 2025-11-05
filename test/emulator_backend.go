@@ -486,6 +486,19 @@ func (e *EmulatorBackend) applyFork(network string, height uint64) error {
 		return err
 	}
 	e.applyChain(newChain, selectedChain, locationHandler, true)
+
+	// Capture fork start height BEFORE creating any local blocks
+	if height == 0 {
+		latestBlock, err := newChain.GetLatestBlock()
+		if err != nil {
+			return fmt.Errorf("failed to get latest block for fork start height: %w", err)
+		}
+		e.forkStartHeight = latestBlock.Height
+	} else {
+		e.forkStartHeight = height
+	}
+
+	// Now create the initial local block
 	if _, _, err := e.blockchain.ExecuteAndCommitBlock(); err != nil {
 		return fmt.Errorf("failed to commit initial block in fork mode: %w", err)
 	}

@@ -658,3 +658,74 @@ func TestFork_LoadForkVariableArguments(t *testing.T) {
 	require.Contains(t, err.Error(), "network argument must be a string literal")
 	require.Contains(t, err.Error(), "Variables are not supported because loadFork is pre-executed via AST analysis")
 }
+
+// TestFork_Events verifies that Test.eventsOfType() works with inline Test.loadFork()
+// without hanging or scanning remote blocks.
+func TestFork_Events(t *testing.T) {
+	sc := systemcontracts.SystemContractsForChain(flowmodel.Mainnet.Chain().ChainID())
+	flowTokenAddr := common.Address(sc.FlowToken.Address)
+	fungibleTokenAddr := common.Address(sc.FungibleToken.Address)
+
+	importResolver := func(network string, location common.Location) (string, error) {
+		// No custom imports needed - rely on fork mode's built-in resolution
+		return "", fmt.Errorf("cannot resolve import: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(importResolver).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "FlowToken" {
+				return flowTokenAddr, nil
+			}
+			if name == "FungibleToken" {
+				return fungibleTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		})
+
+	script := `
+        import Test
+        import "FlowToken"
+
+        access(all) fun setup() {
+            Test.loadFork(network: "mainnet", height: nil)
+        }
+
+        access(all) fun test() {
+            // Get the initial event count before our transaction
+            let eventsBefore = Test.eventsOfType(Type<FlowToken.TokensWithdrawn>())
+            let countBefore = eventsBefore.length
+            
+            // Get a funded account that has a FlowToken vault
+            let acct = Test.getAccount(0x42a06f24a1049154)
+            
+            // Execute a transaction that withdraws tokens (definitely emits TokensWithdrawn)
+            let tx = Test.Transaction(
+                code: "import FlowToken from 0x1654653399040a61\nimport FungibleToken from 0xf233dcee88fe0abe\ntransaction { prepare(acct: auth(BorrowValue) &Account) { let vault = acct.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!; let withdrawn <- vault.withdraw(amount: 0.00000001); destroy withdrawn } }",
+                authorizers: [acct.address],
+                signers: [acct],
+                arguments: []
+            )
+            let res = Test.executeTransaction(tx)
+            Test.expect(res, Test.beSucceeded())
+            
+            // Fetch events after - should NOT hang and should only return local events
+            let eventsAfter = Test.eventsOfType(Type<FlowToken.TokensWithdrawn>())
+            let countAfter = eventsAfter.length
+            
+            // Verify that we got at least one new event from our transaction
+            log("Events before:")
+            log(countBefore)
+            log("Events after:")
+            log(countAfter)
+            
+            // Assert that our event shows up
+            Test.assert(countAfter > countBefore, message: "Expected new TokensWithdrawn event from withdraw")
+        }
+    `
+
+	result, err := runner.RunTest(script, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
