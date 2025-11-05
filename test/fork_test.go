@@ -44,6 +44,8 @@ const (
 // TestForkTestnet_FlowTokenSupply verifies that testnet fork mode works.
 // This is a smoke test to ensure testnet connectivity and basic fork functionality.
 func TestForkTestnet_FlowTokenSupply(t *testing.T) {
+	t.Parallel()
+
 	var blockHeight uint64
 
 	// Resolve testnet FlowToken address via system contracts
@@ -87,6 +89,8 @@ func TestForkTestnet_FlowTokenSupply(t *testing.T) {
 
 // TestForkMainnet_WriteAndReadState tests writing and reading account storage in fork mode.
 func TestForkMainnet_WriteAndReadState(t *testing.T) {
+	t.Parallel()
+
 	var blockHeight uint64
 
 	// Resolve mainnet FlowToken address via system contracts
@@ -143,6 +147,8 @@ func TestForkMainnet_WriteAndReadState(t *testing.T) {
 
 // TestForkMainnet_DeployAndCallContract tests deploying a contract in fork mode.
 func TestForkMainnet_DeployAndCallContract(t *testing.T) {
+	t.Parallel()
+
 	var blockHeight uint64
 
 	// Get system contracts for mainnet
@@ -238,6 +244,8 @@ func TestForkMainnet_DeployAndCallContract(t *testing.T) {
 // TestForkMainnet_ContractUpdate tests that deploying a contract in fork mode
 // will update the contract if it already exists on the forked account.
 func TestForkMainnet_ContractUpdate(t *testing.T) {
+	t.Parallel()
+
 	var blockHeight uint64
 
 	// Get system contracts for mainnet
@@ -403,6 +411,8 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 // TestForkMainnet_ArbitraryAccount tests that in fork mode, you can interact with
 // ANY account on the forked chain, not just pre-created accounts.
 func TestForkMainnet_ArbitraryAccount(t *testing.T) {
+	t.Parallel()
+
 	var blockHeight uint64
 
 	// Get system contracts for mainnet
