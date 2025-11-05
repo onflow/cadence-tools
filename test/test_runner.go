@@ -529,7 +529,7 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface, nil, runtime.StorageConfig{}),
+		runtime.NewStorage(ctx.Interface, nil, nil, runtime.StorageConfig{}),
 		nil,
 		nil,
 	)
@@ -633,6 +633,7 @@ func (r *TestRunner) interpreterContractValueHandler(
 				// its ledger.
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
+					inter,
 					inter,
 					runtime.StorageConfig{},
 				)
