@@ -23,6 +23,7 @@ jobs:
 
           jq '.version = $version' --arg version "$release_version" ./npm-packages/cadence-language-server/package.json > tmp_package.json && \
               mv tmp_package.json ./npm-packages/cadence-language-server/package.json
+          npm install --package-lock-only --prefix ./npm-packages/cadence-language-server
 
           cat ./npm-packages/cadence-language-server/package.json
 
