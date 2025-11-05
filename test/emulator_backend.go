@@ -395,6 +395,7 @@ func NewEmulatorBackend(
 		contractAddressResolver: contractAddressResolver,
 	}
 
+	// Initialize state depending on fork mode. In non-fork mode, bootstrap test accounts.
 	if forkEnabled {
 		// In fork mode, reuse loadFork for setup so all paths share the same logic
 		err := emulatorBackend.LoadFork(backendOptions.ForkHost, &backendOptions.ForkHeight)
