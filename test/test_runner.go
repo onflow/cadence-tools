@@ -151,6 +151,9 @@ type TestRunner struct {
 
 	backend *EmulatorBackend
 
+	// networkResolver maps network labels to host:port addresses
+	networkResolver func(network string) (host string, found bool)
+
 	// fork configuration
 	forkConfig *ForkConfig
 }
@@ -193,11 +196,18 @@ func (r *TestRunner) WithContractAddressResolver(resolver ContractAddressResolve
 	return r
 }
 
+// WithNetworkResolver sets a resolver for mapping network labels to host:port addresses.
+func (r *TestRunner) WithNetworkResolver(resolver func(network string) (host string, found bool)) *TestRunner {
+	r.networkResolver = resolver
+	return r
+}
+
 // ForkConfig configures a single forked environment for the entire test run.
 type ForkConfig struct {
-	ForkHost   string
-	ForkHeight uint64       // Block height to fork from (lastest sealed if empty)
-	ChainID    flow.ChainID // Chain ID to use (optional, will auto-detect if empty)
+	ForkHost     string
+	ForkHeight   uint64       // Block height to fork from (lastest sealed if empty)
+	NetworkLabel string       // Network identifier for contract resolution (e.g., "mainnet", "testnet")
+	ChainID      flow.ChainID // Chain ID to use (optional, will auto-detect if empty)
 }
 
 // WithFork enables fork mode with the given configuration.
@@ -433,15 +443,15 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 
 	// Pre-execute: extract and execute any Test.loadFork(...) calls in setup() before type-checking
 	// This ensures the fork is loaded before imports are resolved
-	if host, height, err := extractTopLevelLoadFork(astProgram); err != nil {
+	if network, height, err := extractTopLevelLoadFork(astProgram); err != nil {
 		return nil, nil, err
-	} else if host != "" {
-		r.backend.forkLabel = host
+	} else if network != "" {
 		var h uint64
 		if height != nil {
 			h = *height
 		}
-		if err := r.backend.applyFork(host, h); err != nil {
+		// applyFork will store the network label and resolve the host
+		if err := r.backend.applyFork(network, h); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -505,12 +515,15 @@ func (r *TestRunner) initializeEnvironment() (
 		backendOptions = &BackendOptions{
 			ForkHost:                r.forkConfig.ForkHost,
 			ForkHeight:              r.forkConfig.ForkHeight,
+			NetworkLabel:            r.forkConfig.NetworkLabel,
+			NetworkResolver:         r.networkResolver,
 			ChainID:                 r.forkConfig.ChainID,
 			ContractAddressResolver: r.contractAddressResolver,
 		}
-	} else if r.contractAddressResolver != nil {
-		// Even without fork config, pass resolver if provided
+	} else if r.contractAddressResolver != nil || r.networkResolver != nil {
+		// Even without fork config, pass resolvers if provided
 		backendOptions = &BackendOptions{
+			NetworkResolver:         r.networkResolver,
 			ContractAddressResolver: r.contractAddressResolver,
 		}
 	}

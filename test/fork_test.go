@@ -35,6 +35,22 @@ const (
 	testnetForkURL = "access.testnet.nodes.onflow.org:9000"
 )
 
+// defaultNetworkResolver provides network-to-host mappings for fork tests.
+func defaultNetworkResolver(network string) (string, bool) {
+	switch strings.ToLower(network) {
+	case "mainnet":
+		return mainnetForkURL, true
+	case "testnet":
+		return testnetForkURL, true
+	default:
+		// If it looks like a host:port, return it as-is
+		if strings.Contains(network, ":") {
+			return network, true
+		}
+		return "", false
+	}
+}
+
 // All tests in this file connect to live networks and run sequentially
 // to avoid overwhelming the remote Access nodes.
 //
@@ -548,6 +564,7 @@ func TestFork_ImportResolverAlias(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithImportResolver(importResolver).
+		WithNetworkResolver(defaultNetworkResolver).
 		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
 			return common.Address{0x5}, nil
 		})
@@ -603,7 +620,7 @@ func TestFork_ContractAddressResolver(t *testing.T) {
 
 	// Test fork mode
 	backend.forkEnabled = true
-	backend.forkLabel = "testnet"
+	backend.networkLabel = "testnet"
 	result = backend.replaceImports(`import "FungibleToken"`)
 	require.Equal(t, "testnet", capturedNetwork)
 	require.Contains(t, result, testnetAddr.Hex())
@@ -618,7 +635,7 @@ func TestFork_LoadForkOutsideSetupErrors(t *testing.T) {
         }
     `
 
-	_, err := NewTestRunner().RunTest(script, "testInvalid")
+	_, err := NewTestRunner().WithNetworkResolver(defaultNetworkResolver).RunTest(script, "testInvalid")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Test.loadFork() must be called in setup() function only")
 }
@@ -636,7 +653,7 @@ func TestFork_LoadForkVariableArguments(t *testing.T) {
         access(all) fun test() {}
     `
 
-	_, err := NewTestRunner().RunTest(script, "test")
+	_, err := NewTestRunner().WithNetworkResolver(defaultNetworkResolver).RunTest(script, "test")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "network argument must be a string literal")
 	require.Contains(t, err.Error(), "Variables are not supported because loadFork is pre-executed via AST analysis")

@@ -64,9 +64,14 @@ type BackendOptions struct {
 	ForkHost string
 	// ForkHeight indicates the block height to fork from (0 means latest sealed block).
 	ForkHeight uint64
+	// NetworkLabel is the network identifier used for resolving contract addresses (e.g., "mainnet", "testnet").
+	NetworkLabel string
 	// ChainID is the chain ID to use for the emulator. If empty, the emulator will use the default chain ID.
 	// For fork mode, the ChainID will use the ChainID of the forked network.
 	ChainID flow.ChainID
+	// NetworkResolver maps network labels to Access node host:port addresses (e.g., "mainnet" -> "access.mainnet.nodes.onflow.org:9000").
+	// If nil, network labels are used as-is (assumed to already be host:port addresses).
+	NetworkResolver func(network string) (host string, found bool)
 	// ContractAddressResolver is an optional resolver for dynamic contract address resolution
 	ContractAddressResolver ContractAddressResolver
 }
@@ -137,8 +142,11 @@ type EmulatorBackend struct {
 	// coverage report passed at construction (optional)
 	coverageReport *runtime.CoverageReport
 
-	// fork label as provided by caller (alias or host); empty when not forked
-	forkLabel string
+	// networkLabel is the network identifier used for contract address resolution
+	networkLabel string
+
+	// networkResolver maps network labels to host:port addresses
+	networkResolver func(network string) (host string, found bool)
 
 	// contractAddressResolver is an optional callback to resolve contract addresses dynamically
 	contractAddressResolver ContractAddressResolver
@@ -379,6 +387,12 @@ func NewEmulatorBackend(
 		contractAddressResolver = backendOptions.ContractAddressResolver
 	}
 
+	// Extract network resolver from options (if provided)
+	var networkResolver func(string) (string, bool)
+	if backendOptions != nil {
+		networkResolver = backendOptions.NetworkResolver
+	}
+
 	// Create backend struct with shared fields
 	emulatorBackend := &EmulatorBackend{
 		blockchain:              nil,
@@ -392,11 +406,15 @@ func NewEmulatorBackend(
 		forkEnabled:             false,
 		logger:                  logger,
 		coverageReport:          coverageReport,
+		networkResolver:         networkResolver,
 		contractAddressResolver: contractAddressResolver,
 	}
 
 	// Initialize state depending on fork mode. In non-fork mode, bootstrap test accounts.
 	if forkEnabled {
+		// Store the network label for contract resolution (empty if not provided)
+		emulatorBackend.networkLabel = backendOptions.NetworkLabel
+
 		// Build the forked blockchain first (without committing a local block yet)
 		selectedChain, blockchain, locationHandler, err := buildEmulator(
 			logger,
@@ -442,14 +460,24 @@ func NewEmulatorBackend(
 	return emulatorBackend
 }
 
-// applyFork configures the current backend to fork from host at height.
-func (e *EmulatorBackend) applyFork(host string, height uint64) error {
-	// Allow passing network aliases (e.g., "mainnet", "testnet") and map them to default hosts
-	host = resolveForkHost(host)
+// applyFork configures the current backend to fork from the given network at the specified height.
+func (e *EmulatorBackend) applyFork(network string, height uint64) error {
+	// Store the network label for contract resolution
+	e.networkLabel = network
+
+	// Resolve network to host:port address
+	if e.networkResolver == nil {
+		return fmt.Errorf("cannot resolve network %q: no network resolver provided", network)
+	}
+	forkHost, ok := e.networkResolver(network)
+	if !ok {
+		return fmt.Errorf("network resolver could not resolve network %q", network)
+	}
+
 	selectedChain, newChain, locationHandler, err := buildEmulator(
 		e.logger,
 		e.coverageReport,
-		&BackendOptions{ForkHost: host, ForkHeight: height},
+		&BackendOptions{ForkHost: forkHost, ForkHeight: height},
 		e.logCollection,
 	)
 	if err != nil {
@@ -462,8 +490,8 @@ func (e *EmulatorBackend) applyFork(host string, height uint64) error {
 	return nil
 }
 
-// NetworkLabel returns the raw label used to load the fork (alias or host), or empty if not forked
-func (e *EmulatorBackend) NetworkLabel() string { return e.forkLabel }
+// NetworkLabel returns the network identifier used for contract resolution
+func (e *EmulatorBackend) NetworkLabel() string { return e.networkLabel }
 
 // LoadFork is a noop when called at runtime from Cadence code.
 // Fork loading is handled via AST-based pre-execution in parseCheckAndInterpret(),
@@ -472,23 +500,9 @@ func (e *EmulatorBackend) NetworkLabel() string { return e.forkLabel }
 //
 // This method exists to satisfy the stdlib.Blockchain interface, but does nothing when
 // invoked during test execution (after type-checking has already occurred).
-func (e *EmulatorBackend) LoadFork(host string, height *uint64) error {
+func (e *EmulatorBackend) LoadFork(network string, height *uint64) error {
 	// Noop - the real work happens via AST pre-execution
 	return nil
-}
-
-// resolveForkHost maps known aliases to default Access node hosts, otherwise returns the input as-is.
-func resolveForkHost(hostOrAlias string) string {
-	if strings.Contains(hostOrAlias, ":") {
-		return hostOrAlias
-	}
-	switch strings.ToLower(hostOrAlias) {
-	case "mainnet":
-		return "access.mainnet.nodes.onflow.org:9000"
-	case "testnet":
-		return "access.testnet.nodes.onflow.org:9000"
-	}
-	return hostOrAlias
 }
 
 // detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.
@@ -823,8 +837,8 @@ func (e *EmulatorBackend) DeployContract(
 	}
 
 	network := "emulator"
-	if e.forkEnabled && e.forkLabel != "" {
-		network = e.forkLabel
+	if e.networkLabel != "" {
+		network = e.networkLabel
 	}
 
 	address, err := e.contractAddressResolver(network, name)
@@ -1099,8 +1113,8 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 		}
 
 		network := "emulator"
-		if e.forkEnabled && e.forkLabel != "" {
-			network = e.forkLabel
+		if e.networkLabel != "" {
+			network = e.networkLabel
 		}
 
 		address, err := e.contractAddressResolver(network, contractName)
