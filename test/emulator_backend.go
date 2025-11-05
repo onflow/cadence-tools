@@ -397,21 +397,32 @@ func NewEmulatorBackend(
 
 	// Initialize state depending on fork mode. In non-fork mode, bootstrap test accounts.
 	if forkEnabled {
-		// In fork mode, reuse loadFork for setup so all paths share the same logic
-		err := emulatorBackend.LoadFork(backendOptions.ForkHost, &backendOptions.ForkHeight)
+		// Build the forked blockchain first (without committing a local block yet)
+		selectedChain, blockchain, locationHandler, err := buildEmulator(
+			logger,
+			coverageReport,
+			backendOptions,
+			logHook,
+		)
 		if err != nil {
 			panic(err)
 		}
+		emulatorBackend.applyChain(blockchain, selectedChain, locationHandler, true)
 
-		// Capture fork start height: if height == 0 (nil), use current tip (latest block)
+		// Capture fork start height BEFORE creating any local blocks
 		if backendOptions.ForkHeight == 0 {
-			latestBlock, err := emulatorBackend.blockchain.GetLatestBlock()
+			latestBlock, err := blockchain.GetLatestBlock()
 			if err != nil {
 				panic(fmt.Errorf("failed to get latest block for fork start height: %w", err))
 			}
 			emulatorBackend.forkStartHeight = latestBlock.Height
 		} else {
 			emulatorBackend.forkStartHeight = backendOptions.ForkHeight
+		}
+
+		// Now create the initial local block needed as a reference block for the forked blockchain.
+		if _, _, err := blockchain.ExecuteAndCommitBlock(); err != nil {
+			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
 		}
 	} else {
 		// Build a non-fork emulator and bootstrap accounts
