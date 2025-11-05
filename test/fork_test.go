@@ -498,3 +498,84 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
+
+// TestForkMainnet_EventsOfType tests that calling eventsOfType in fork mode
+// completes quickly and doesn't hang. This reproduces the bug reported where
+// eventsOfType would hang when called after a transaction in fork mode.
+func TestForkMainnet_Events(t *testing.T) {
+	var blockHeight uint64
+
+	// Get system contracts for mainnet
+	sc := systemcontracts.SystemContractsForChain(flowmodel.Mainnet.Chain().ChainID())
+	flowTokenAddr := common.Address(sc.FlowToken.Address)
+
+	evtContract := `
+        access(all) contract Ev {
+            access(all) event Emitted(x: Int)
+
+            access(all) fun fire(_ x: Int) {
+                emit Emitted(x: x)
+            }
+        }
+    `
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "Ev.cdc":
+			return evtContract, nil
+		default:
+			return "", fmt.Errorf("unknown path: %s", path)
+		}
+	}
+	importResolver := func(location common.Location) (string, error) {
+		if addrLoc, ok := location.(common.AddressLocation); ok && addrLoc.Name == "Ev" {
+			return evtContract, nil
+		}
+		return "", fmt.Errorf("cannot find import location: %s", location)
+	}
+
+	// Use a known mainnet account for Ev deployment
+	testAccount, err := common.HexToAddress("0x1654653399040a61")
+	require.NoError(t, err)
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(importResolver).
+		WithContracts(map[string]common.Address{
+			"FlowToken": flowTokenAddr,
+			"Ev":        testAccount,
+		}).
+		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
+
+	// Test: Deploy a contract, emit an event, and fetch it via eventsOfType
+	result, err := runner.RunTest(`
+        import Test
+        import "Ev"
+
+        access(all) fun test() {
+            let admin = Test.getAccount(0x1654653399040a61)
+
+            // Deploy event-emitting contract
+            let err = Test.deployContract(name: "Ev", path: "Ev.cdc", arguments: [])
+            Test.expect(err, Test.beNil())
+
+            // Emit event
+            let emitTx = Test.Transaction(
+                code: "import Ev from 0x1654653399040a61\ntransaction { execute { Ev.fire(42) } }",
+                authorizers: [],
+                signers: [admin],
+                arguments: []
+            )
+            let emitRes = Test.executeTransaction(emitTx)
+            Test.expect(emitRes, Test.beSucceeded())
+
+            // Fetch events by proper generic type
+            let evs = Test.eventsOfType(Type<Ev.Emitted>())
+            Test.assertEqual(1, evs.length)
+            let e = evs[0] as! Ev.Emitted
+            Test.assertEqual(42, e.x)
+        }
+    `, "test")
+
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}

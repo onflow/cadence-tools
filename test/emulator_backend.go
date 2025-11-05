@@ -132,6 +132,9 @@ type EmulatorBackend struct {
 
 	// fork configuration
 	forkEnabled bool
+
+	// forkStartHeight is the block height when the fork was loaded (0 if not in fork mode)
+	forkStartHeight uint64
 }
 
 type keyInfo struct {
@@ -350,9 +353,20 @@ func NewEmulatorBackend(
 	// - In fork mode, create an initial local block to establish a valid reference block ID in the remote store
 	// - In non-fork mode, bootstrap test accounts
 	if forkEnabled {
+		// Determine fork start height before creating any local blocks
+		if backendOptions.ForkHeight == 0 {
+			latestBlock, err := blockchain.GetLatestBlock()
+			if err != nil {
+				panic(fmt.Errorf("get fork start height: %w", err))
+			}
+			emulatorBackend.forkStartHeight = latestBlock.Height
+		} else {
+			emulatorBackend.forkStartHeight = backendOptions.ForkHeight
+		}
+		// Create the initial local block
 		_, _, err := blockchain.ExecuteAndCommitBlock()
 		if err != nil {
-			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
+			panic(fmt.Errorf("commit initial block (fork mode): %w", err))
 		}
 	} else {
 		emulatorBackend.bootstrapAccounts()
@@ -747,6 +761,8 @@ func (e *EmulatorBackend) Reset(height uint64) {
 
 // Events returns all the emitted events up until the latest block,
 // optionally filtered by event type.
+// In fork mode, events are bounded to [forkStartHeight, latest].
+
 func (e *EmulatorBackend) Events(
 	context stdlib.TestFrameworkEventsContext,
 	eventType interpreter.StaticType,
@@ -757,7 +773,17 @@ func (e *EmulatorBackend) Events(
 	}
 
 	latestBlockHeight := latestBlock.Height
-	height := uint64(0)
+
+	// In fork mode, bound events to [forkStartHeight, latest]
+	// Outside fork mode, use existing (unbounded) behavior starting from 0
+	startHeight := uint64(0)
+	if e.forkEnabled {
+		// Only include local blocks by starting after the fork start height
+		startHeight = e.forkStartHeight + 1
+	}
+
+	// Scan from startHeight to latestBlockHeight
+
 	values := make([]interpreter.Value, 0)
 
 	var eventTypeString string
@@ -770,6 +796,7 @@ func (e *EmulatorBackend) Events(
 		panic(errors.NewUnreachableError())
 	}
 
+	height := startHeight
 	for height <= latestBlockHeight {
 		events, err := e.blockchain.GetEventsByHeight(height, eventTypeString)
 		if err != nil {
