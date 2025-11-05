@@ -350,7 +350,6 @@ func NewEmulatorBackend(
 	}
 
 	// Initialize state depending on fork mode:
-	// - In fork mode, create an initial local block to establish a valid reference block ID in the remote store
 	// - In non-fork mode, bootstrap test accounts
 	if forkEnabled {
 		// Determine fork start height before creating any local blocks
@@ -362,11 +361,6 @@ func NewEmulatorBackend(
 			emulatorBackend.forkStartHeight = latestBlock.Height
 		} else {
 			emulatorBackend.forkStartHeight = backendOptions.ForkHeight
-		}
-		// Create the initial local block
-		_, _, err := blockchain.ExecuteAndCommitBlock()
-		if err != nil {
-			panic(fmt.Errorf("commit initial block (fork mode): %w", err))
 		}
 	} else {
 		emulatorBackend.bootstrapAccounts()
