@@ -151,6 +151,9 @@ type TestRunner struct {
 
 	backend *EmulatorBackend
 
+	// networkLabel is the network identifier for contract address resolution (e.g., "mainnet", "testnet", "emulator")
+	networkLabel string
+
 	// networkResolver maps network labels to host:port addresses
 	networkResolver func(network string) (host string, found bool)
 
@@ -196,6 +199,13 @@ func (r *TestRunner) WithContractAddressResolver(resolver ContractAddressResolve
 	return r
 }
 
+// WithNetworkLabel sets the network identifier used for contract address resolution.
+// Defaults to "emulator" if not set.
+func (r *TestRunner) WithNetworkLabel(label string) *TestRunner {
+	r.networkLabel = label
+	return r
+}
+
 // WithNetworkResolver sets a resolver for mapping network labels to host:port addresses.
 func (r *TestRunner) WithNetworkResolver(resolver func(network string) (host string, found bool)) *TestRunner {
 	r.networkResolver = resolver
@@ -204,10 +214,9 @@ func (r *TestRunner) WithNetworkResolver(resolver func(network string) (host str
 
 // ForkConfig configures a single forked environment for the entire test run.
 type ForkConfig struct {
-	ForkHost     string
-	ForkHeight   uint64       // Block height to fork from (lastest sealed if empty)
-	NetworkLabel string       // Network identifier for contract resolution (e.g., "mainnet", "testnet")
-	ChainID      flow.ChainID // Chain ID to use (optional, will auto-detect if empty)
+	ForkHost   string       // Access node host:port to fork from
+	ForkHeight uint64       // Block height to fork from (latest sealed if empty)
+	ChainID    flow.ChainID // Chain ID to use (optional, will auto-detect if empty)
 }
 
 // WithFork enables fork mode with the given configuration.
@@ -515,14 +524,15 @@ func (r *TestRunner) initializeEnvironment() (
 		backendOptions = &BackendOptions{
 			ForkHost:                r.forkConfig.ForkHost,
 			ForkHeight:              r.forkConfig.ForkHeight,
-			NetworkLabel:            r.forkConfig.NetworkLabel,
+			NetworkLabel:            r.networkLabel,
 			NetworkResolver:         r.networkResolver,
 			ChainID:                 r.forkConfig.ChainID,
 			ContractAddressResolver: r.contractAddressResolver,
 		}
-	} else if r.contractAddressResolver != nil || r.networkResolver != nil {
-		// Even without fork config, pass resolvers if provided
+	} else if r.contractAddressResolver != nil || r.networkResolver != nil || r.networkLabel != "" {
+		// Even without fork config, pass network label and resolvers if provided
 		backendOptions = &BackendOptions{
+			NetworkLabel:            r.networkLabel,
 			NetworkResolver:         r.networkResolver,
 			ContractAddressResolver: r.contractAddressResolver,
 		}

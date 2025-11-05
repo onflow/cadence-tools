@@ -410,11 +410,13 @@ func NewEmulatorBackend(
 		contractAddressResolver: contractAddressResolver,
 	}
 
+	// Store the network label for contract resolution (if provided)
+	if backendOptions != nil && backendOptions.NetworkLabel != "" {
+		emulatorBackend.networkLabel = backendOptions.NetworkLabel
+	}
+
 	// Initialize state depending on fork mode. In non-fork mode, bootstrap test accounts.
 	if forkEnabled {
-		// Store the network label for contract resolution (empty if not provided)
-		emulatorBackend.networkLabel = backendOptions.NetworkLabel
-
 		// Build the forked blockchain first (without committing a local block yet)
 		selectedChain, blockchain, locationHandler, err := buildEmulator(
 			logger,
