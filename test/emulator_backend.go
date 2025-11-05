@@ -142,6 +142,9 @@ type EmulatorBackend struct {
 
 	// contractAddressResolver is an optional callback to resolve contract addresses dynamically
 	contractAddressResolver ContractAddressResolver
+
+	// forkStartHeight is the block height when the fork was loaded (0 if not in fork mode)
+	forkStartHeight uint64
 }
 
 type keyInfo struct {
@@ -398,6 +401,17 @@ func NewEmulatorBackend(
 		if err != nil {
 			panic(err)
 		}
+
+		// Capture fork start height: if height == 0 (nil), use current tip (latest block)
+		if backendOptions.ForkHeight == 0 {
+			latestBlock, err := emulatorBackend.blockchain.GetLatestBlock()
+			if err != nil {
+				panic(fmt.Errorf("failed to get latest block for fork start height: %w", err))
+			}
+			emulatorBackend.forkStartHeight = latestBlock.Height
+		} else {
+			emulatorBackend.forkStartHeight = backendOptions.ForkHeight
+		}
 	} else {
 		// Build a non-fork emulator and bootstrap accounts
 		selectedChain, blockchain, locationHandler, err := buildEmulator(
@@ -418,8 +432,8 @@ func NewEmulatorBackend(
 
 // applyFork configures the current backend to fork from host at height.
 func (e *EmulatorBackend) applyFork(host string, height uint64) error {
-    // Allow passing network aliases (e.g., "mainnet", "testnet") and map them to default hosts
-    host = resolveForkHost(host)
+	// Allow passing network aliases (e.g., "mainnet", "testnet") and map them to default hosts
+	host = resolveForkHost(host)
 	selectedChain, newChain, locationHandler, err := buildEmulator(
 		e.logger,
 		e.coverageReport,
@@ -453,16 +467,16 @@ func (e *EmulatorBackend) LoadFork(host string, height *uint64) error {
 
 // resolveForkHost maps known aliases to default Access node hosts, otherwise returns the input as-is.
 func resolveForkHost(hostOrAlias string) string {
-    if strings.Contains(hostOrAlias, ":") {
-        return hostOrAlias
-    }
-    switch strings.ToLower(hostOrAlias) {
-    case "mainnet":
-        return "access.mainnet.nodes.onflow.org:9000"
-    case "testnet":
-        return "access.testnet.nodes.onflow.org:9000"
-    }
-    return hostOrAlias
+	if strings.Contains(hostOrAlias, ":") {
+		return hostOrAlias
+	}
+	switch strings.ToLower(hostOrAlias) {
+	case "mainnet":
+		return "access.mainnet.nodes.onflow.org:9000"
+	case "testnet":
+		return "access.testnet.nodes.onflow.org:9000"
+	}
+	return hostOrAlias
 }
 
 // detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.
@@ -795,17 +809,17 @@ func (e *EmulatorBackend) DeployContract(
 	if e.contractAddressResolver == nil {
 		return fmt.Errorf("could not find the address of contract: %s (no resolver provided)", name)
 	}
-	
+
 	network := "emulator"
 	if e.forkEnabled && e.forkLabel != "" {
 		network = e.forkLabel
 	}
-	
+
 	address, err := e.contractAddressResolver(network, name)
 	if err != nil {
 		return fmt.Errorf("could not resolve address of contract %s: %w", name, err)
 	}
-	
+
 	account, err := e.GetAccount(interpreter.AddressValue(address))
 	if err != nil {
 		return err
@@ -862,6 +876,7 @@ func (e *EmulatorBackend) Reset(height uint64) {
 
 // Events returns all the emitted events up until the latest block,
 // optionally filtered by event type.
+// In fork mode, events are bounded to [forkStartHeight, latest].
 func (e *EmulatorBackend) Events(
 	context stdlib.TestFrameworkEventsContext,
 	eventType interpreter.StaticType,
@@ -872,7 +887,14 @@ func (e *EmulatorBackend) Events(
 	}
 
 	latestBlockHeight := latestBlock.Height
+
+	// In fork mode, bound events to [forkStartHeight, latest]
+	// Outside fork mode, use existing (unbounded) behavior starting from 0
 	height := uint64(0)
+	if e.forkEnabled {
+		height = e.forkStartHeight
+	}
+
 	values := make([]interpreter.Value, 0)
 
 	var eventTypeString string
@@ -1063,12 +1085,12 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
 			continue
 		}
-		
+
 		network := "emulator"
 		if e.forkEnabled && e.forkLabel != "" {
 			network = e.forkLabel
 		}
-		
+
 		address, err := e.contractAddressResolver(network, contractName)
 		if err != nil {
 			// Cannot resolve, keep import statement as-is
