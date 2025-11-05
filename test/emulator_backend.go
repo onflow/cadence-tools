@@ -916,11 +916,11 @@ func (e *EmulatorBackend) Events(
 
 	latestBlockHeight := latestBlock.Height
 
-	// In fork mode, bound events to [forkStartHeight, latest]
+	// In fork mode, only include local blocks by starting after the fork start height
 	// Outside fork mode, use existing (unbounded) behavior starting from 0
-	height := uint64(0)
+	startHeight := uint64(0)
 	if e.forkEnabled {
-		height = e.forkStartHeight
+		startHeight = e.forkStartHeight + 1
 	}
 
 	values := make([]interpreter.Value, 0)
@@ -935,7 +935,7 @@ func (e *EmulatorBackend) Events(
 		panic(errors.NewUnreachableError())
 	}
 
-	for height <= latestBlockHeight {
+	for height := startHeight; height <= latestBlockHeight; height++ {
 		events, err := e.blockchain.GetEventsByHeight(height, eventTypeString)
 		if err != nil {
 			panic(err)
@@ -960,7 +960,6 @@ func (e *EmulatorBackend) Events(
 			values = append(values, value)
 
 		}
-		height += 1
 	}
 
 	arrayType := interpreter.NewVariableSizedStaticType(
