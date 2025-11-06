@@ -190,7 +190,7 @@ type Server struct {
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
 	// memberAccountAccessHandler stored to apply when building per-project configs
-	memberAccountAccessHandler sema.MemberAccountAccessHandlerFunc
+	memberAccountAccessHandler func(projectID string) sema.MemberAccountAccessHandlerFunc
 	// checkerStandardConfig is a config factory for contracts and transactions (per project)
 	checkerStandardConfig func(projectID string) *sema.Config
 	// checkerScriptConfig is a config factory for scripts (per project)
@@ -399,7 +399,7 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 //
 // When we have a syntax like access(account) this handler is called and
 // determines whether the access is allowed based on the location of program and the called member.
-func WithMemberAccountAccessHandler(handler sema.MemberAccountAccessHandlerFunc) Option {
+func WithMemberAccountAccessHandler(handler func(projectID string) sema.MemberAccountAccessHandlerFunc) Option {
 	return func(server *Server) error {
 		server.memberAccountAccessHandler = handler
 		return nil
@@ -480,7 +480,9 @@ func newCheckerConfig(s *Server, lib *standardLibrary, projectID string) *sema.C
 		ImportHandler: func(chk *sema.Checker, importedLocation common.Location, r ast.Range) (sema.Import, error) {
 			return s.handleImport(projectID, chk, importedLocation, r)
 		},
-		MemberAccountAccessHandler: s.memberAccountAccessHandler,
+	}
+	if s.memberAccountAccessHandler != nil {
+		cfg.MemberAccountAccessHandler = s.memberAccountAccessHandler(projectID)
 	}
 	return cfg
 }

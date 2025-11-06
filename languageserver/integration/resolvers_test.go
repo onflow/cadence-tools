@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/parser"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/flow-go-sdk"
 
 	"github.com/spf13/afero"
@@ -143,5 +145,382 @@ func Test_SimpleImport(t *testing.T) {
 		resolved, err := resolver.stringImport("/p/flow.json", common.StringLocation("Foo"))
 		assert.Error(t, err)
 		assert.Empty(t, resolved)
+	})
+}
+
+func createTestChecker(t *testing.T, location common.Location) *sema.Checker {
+	program, err := parser.ParseProgram(
+		nil,
+		[]byte(`access(all) contract Test {}`),
+		parser.Config{},
+	)
+	assert.NoError(t, err)
+
+	checker, err := sema.NewChecker(
+		program,
+		location,
+		nil,
+		&sema.Config{
+			AccessCheckMode: sema.AccessCheckModeStrict,
+		},
+	)
+	assert.NoError(t, err)
+	return checker
+}
+
+func Test_AccountAccess(t *testing.T) {
+	t.Run("both AddressLocation same address", func(t *testing.T) {
+		t.Parallel()
+		resolver := resolvers{}
+		addr, err := common.HexToAddress("01")
+		assert.NoError(t, err)
+
+		checker := createTestChecker(t, common.AddressLocation{Address: addr, Name: "ContractA"})
+		memberLoc := common.AddressLocation{Address: addr, Name: "ContractB"}
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.True(t, result, "contracts at same address should have account access")
+	})
+
+	t.Run("both AddressLocation different address", func(t *testing.T) {
+		t.Parallel()
+		resolver := resolvers{}
+		addr1, err := common.HexToAddress("01")
+		assert.NoError(t, err)
+		addr2, err := common.HexToAddress("02")
+		assert.NoError(t, err)
+
+		checker := createTestChecker(t, common.AddressLocation{Address: addr1, Name: "ContractA"})
+		memberLoc := common.AddressLocation{Address: addr2, Name: "ContractB"}
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.False(t, result, "contracts at different addresses should not have account access")
+	})
+
+	t.Run("both StringLocation same account", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		// Setup project with two contracts deployed to same account
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`access(all) contract ContractA {}`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`access(all) contract ContractB {}`), 0644)
+		assert.NoError(t, err)
+
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": "./ContractA.cdc",
+				"ContractB": "./ContractB.cdc"
+			},
+			"deployments": {
+				"emulator": {
+					"emulator-account": ["ContractA", "ContractB"]
+				}
+			},
+		"accounts": {
+			"emulator-account": {
+				"address": "0xf8d6e0586b0a20c7",
+				"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+			}
+		},
+			"networks": {
+				"emulator": "127.0.0.1:3569"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.True(t, result, "contracts deployed to same account should have account access")
+	})
+
+	t.Run("both StringLocation different accounts", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		// Setup project with two contracts deployed to different accounts
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`access(all) contract ContractA {}`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`access(all) contract ContractB {}`), 0644)
+		assert.NoError(t, err)
+
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": "./ContractA.cdc",
+				"ContractB": "./ContractB.cdc"
+			},
+			"deployments": {
+				"emulator": {
+					"account-1": ["ContractA"],
+					"account-2": ["ContractB"]
+				}
+			},
+			"accounts": {
+				"account-1": {
+					"address": "0xf8d6e0586b0a20c7",
+					"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+				},
+				"account-2": {
+					"address": "0x045a1763c93006ca",
+					"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+				}
+			},
+			"networks": {
+				"emulator": "127.0.0.1:3569"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.False(t, result, "contracts deployed to different accounts should not have account access")
+	})
+
+	t.Run("mixed location types not supported", func(t *testing.T) {
+		t.Parallel()
+		resolver := resolvers{}
+		addr, err := common.HexToAddress("01")
+		assert.NoError(t, err)
+
+		checker := createTestChecker(t, common.AddressLocation{Address: addr, Name: "ContractA"})
+		memberLoc := common.StringLocation("/some/path.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.False(t, result, "mixed location types should not be supported")
+	})
+
+	t.Run("no config manager", func(t *testing.T) {
+		t.Parallel()
+		resolver := resolvers{} // no cfgManager
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.False(t, result, "should return false when no config manager")
+	})
+
+	t.Run("contracts on same account across multiple networks", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`access(all) contract ContractA {}`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`access(all) contract ContractB {}`), 0644)
+		assert.NoError(t, err)
+
+		// Contracts are on same account in testnet but different accounts in mainnet
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": "./ContractA.cdc",
+				"ContractB": "./ContractB.cdc"
+			},
+			"deployments": {
+				"testnet": {
+					"testnet-account": ["ContractA", "ContractB"]
+				},
+				"mainnet": {
+					"mainnet-account-1": ["ContractA"],
+					"mainnet-account-2": ["ContractB"]
+				}
+			},
+			"accounts": {
+				"testnet-account": {
+					"address": "0xf8d6e0586b0a20c7",
+					"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+				},
+				"mainnet-account-1": {
+					"address": "0x1e4aa0b87d10b141",
+					"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+				},
+				"mainnet-account-2": {
+					"address": "0x045a1763c93006ca",
+					"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+				}
+			},
+			"networks": {
+				"testnet": "access.devnet.nodes.onflow.org:9000",
+				"mainnet": "access.mainnet.nodes.onflow.org:9000"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.True(t, result, "should allow access if contracts are on same account on ANY network")
+	})
+
+	t.Run("contracts with aliases same address", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`access(all) contract ContractA {}`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`access(all) contract ContractB {}`), 0644)
+		assert.NoError(t, err)
+
+		// Both contracts have aliases pointing to same address on emulator
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": {
+					"source": "./ContractA.cdc",
+					"aliases": {
+						"emulator": "0xf8d6e0586b0a20c7"
+					}
+				},
+				"ContractB": {
+					"source": "./ContractB.cdc",
+					"aliases": {
+						"emulator": "0xf8d6e0586b0a20c7"
+					}
+				}
+			},
+			"networks": {
+				"emulator": "127.0.0.1:3569"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.True(t, result, "contracts with aliases at same address should have account access")
+	})
+
+	t.Run("contracts with aliases different addresses", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`access(all) contract ContractA {}`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`access(all) contract ContractB {}`), 0644)
+		assert.NoError(t, err)
+
+		// Contracts have aliases pointing to different addresses
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": {
+					"source": "./ContractA.cdc",
+					"aliases": {
+						"emulator": "0xf8d6e0586b0a20c7"
+					}
+				},
+				"ContractB": {
+					"source": "./ContractB.cdc",
+					"aliases": {
+						"emulator": "0x045a1763c93006ca"
+					}
+				}
+			},
+			"networks": {
+				"emulator": "127.0.0.1:3569"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.False(t, result, "contracts with aliases at different addresses should not have account access")
+	})
+
+	t.Run("deployments take priority over aliases", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`access(all) contract ContractA {}`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`access(all) contract ContractB {}`), 0644)
+		assert.NoError(t, err)
+
+		// ContractA has both deployment and alias - deployment should win
+		// ContractB only has alias at same address as ContractA deployment
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": {
+					"source": "./ContractA.cdc",
+					"aliases": {
+						"emulator": "0x045a1763c93006ca"
+					}
+				},
+				"ContractB": {
+					"source": "./ContractB.cdc",
+					"aliases": {
+						"emulator": "0xf8d6e0586b0a20c7"
+					}
+				}
+			},
+			"deployments": {
+				"emulator": {
+					"emulator-account": ["ContractA"]
+				}
+			},
+		"accounts": {
+			"emulator-account": {
+				"address": "0xf8d6e0586b0a20c7",
+				"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+			}
+		},
+			"networks": {
+				"emulator": "127.0.0.1:3569"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		checker := createTestChecker(t, common.StringLocation("/proj/ContractA.cdc"))
+		memberLoc := common.StringLocation("/proj/ContractB.cdc")
+
+		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
+		assert.True(t, result, "deployment address should be used instead of alias, matching ContractB's alias")
 	})
 }

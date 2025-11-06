@@ -28,6 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
 
 	"github.com/onflow/flowkit/v2"
@@ -172,6 +173,11 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
 		server.WithIdentifierImportResolver(resolve.identifierImportProject),
 		server.WithProjectIdentityProvider(projectProvider),
+		server.WithMemberAccountAccessHandler(func(projectID string) sema.MemberAccountAccessHandlerFunc {
+			return func(checker *sema.Checker, memberLocation common.Location) bool {
+				return resolve.accountAccess(projectID, checker, memberLocation)
+			}
+		}),
 	}
 
 	// Prompt to create flow.json when opening an existing .cdc file without a config.
@@ -185,7 +191,6 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
-			server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
 	}
 
