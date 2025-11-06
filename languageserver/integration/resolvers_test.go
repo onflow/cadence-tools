@@ -523,4 +523,80 @@ func Test_AccountAccess(t *testing.T) {
 		result := resolver.accountAccess("/proj/flow.json", checker, memberLoc)
 		assert.True(t, result, "deployment address should be used instead of alias, matching ContractB's alias")
 	})
+
+	t.Run("nested imports with contract identifiers", func(t *testing.T) {
+		t.Parallel()
+		mem := afero.NewMemMapFs()
+		af := afero.Afero{Fs: mem}
+
+		// Setup: ContractA imports ContractB (by identifier) which imports ContractC (by identifier)
+		// All three should be on the same account
+		err := af.MkdirAll("/proj", 0755)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractA.cdc", []byte(`
+			import ContractB
+			access(all) contract ContractA {
+				access(all) fun foo() {
+					ContractB.bar()
+				}
+			}
+		`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractB.cdc", []byte(`
+			import ContractC
+			access(all) contract ContractB {
+				access(account) fun bar() {
+					ContractC.baz()
+				}
+			}
+		`), 0644)
+		assert.NoError(t, err)
+		err = af.WriteFile("/proj/ContractC.cdc", []byte(`
+			access(all) contract ContractC {
+				access(account) fun baz() {}
+			}
+		`), 0644)
+		assert.NoError(t, err)
+
+		flowJSON := []byte(`{
+			"contracts": {
+				"ContractA": "./ContractA.cdc",
+				"ContractB": "./ContractB.cdc",
+				"ContractC": "./ContractC.cdc"
+			},
+			"deployments": {
+				"emulator": {
+					"emulator-account": ["ContractA", "ContractB", "ContractC"]
+				}
+			},
+			"accounts": {
+				"emulator-account": {
+					"address": "0xf8d6e0586b0a20c7",
+					"key": "c44604c862a3950ae82d56638929720f44875b2637054a1fdcb4e76b01b40881"
+				}
+			},
+			"networks": {
+				"emulator": "127.0.0.1:3569"
+			}
+		}`)
+		err = af.WriteFile("/proj/flow.json", flowJSON, 0644)
+		assert.NoError(t, err)
+
+		cm := NewConfigManager(af, false, 0, "/proj/flow.json")
+		resolver := resolvers{loader: af, cfgManager: cm}
+
+		// Test ContractB accessing ContractC (both are contract identifiers when imported)
+		checkerB := createTestChecker(t, common.StringLocation("ContractB"))
+		memberLocC := common.StringLocation("ContractC")
+
+		result := resolver.accountAccess("/proj/flow.json", checkerB, memberLocC)
+		assert.True(t, result, "ContractB should have account access to ContractC when both deployed to same account")
+
+		// Test ContractA accessing ContractB
+		checkerA := createTestChecker(t, common.StringLocation("ContractA"))
+		memberLocB := common.StringLocation("ContractB")
+
+		result = resolver.accountAccess("/proj/flow.json", checkerA, memberLocB)
+		assert.True(t, result, "ContractA should have account access to ContractB when both deployed to same account")
+	})
 }
