@@ -62,6 +62,9 @@ type ConfigManager struct {
 	// directory watchers to detect creation/removal of flow.json
 	dirWatchers map[string]*fsnotify.Watcher
 
+	// onConfigReload is called when a config is reloaded, with the config path
+	onConfigReload func(configPath string)
+
 	// loadErrors keeps the last load/reload error per config path (abs)
 	loadErrors map[string]string
 }
@@ -79,6 +82,13 @@ func NewConfigManager(loader flowkit.ReaderWriter, enableFlowClient bool, number
 		dirWatchers:      make(map[string]*fsnotify.Watcher),
 		loadErrors:       make(map[string]string),
 	}
+}
+
+// SetOnConfigReload sets a callback that is invoked when a config is reloaded
+func (m *ConfigManager) SetOnConfigReload(callback func(configPath string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onConfigReload = callback
 }
 
 // ResolveStateForChecker returns the state associated with the closest flow.json for the given checker.
@@ -107,12 +117,17 @@ func (m *ConfigManager) ReloadAll() error {
 	for _, st := range m.states {
 		states = append(states, st)
 	}
+	callback := m.onConfigReload
 	m.mu.RUnlock()
 
 	for _, st := range states {
 		if st != nil && st.IsLoaded() {
 			if err := st.Reload(); err != nil {
 				return err
+			}
+			// Notify callback that config was reloaded
+			if callback != nil && st.getConfigPath() != "" {
+				callback(st.getConfigPath())
 			}
 		}
 	}
@@ -559,6 +574,7 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 			m.mu.RLock()
 			st := m.states[cfgPath]
 			cl := m.clients[cfgPath]
+			callback := m.onConfigReload
 			m.mu.RUnlock()
 			if st != nil {
 				if err := st.Reload(); err != nil {
@@ -574,6 +590,10 @@ func (m *ConfigManager) watchLoop(cfgPath string, watcher *fsnotify.Watcher) {
 					m.mu.Lock()
 					delete(m.loadErrors, cfgPath)
 					m.mu.Unlock()
+					// Notify callback that config was reloaded
+					if callback != nil {
+						callback(cfgPath)
+					}
 				}
 			}
 			if cl != nil {
@@ -637,9 +657,14 @@ func (m *ConfigManager) watchDirLoop(dir string, watcher *fsnotify.Watcher) {
 				m.mu.RLock()
 				st := m.states[cfgPath]
 				cl := m.clients[cfgPath]
+				callback := m.onConfigReload
 				m.mu.RUnlock()
 				if st != nil {
 					_ = st.Reload()
+					// Notify callback that config was reloaded
+					if callback != nil {
+						callback(cfgPath)
+					}
 				} else {
 					// ensure a state is loaded and watcher added
 					_, _ = m.resolveStateForPath(cfgPath)

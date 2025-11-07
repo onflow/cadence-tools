@@ -24,20 +24,29 @@ import (
 	neturl "net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flowkit/v2"
-	"github.com/onflow/flowkit/v2/config"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
 
+// networkContractMap maps network name -> contract name -> address
+type networkContractMap map[string]map[string]flow.Address
+
+// fileContractMap maps absolute file path -> contract name
+type fileContractMap map[string]string
+
 type resolvers struct {
-	loader     flowkit.ReaderWriter
-	cfgManager *ConfigManager
+	loader              flowkit.ReaderWriter
+	cfgManager          *ConfigManager
+	mu                  sync.RWMutex
+	nameToAddressCache  map[string]networkContractMap
+	fileToContractCache map[string]fileContractMap
 }
 
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
@@ -51,11 +60,16 @@ func deURI(path string) string {
 	return path
 }
 
+// isContractName returns true if the location string is a contract name (not a file path)
+func isContractName(locationString string) bool {
+	return !strings.HasSuffix(locationString, ".cdc")
+}
+
 // stringImport loads the code for a string location that can either be file path or contract identifier.
 // projectID identifies the project scope (e.g., abs flow.json path) established by the server
 func (r *resolvers) stringImport(projectID string, location common.StringLocation) (string, error) {
 	name := location.String()
-	if !strings.Contains(name, ".cdc") {
+	if isContractName(name) {
 		return r.resolveStringIdentifierImport(projectID, name)
 	}
 	return r.resolveFileImport(projectID, name)
@@ -164,38 +178,240 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 	return names, nil
 }
 
-// accountAccess checks whether the current program location and accessed program location were deployed to the same account.
-//
-// if the contracts were deployed on the same account then it returns true and hence allows the access, false otherwise.
-func (r *resolvers) accountAccess(checker *sema.Checker, memberLocation common.Location) bool {
+// buildNameToAddressByNetwork builds per network: contract name -> address
+func (r *resolvers) buildNameToAddressByNetwork(state flowState) networkContractMap {
+	if state == nil || state.getState() == nil {
+		return make(networkContractMap)
+	}
+
+	configPath := state.getConfigPath()
+	if configPath != "" {
+		if cached, ok := r.getCachedNameToAddress(configPath); ok {
+			return cached
+		}
+	}
+
+	nameToAddressByNetwork := make(networkContractMap)
+
+	stateNetworks := state.getState().Networks()
+	if stateNetworks == nil {
+		return nameToAddressByNetwork
+	}
+
+	networks := *stateNetworks
+	for _, network := range networks {
+		networkName := network.Name
+		contractNameToAddress := make(map[string]flow.Address)
+
+		// Add aliases first
+		stateContracts := state.getState().Contracts()
+		if stateContracts != nil {
+			for _, contract := range *stateContracts {
+				alias := contract.Aliases.ByNetwork(networkName)
+				if alias != nil {
+					contractNameToAddress[contract.Name] = alias.Address
+				}
+			}
+		}
+
+		// Add deployments (overwrites aliases, giving deployments priority)
+		deployedContracts, err := state.getState().DeploymentContractsByNetwork(network)
+		if err == nil {
+			for _, deployedContract := range deployedContracts {
+				contract, err := state.getState().Contracts().ByName(deployedContract.Name)
+				if err == nil {
+					address, err := state.getState().ContractAddress(contract, network)
+					if err == nil && address != nil {
+						contractNameToAddress[deployedContract.Name] = *address
+					}
+				}
+			}
+		}
+
+		if len(contractNameToAddress) > 0 {
+			nameToAddressByNetwork[networkName] = contractNameToAddress
+		}
+	}
+
+	// Cache the result
+	if configPath != "" {
+		r.setCachedNameToAddress(configPath, nameToAddressByNetwork)
+	}
+
+	return nameToAddressByNetwork
+}
+
+// normalizeAbs converts p to an absolute, symlink-resolved path. If base is non-empty
+// and p is relative, it is joined to base first.
+func normalizeAbs(base, p string) string {
+	if p == "" {
+		return ""
+	}
+	p = deURI(cleanWindowsPath(p))
+	if base != "" && !filepath.IsAbs(p) {
+		p = filepath.Join(base, p)
+	}
+	if ap, err := filepath.Abs(p); err == nil {
+		p = ap
+	}
+	if rp, err := filepath.EvalSymlinks(p); err == nil {
+		p = rp
+	}
+	return p
+}
+
+// buildFileToContractName builds a map from absolute file paths to contract names
+func (r *resolvers) buildFileToContractName(state flowState) fileContractMap {
+	if state == nil || state.getState() == nil {
+		return make(fileContractMap)
+	}
+
+	configPath := state.getConfigPath()
+	if configPath != "" {
+		if cached, ok := r.getCachedFileToContract(configPath); ok {
+			return cached
+		}
+	}
+
+	filePathToContractName := make(fileContractMap)
+
+	stateContracts := state.getState().Contracts()
+	if stateContracts == nil {
+		return filePathToContractName
+	}
+
+	configDir := filepath.Dir(state.getConfigPath())
+	for _, contract := range *stateContracts {
+		absolutePath := normalizeAbs(configDir, contract.Location)
+		if absolutePath != "" {
+			filePathToContractName[absolutePath] = contract.Name
+		}
+	}
+
+	// Cache the result
+	if configPath != "" {
+		r.setCachedFileToContract(configPath, filePathToContractName)
+	}
+
+	return filePathToContractName
+}
+
+// Cache access helpers
+func (r *resolvers) getCachedNameToAddress(configPath string) (networkContractMap, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	cached, ok := r.nameToAddressCache[configPath]
+	return cached, ok
+}
+
+func (r *resolvers) setCachedNameToAddress(configPath string, value networkContractMap) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.nameToAddressCache == nil {
+		r.nameToAddressCache = make(map[string]networkContractMap)
+	}
+	r.nameToAddressCache[configPath] = value
+}
+
+func (r *resolvers) getCachedFileToContract(configPath string) (fileContractMap, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	cached, ok := r.fileToContractCache[configPath]
+	return cached, ok
+}
+
+func (r *resolvers) setCachedFileToContract(configPath string, value fileContractMap) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.fileToContractCache == nil {
+		r.fileToContractCache = make(map[string]fileContractMap)
+	}
+	r.fileToContractCache[configPath] = value
+}
+
+// invalidateCache clears cached data for a specific config path
+func (r *resolvers) invalidateCache(configPath string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.nameToAddressCache, configPath)
+	delete(r.fileToContractCache, configPath)
+}
+
+// accountAccess checks if checker and member are at the same address on at least one network
+func (r *resolvers) accountAccess(projectID string, checker *sema.Checker, memberLocation common.Location) bool {
+	// If both are AddressLocation, directly compare addresses
+	// Otherwise, both must be StringLocation and we need to resolve the contract -> account mappings per network.
+	if checkerAddr, ok := checker.Location.(common.AddressLocation); ok {
+		if memberAddr, ok := memberLocation.(common.AddressLocation); ok {
+			return checkerAddr.Address == memberAddr.Address
+		}
+	}
+
 	if r.cfgManager == nil {
 		return false
 	}
-	cl, err := r.cfgManager.ResolveClientForChecker(checker)
-	if err != nil || cl == nil {
+
+	state, err := r.cfgManager.ResolveStateForProject(projectID)
+	if err != nil || state == nil {
 		return false
 	}
 
-	contracts, err := cl.getState().getState().DeploymentContractsByNetwork(config.EmulatorNetwork)
-	if err != nil {
+	// Build mappings: contract name to address per network
+	contractNameToAddressByNetwork := r.buildNameToAddressByNetwork(state)
+	if len(contractNameToAddressByNetwork) == 0 {
 		return false
 	}
 
-	var checkerAccount, memberAccount string
-	// go over contracts and match contract by the location of checker and member and assign the account name for later check
-	for _, c := range contracts {
-		// get absolute path of the contract relative to the dir where flow.json is (working env)
-		absLocation, _ := filepath.Abs(filepath.Join(filepath.Dir(cl.getConfigPath()), c.Location()))
+	// Build mapping: file path → contract name
+	filePathToContractName := r.buildFileToContractName(state)
 
-		if memberLocation.String() == absLocation {
-			memberAccount = c.AccountName
+	// Helper to resolve contract name from StringLocation
+	resolveContractName := func(location common.StringLocation) string {
+		locationString := location.String()
+
+		// If it's a contract name, return it as is
+		if isContractName(locationString) {
+			return locationString
 		}
-		if checker.Location.String() == absLocation {
-			checkerAccount = c.AccountName
+
+		// Otherwise, resolve file path and check for known contract name
+		absolutePath := normalizeAbs("", locationString)
+		if contractName, exists := filePathToContractName[absolutePath]; exists {
+			return contractName
 		}
+
+		return ""
 	}
 
-	return checkerAccount == memberAccount && checkerAccount != "" && memberAccount != ""
+	// Get checker contract name from location (only support StringLocation)
+	checkerLocation, ok := checker.Location.(common.StringLocation)
+	if !ok {
+		return false
+	}
+	checkerContractName := resolveContractName(checkerLocation)
+	if checkerContractName == "" {
+		return false
+	}
+
+	// Get member contract name from location (only support StringLocation)
+	memberStringLocation, ok := memberLocation.(common.StringLocation)
+	if !ok {
+		return false
+	}
+	memberContractName := resolveContractName(memberStringLocation)
+	if memberContractName == "" {
+		return false
+	}
+
+	// Check if they're at the same address on at least one network
+	for _, contractNameToAddress := range contractNameToAddressByNetwork {
+		checkerAddress, checkerExists := contractNameToAddress[checkerContractName]
+		memberAddress, memberExists := contractNameToAddress[memberContractName]
+		if checkerExists && memberExists && checkerAddress == memberAddress {
+			return true
+		}
+	}
+	return false
 }
 
 // workaround for Windows files being sent with prefixed '/' which is /c:/test/foo
