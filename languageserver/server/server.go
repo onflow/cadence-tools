@@ -149,6 +149,10 @@ type AddressContractNamesResolver func(address common.Address) ([]string, error)
 // projectID identifies the project configuration (e.g., flow.json path)
 type StringImportResolver func(projectID string, location common.StringLocation) (string, error)
 
+// MemberAccountAccessHandler determines if access(account) is allowed, scoped by project ID
+// projectID identifies the project configuration (e.g., flow.json path)
+type MemberAccountAccessHandler func(projectID string, checker *sema.Checker, memberLocation common.Location) bool
+
 // CodeLensProvider is a function that is used to provide code lenses for the given checker
 type CodeLensProvider func(uri protocol.DocumentURI, version int32, checker *sema.Checker) ([]*protocol.CodeLens, error)
 
@@ -190,7 +194,7 @@ type Server struct {
 	// reportCrashes decides when the crash is detected should it be reported
 	reportCrashes bool
 	// memberAccountAccessHandler is the optional function that is used to determine access for accounts
-	memberAccountAccessHandler func(projectID string, checker *sema.Checker, memberLocation common.Location) bool
+	memberAccountAccessHandler MemberAccountAccessHandler
 	// checkerStandardConfig is a config factory for contracts and transactions (per project)
 	checkerStandardConfig func(projectID string) *sema.Config
 	// checkerScriptConfig is a config factory for scripts (per project)
@@ -399,7 +403,7 @@ func WithInitializationOptionsHandler(handler InitializationOptionsHandler) Opti
 //
 // When we have a syntax like access(account) this handler is called and
 // determines whether the access is allowed based on the location of program and the called member.
-func WithMemberAccountAccessHandler(handler func(projectID string, checker *sema.Checker, memberLocation common.Location) bool) Option {
+func WithMemberAccountAccessHandler(handler MemberAccountAccessHandler) Option {
 	return func(server *Server) error {
 		server.memberAccountAccessHandler = handler
 		return nil
