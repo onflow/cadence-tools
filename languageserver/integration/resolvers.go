@@ -60,8 +60,8 @@ func deURI(path string) string {
 	return path
 }
 
-// isContractIdentifier returns true if the location string is a contract identifier (not a file path)
-func isContractIdentifier(locationString string) bool {
+// isContractName returns true if the location string is a contract name (not a file path)
+func isContractName(locationString string) bool {
 	return !strings.HasSuffix(locationString, ".cdc")
 }
 
@@ -69,7 +69,7 @@ func isContractIdentifier(locationString string) bool {
 // projectID identifies the project scope (e.g., abs flow.json path) established by the server
 func (r *resolvers) stringImport(projectID string, location common.StringLocation) (string, error) {
 	name := location.String()
-	if isContractIdentifier(name) {
+	if isContractName(name) {
 		return r.resolveStringIdentifierImport(projectID, name)
 	}
 	return r.resolveFileImport(projectID, name)
@@ -369,8 +369,8 @@ func (r *resolvers) accountAccess(projectID string, checker *sema.Checker, membe
 	resolveContractName := func(location common.StringLocation) string {
 		locationString := location.String()
 
-		// If it's a contract identifier, return it as is
-		if isContractIdentifier(locationString) {
+		// If it's a contract name, return it as is
+		if isContractName(locationString) {
 			return locationString
 		}
 
