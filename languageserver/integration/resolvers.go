@@ -42,10 +42,9 @@ type resolvers struct {
 	loader     flowkit.ReaderWriter
 	cfgManager *ConfigManager
 	// Cache for buildNameToAddressByNetwork, keyed by config path
-	nameToAddressCache map[string]networkContractMap
+	nameToAddressCache sync.Map // map[string]networkContractMap
 	// Cache for buildFileToContractName, keyed by config path
-	fileToContractCache map[string]map[string]string
-	cacheMutex          sync.RWMutex
+	fileToContractCache sync.Map // map[string]map[string]string
 }
 
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
@@ -185,12 +184,9 @@ func (r *resolvers) buildNameToAddressByNetwork(state flowState) networkContract
 
 	configPath := state.getConfigPath()
 	if configPath != "" {
-		r.cacheMutex.RLock()
-		if cached, ok := r.nameToAddressCache[configPath]; ok {
-			r.cacheMutex.RUnlock()
-			return cached
+		if cached, ok := r.nameToAddressCache.Load(configPath); ok {
+			return cached.(networkContractMap)
 		}
-		r.cacheMutex.RUnlock()
 	}
 
 	nameToAddressByNetwork := make(networkContractMap)
@@ -237,12 +233,7 @@ func (r *resolvers) buildNameToAddressByNetwork(state flowState) networkContract
 
 	// Cache the result
 	if configPath != "" {
-		r.cacheMutex.Lock()
-		if r.nameToAddressCache == nil {
-			r.nameToAddressCache = make(map[string]networkContractMap)
-		}
-		r.nameToAddressCache[configPath] = nameToAddressByNetwork
-		r.cacheMutex.Unlock()
+		r.nameToAddressCache.Store(configPath, nameToAddressByNetwork)
 	}
 
 	return nameToAddressByNetwork
@@ -275,12 +266,9 @@ func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
 
 	configPath := state.getConfigPath()
 	if configPath != "" {
-		r.cacheMutex.RLock()
-		if cached, ok := r.fileToContractCache[configPath]; ok {
-			r.cacheMutex.RUnlock()
-			return cached
+		if cached, ok := r.fileToContractCache.Load(configPath); ok {
+			return cached.(map[string]string)
 		}
-		r.cacheMutex.RUnlock()
 	}
 
 	filePathToContractName := make(map[string]string)
@@ -300,12 +288,7 @@ func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
 
 	// Cache the result
 	if configPath != "" {
-		r.cacheMutex.Lock()
-		if r.fileToContractCache == nil {
-			r.fileToContractCache = make(map[string]map[string]string)
-		}
-		r.fileToContractCache[configPath] = filePathToContractName
-		r.cacheMutex.Unlock()
+		r.fileToContractCache.Store(configPath, filePathToContractName)
 	}
 
 	return filePathToContractName
@@ -313,14 +296,8 @@ func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
 
 // invalidateCache clears cached data for a specific config path
 func (r *resolvers) invalidateCache(configPath string) {
-	r.cacheMutex.Lock()
-	defer r.cacheMutex.Unlock()
-	if r.nameToAddressCache != nil {
-		delete(r.nameToAddressCache, configPath)
-	}
-	if r.fileToContractCache != nil {
-		delete(r.fileToContractCache, configPath)
-	}
+	r.nameToAddressCache.Delete(configPath)
+	r.fileToContractCache.Delete(configPath)
 }
 
 // accountAccess checks if checker and member are at the same address on at least one network
