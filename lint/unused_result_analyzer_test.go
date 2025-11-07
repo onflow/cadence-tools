@@ -170,4 +170,66 @@ func TestUnusedResultAnalyzer(t *testing.T) {
 			diagnostics,
 		)
 	})
+
+	t.Run("optional chaining with void function", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) struct S {
+				  access(all) fun nothing() {}
+			  }
+
+              access(all) fun test() {
+                  let s: S? = S()
+				  s?.nothing()
+              }
+            `,
+			lint.UnusedResultAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("optional chaining with non-void function", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) struct S {
+				  access(all) fun answer(): Int {
+                      return 42
+                  }
+			  }
+
+              access(all) fun test() {
+                  let s: S? = S()
+				  s?.answer()
+              }
+            `,
+			lint.UnusedResultAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 215, Line: 10, Column: 6},
+						EndPos:   ast.Position{Offset: 225, Line: 10, Column: 16},
+					},
+					Location: testLocation,
+					Category: lint.UnusedResultCategory,
+					Message:  "unused result",
+				},
+			},
+			diagnostics,
+		)
+	})
 }
