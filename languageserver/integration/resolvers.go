@@ -38,12 +38,15 @@ import (
 // networkContractMap maps network name -> contract name -> address
 type networkContractMap map[string]map[string]flow.Address
 
+// fileContractMap maps absolute file path -> contract name
+type fileContractMap map[string]string
+
 type resolvers struct {
 	loader              flowkit.ReaderWriter
 	cfgManager          *ConfigManager
 	mu                  sync.RWMutex
 	nameToAddressCache  map[string]networkContractMap
-	fileToContractCache map[string]map[string]string
+	fileToContractCache map[string]fileContractMap
 }
 
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
@@ -258,9 +261,9 @@ func normalizeAbs(base, p string) string {
 }
 
 // buildFileToContractName builds a map from absolute file paths to contract names
-func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
+func (r *resolvers) buildFileToContractName(state flowState) fileContractMap {
 	if state == nil || state.getState() == nil {
-		return make(map[string]string)
+		return make(fileContractMap)
 	}
 
 	configPath := state.getConfigPath()
@@ -270,7 +273,7 @@ func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
 		}
 	}
 
-	filePathToContractName := make(map[string]string)
+	filePathToContractName := make(fileContractMap)
 
 	stateContracts := state.getState().Contracts()
 	if stateContracts == nil {
@@ -310,18 +313,18 @@ func (r *resolvers) setCachedNameToAddress(configPath string, value networkContr
 	r.nameToAddressCache[configPath] = value
 }
 
-func (r *resolvers) getCachedFileToContract(configPath string) (map[string]string, bool) {
+func (r *resolvers) getCachedFileToContract(configPath string) (fileContractMap, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	cached, ok := r.fileToContractCache[configPath]
 	return cached, ok
 }
 
-func (r *resolvers) setCachedFileToContract(configPath string, value map[string]string) {
+func (r *resolvers) setCachedFileToContract(configPath string, value fileContractMap) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.fileToContractCache == nil {
-		r.fileToContractCache = make(map[string]map[string]string)
+		r.fileToContractCache = make(map[string]fileContractMap)
 	}
 	r.fileToContractCache[configPath] = value
 }
