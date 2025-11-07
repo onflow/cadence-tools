@@ -35,11 +35,14 @@ import (
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 )
 
+// networkContractMap maps network name -> contract name -> address
+type networkContractMap map[string]map[string]flow.Address
+
 type resolvers struct {
 	loader     flowkit.ReaderWriter
 	cfgManager *ConfigManager
 	// Cache for buildNameToAddressByNetwork, keyed by config path
-	nameToAddressCache map[string]map[string]map[string]flow.Address
+	nameToAddressCache map[string]networkContractMap
 	// Cache for buildFileToContractName, keyed by config path
 	fileToContractCache map[string]map[string]string
 	cacheMutex          sync.RWMutex
@@ -170,9 +173,9 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 }
 
 // buildNameToAddressByNetwork builds per network: contract name -> address
-func (r *resolvers) buildNameToAddressByNetwork(state flowState) map[string]map[string]flow.Address {
+func (r *resolvers) buildNameToAddressByNetwork(state flowState) networkContractMap {
 	if state == nil || state.getState() == nil {
-		return make(map[string]map[string]flow.Address)
+		return make(networkContractMap)
 	}
 
 	configPath := state.getConfigPath()
@@ -185,7 +188,7 @@ func (r *resolvers) buildNameToAddressByNetwork(state flowState) map[string]map[
 		r.cacheMutex.RUnlock()
 	}
 
-	nameToAddressByNetwork := make(map[string]map[string]flow.Address)
+	nameToAddressByNetwork := make(networkContractMap)
 
 	stateNetworks := state.getState().Networks()
 	if stateNetworks == nil {
@@ -231,7 +234,7 @@ func (r *resolvers) buildNameToAddressByNetwork(state flowState) map[string]map[
 	if configPath != "" {
 		r.cacheMutex.Lock()
 		if r.nameToAddressCache == nil {
-			r.nameToAddressCache = make(map[string]map[string]map[string]flow.Address)
+			r.nameToAddressCache = make(map[string]networkContractMap)
 		}
 		r.nameToAddressCache[configPath] = nameToAddressByNetwork
 		r.cacheMutex.Unlock()
