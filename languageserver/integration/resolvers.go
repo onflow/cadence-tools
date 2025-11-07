@@ -298,18 +298,6 @@ func (r *resolvers) accountAccess(projectID string, checker *sema.Checker, membe
 			return contractName
 		}
 
-		// Fallback: match by filename for dependencies
-		// (e.g., file in lib/ but contract configured in imports/)
-		filename := filepath.Base(absolutePath)
-		contractNameFromFile := strings.TrimSuffix(filename, filepath.Ext(filename))
-
-		// Verify this contract name exists in our deployment/alias maps
-		for _, contractNameToAddress := range contractNameToAddressByNetwork {
-			if _, exists := contractNameToAddress[contractNameFromFile]; exists {
-				return contractNameFromFile
-			}
-		}
-
 		return ""
 	}
 
