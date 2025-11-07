@@ -24,6 +24,7 @@ import (
 	neturl "net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
@@ -37,6 +38,11 @@ import (
 type resolvers struct {
 	loader     flowkit.ReaderWriter
 	cfgManager *ConfigManager
+	// Cache for buildNameToAddressByNetwork, keyed by config path
+	nameToAddressCache map[string]map[string]map[string]flow.Address
+	// Cache for buildFileToContractName, keyed by config path
+	fileToContractCache map[string]map[string]string
+	cacheMutex          sync.RWMutex
 }
 
 // deURI normalizes a possibly URI-formatted path (e.g., file:///...) and decodes percent-escapes.
@@ -165,10 +171,21 @@ func (r *resolvers) addressContractNames(address common.Address) ([]string, erro
 
 // buildNameToAddressByNetwork builds per network: contract name -> address
 func (r *resolvers) buildNameToAddressByNetwork(state flowState) map[string]map[string]flow.Address {
-	nameToAddressByNetwork := make(map[string]map[string]flow.Address)
 	if state == nil || state.getState() == nil {
-		return nameToAddressByNetwork
+		return make(map[string]map[string]flow.Address)
 	}
+
+	configPath := state.getConfigPath()
+	if configPath != "" {
+		r.cacheMutex.RLock()
+		if cached, ok := r.nameToAddressCache[configPath]; ok {
+			r.cacheMutex.RUnlock()
+			return cached
+		}
+		r.cacheMutex.RUnlock()
+	}
+
+	nameToAddressByNetwork := make(map[string]map[string]flow.Address)
 
 	stateNetworks := state.getState().Networks()
 	if stateNetworks == nil {
@@ -210,6 +227,16 @@ func (r *resolvers) buildNameToAddressByNetwork(state flowState) map[string]map[
 		}
 	}
 
+	// Cache the result
+	if configPath != "" {
+		r.cacheMutex.Lock()
+		if r.nameToAddressCache == nil {
+			r.nameToAddressCache = make(map[string]map[string]map[string]flow.Address)
+		}
+		r.nameToAddressCache[configPath] = nameToAddressByNetwork
+		r.cacheMutex.Unlock()
+	}
+
 	return nameToAddressByNetwork
 }
 
@@ -234,10 +261,21 @@ func normalizeAbs(base, p string) string {
 
 // buildFileToContractName builds a map from absolute file paths to contract names
 func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
-	filePathToContractName := make(map[string]string)
 	if state == nil || state.getState() == nil {
-		return filePathToContractName
+		return make(map[string]string)
 	}
+
+	configPath := state.getConfigPath()
+	if configPath != "" {
+		r.cacheMutex.RLock()
+		if cached, ok := r.fileToContractCache[configPath]; ok {
+			r.cacheMutex.RUnlock()
+			return cached
+		}
+		r.cacheMutex.RUnlock()
+	}
+
+	filePathToContractName := make(map[string]string)
 
 	stateContracts := state.getState().Contracts()
 	if stateContracts == nil {
@@ -252,7 +290,29 @@ func (r *resolvers) buildFileToContractName(state flowState) map[string]string {
 		}
 	}
 
+	// Cache the result
+	if configPath != "" {
+		r.cacheMutex.Lock()
+		if r.fileToContractCache == nil {
+			r.fileToContractCache = make(map[string]map[string]string)
+		}
+		r.fileToContractCache[configPath] = filePathToContractName
+		r.cacheMutex.Unlock()
+	}
+
 	return filePathToContractName
+}
+
+// invalidateCache clears cached data for a specific config path
+func (r *resolvers) invalidateCache(configPath string) {
+	r.cacheMutex.Lock()
+	defer r.cacheMutex.Unlock()
+	if r.nameToAddressCache != nil {
+		delete(r.nameToAddressCache, configPath)
+	}
+	if r.fileToContractCache != nil {
+		delete(r.fileToContractCache, configPath)
+	}
 }
 
 // accountAccess checks if checker and member are at the same address on at least one network

@@ -160,10 +160,15 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 	// Provide a project identity provider keyed by nearest flow.json for checker cache scoping
 	projectProvider := projectIdentityProvider{cfg: integration.cfgManager}
 
-	resolve := resolvers{
+	resolve := &resolvers{
 		loader:     loader,
 		cfgManager: integration.cfgManager,
 	}
+
+	// Set up cache invalidation callback for when configs are reloaded
+	integration.cfgManager.SetOnConfigReload(func(configPath string) {
+		resolve.invalidateCache(configPath)
+	})
 
 	options := []server.Option{
 		server.WithDiagnosticProvider(diagnostics),
