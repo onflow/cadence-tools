@@ -274,7 +274,7 @@ func (r *resolvers) accountAccess(projectID string, checker *sema.Checker, membe
 		return false
 	}
 
-	// Build mappings: contract name → address per network
+	// Build mappings: contract name to address per network
 	contractNameToAddressByNetwork := r.buildNameToAddressByNetwork(state)
 	if len(contractNameToAddressByNetwork) == 0 {
 		return false
@@ -287,12 +287,12 @@ func (r *resolvers) accountAccess(projectID string, checker *sema.Checker, membe
 	resolveContractName := func(location common.StringLocation) string {
 		locationString := location.String()
 
-		// If it doesn't look like a file path, treat it as a contract identifier
+		// If it's a contract identifier, return it as is
 		if !strings.Contains(locationString, ".cdc") {
 			return locationString
 		}
 
-		// File path - try exact match
+		// Otherwise, resolve file path and check for known contract name
 		absolutePath := normalizeAbs("", locationString)
 		if contractName, exists := filePathToContractName[absolutePath]; exists {
 			return contractName
