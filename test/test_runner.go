@@ -587,7 +587,7 @@ func (r *TestRunner) initializeEnvironment() (
 	env.Configure(
 		ctx.Interface,
 		runtime.NewCodesAndPrograms(),
-		runtime.NewStorage(ctx.Interface.(environment.Environment), nil, nil, runtime.StorageConfig{}),
+		runtime.NewStorage(ctx.Interface, nil, nil, runtime.StorageConfig{}),
 		nil,
 		nil,
 	)
@@ -795,8 +795,8 @@ func (r *TestRunner) parseAndCheckImport(
 		return nil, nil, ImportResolverNotProvidedError{}
 	}
 
-	// Resolve code using current network label (raw string passed by caller for fork) or "emulator"
-	network := "emulator"
+	// Resolve code using current network label (raw string passed by caller for fork) or default
+	network := defaultNetworkLabel
 	if r.backend.forkEnabled && r.backend.NetworkLabel() != "" {
 		network = r.backend.NetworkLabel()
 	}

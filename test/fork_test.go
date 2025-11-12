@@ -613,9 +613,9 @@ func TestFork_ContractAddressResolver(t *testing.T) {
 	backend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
 	backend.contractAddressResolver = addressResolver
 
-	// Test emulator mode
+	// Test default (testing) mode
 	result := backend.replaceImports(`import "FungibleToken"`)
-	require.Equal(t, "emulator", capturedNetwork)
+	require.Equal(t, "testing", capturedNetwork)
 	require.Contains(t, result, "0xee")
 
 	// Test fork mode

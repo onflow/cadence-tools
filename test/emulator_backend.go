@@ -70,7 +70,6 @@ type BackendOptions struct {
 	// For fork mode, the ChainID will use the ChainID of the forked network.
 	ChainID flow.ChainID
 	// NetworkResolver maps network labels to Access node host:port addresses (e.g., "mainnet" -> "access.mainnet.nodes.onflow.org:9000").
-	// If nil, network labels are used as-is (assumed to already be host:port addresses).
 	NetworkResolver func(network string) (host string, found bool)
 	// ContractAddressResolver is an optional resolver for dynamic contract address resolution
 	ContractAddressResolver ContractAddressResolver
@@ -83,6 +82,9 @@ const helperFilePrefix = "\x00helper/"
 // The number of predefined accounts that are created
 // upon initialization of EmulatorBackend.
 const initialAccountsNumber = 20
+
+// The default network label used when no specific network is configured.
+const defaultNetworkLabel = "testing"
 
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
@@ -429,21 +431,17 @@ func NewEmulatorBackend(
 		}
 		emulatorBackend.applyChain(blockchain, selectedChain, locationHandler, true)
 
-		// Capture fork start height BEFORE creating any local blocks
-		if backendOptions.ForkHeight == 0 {
-			latestBlock, err := blockchain.GetLatestBlock()
-			if err != nil {
-				panic(fmt.Errorf("failed to get latest block for fork start height: %w", err))
-			}
-			emulatorBackend.forkStartHeight = latestBlock.Height
-		} else {
-			emulatorBackend.forkStartHeight = backendOptions.ForkHeight
-		}
-
-		// Now create the initial local block needed as a reference block for the forked blockchain.
+		// Create the initial local block needed as a reference block for the forked blockchain.
 		if _, _, err := blockchain.ExecuteAndCommitBlock(); err != nil {
 			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
 		}
+
+		// Capture fork start height: the block before our first local block
+		latestBlock, err := blockchain.GetLatestBlock()
+		if err != nil {
+			panic(fmt.Errorf("failed to get latest block for fork start height: %w", err))
+		}
+		emulatorBackend.forkStartHeight = latestBlock.Height - 1
 	} else {
 		// Build a non-fork emulator and bootstrap accounts
 		selectedChain, blockchain, locationHandler, err := buildEmulator(
@@ -487,21 +485,17 @@ func (e *EmulatorBackend) applyFork(network string, height uint64) error {
 	}
 	e.applyChain(newChain, selectedChain, locationHandler, true)
 
-	// Capture fork start height BEFORE creating any local blocks
-	if height == 0 {
-		latestBlock, err := newChain.GetLatestBlock()
-		if err != nil {
-			return fmt.Errorf("failed to get latest block for fork start height: %w", err)
-		}
-		e.forkStartHeight = latestBlock.Height
-	} else {
-		e.forkStartHeight = height
-	}
-
-	// Now create the initial local block
+	// Create the initial local block
 	if _, _, err := e.blockchain.ExecuteAndCommitBlock(); err != nil {
 		return fmt.Errorf("failed to commit initial block in fork mode: %w", err)
 	}
+
+	// Capture fork start height: the block before our first local block
+	latestBlock, err := e.blockchain.GetLatestBlock()
+	if err != nil {
+		return fmt.Errorf("failed to get latest block for fork start height: %w", err)
+	}
+	e.forkStartHeight = latestBlock.Height - 1
 	return nil
 }
 
@@ -851,7 +845,7 @@ func (e *EmulatorBackend) DeployContract(
 		return fmt.Errorf("could not find the address of contract: %s (no resolver provided)", name)
 	}
 
-	network := "emulator"
+	network := defaultNetworkLabel
 	if e.networkLabel != "" {
 		network = e.networkLabel
 	}
@@ -917,7 +911,7 @@ func (e *EmulatorBackend) Reset(height uint64) {
 
 // Events returns all the emitted events up until the latest block,
 // optionally filtered by event type.
-// In fork mode, events are bounded to [forkStartHeight, latest].
+// In fork mode, events are bounded to [forkStartHeight + 1, latest] (local blocks only).
 func (e *EmulatorBackend) Events(
 	context stdlib.TestFrameworkEventsContext,
 	eventType interpreter.StaticType,
@@ -1126,7 +1120,7 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 			continue
 		}
 
-		network := "emulator"
+		network := defaultNetworkLabel
 		if e.networkLabel != "" {
 			network = e.networkLabel
 		}
