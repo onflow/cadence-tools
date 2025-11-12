@@ -183,7 +183,7 @@ func systemAddressLocationsForChain(ch flow.Chain) []common.AddressLocation {
 		"Crypto":                         serviceAddress,
 		"NFTStorefrontV2":                chainContracts.NonFungibleToken.Address.HexWithPrefix(),
 		"USDCFlow":                       chainContracts.FungibleToken.Address.HexWithPrefix(),
-		"FlowExecutionParameters":        chainContracts.ExecutionParametersAccount.Address.Hex(),
+		"FlowExecutionParameters":        chainContracts.ExecutionParametersAccount.Address.HexWithPrefix(),
 		"Migration":                      chainContracts.Migration.Address.HexWithPrefix(),
 		"CrossVMMetadataViews":           serviceAddress,
 		"CrossVMNFT":                     serviceAddress,

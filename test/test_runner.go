@@ -702,8 +702,8 @@ func (r *TestRunner) interpreterContractValueHandler(
 				// its ledger.
 				blockchainStorage := runtime.NewStorage(
 					r.backend.blockchain.NewScriptEnvironment(),
-					nil,
-					nil,
+					inter,
+					inter,
 					runtime.StorageConfig{},
 				)
 				storageMap := blockchainStorage.GetDomainStorageMap(

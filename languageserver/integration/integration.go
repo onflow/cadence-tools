@@ -160,10 +160,15 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 	// Provide a project identity provider keyed by nearest flow.json for checker cache scoping
 	projectProvider := projectIdentityProvider{cfg: integration.cfgManager}
 
-	resolve := resolvers{
+	resolve := &resolvers{
 		loader:     loader,
 		cfgManager: integration.cfgManager,
 	}
+
+	// Set up cache invalidation callback for when configs are reloaded
+	integration.cfgManager.SetOnConfigReload(func(configPath string) {
+		resolve.invalidateCache(configPath)
+	})
 
 	options := []server.Option{
 		server.WithDiagnosticProvider(diagnostics),
@@ -172,6 +177,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
 		server.WithIdentifierImportResolver(resolve.identifierImportProject),
 		server.WithProjectIdentityProvider(projectProvider),
+		server.WithMemberAccountAccessHandler(resolve.accountAccess),
 	}
 
 	// Prompt to create flow.json when opening an existing .cdc file without a config.
@@ -185,7 +191,6 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 			server.WithCodeLensProvider(integration.codeLenses),
 			server.WithAddressImportResolver(resolve.addressImport),
 			server.WithAddressContractNamesResolver(resolve.addressContractNames),
-			server.WithMemberAccountAccessHandler(resolve.accountAccess),
 		)
 	}
 
