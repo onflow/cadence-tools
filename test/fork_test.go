@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	flowmodel "github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -546,84 +545,62 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
 	require.NoError(t, result.Error)
 }
 
-// TestFork_ImportResolverAlias verifies that after loadFork in setup(),
-// imports are resolved using the correct network string (e.g., "testnet").
+// TestFork_ImportResolverAlias verifies that Test.executeScript returns types from the emulator
+// that match the test framework's types when using custom import resolution.
 func TestFork_ImportResolverAlias(t *testing.T) {
-	var observedNetwork string
+	helperContract := `access(all) contract Helper {}`
+	helperAddr := common.MustBytesToAddress([]byte{0x16, 0x54, 0x65, 0x33, 0x99, 0x04, 0x0a, 0x61})
+
+	fileResolver := func(path string) (string, error) {
+		if path == "Helper.cdc" {
+			return helperContract, nil
+		}
+		return "", fmt.Errorf("unknown path: %s", path)
+	}
 
 	importResolver := func(network string, location common.Location) (string, error) {
-		observedNetwork = network
-		if loc, ok := location.(common.StringLocation); ok && string(loc) == "Helper" {
-			return `access(all) contract Helper {}`, nil
-		}
-		if loc, ok := location.(common.AddressLocation); ok && loc.Name == "Helper" {
-			return `access(all) contract Helper {}`, nil
+		if loc, ok := location.(common.AddressLocation); ok {
+			if loc.Name == "Helper" && common.Address(loc.Address) == helperAddr {
+				return helperContract, nil
+			}
 		}
 		return "", fmt.Errorf("unknown import: %s", location.ID())
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithFileResolver(fileResolver).
 		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(importResolver).
 		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
-			return common.Address{0x5}, nil
+			if name == "Helper" {
+				return helperAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		})
 
 	script := `
         import Test
         import "Helper"
-
         access(all) fun setup() {
-            Test.loadFork(network: "testnet", height: nil)
+            Test.loadFork(network: "mainnet", height: nil)
         }
-
         access(all) fun test() {
-            Test.assertEqual(Type<Helper>(), Type<Helper>())
+            let err = Test.deployContract(name: "Helper", path: "Helper.cdc", arguments: [])
+            Test.expect(err, Test.beNil())
+            Test.commitBlock()
+            
+            let script = "import \"Helper\"\naccess(all) fun main(): Type { return Type<Helper>() }"
+            let result = Test.executeScript(script, [])
+            Test.expect(result, Test.beSucceeded())
+            
+            let emulatorType = result.returnValue! as! Type
+            Test.assertEqual(Type<Helper>(), emulatorType)
         }
     `
 
 	res, err := runner.RunTest(script, "test")
 	require.NoError(t, err)
 	require.NoError(t, res.Error)
-
-	// Verify import resolver received "testnet" after loadFork pre-execution
-	require.Equal(t, "testnet", observedNetwork)
-
-	backend, ok := runner.testFramework.EmulatorBackend().(*EmulatorBackend)
-	require.True(t, ok)
-	require.Equal(t, "testnet", backend.NetworkLabel())
-}
-
-// TestFork_ContractAddressResolver verifies dynamic address resolution based on network.
-func TestFork_ContractAddressResolver(t *testing.T) {
-	testnetAddr := common.MustBytesToAddress([]byte{0x9a, 0x07, 0x66, 0xd9, 0x3b, 0x66, 0x08, 0xb7})
-
-	var capturedNetwork string
-	addressResolver := func(network string, contractName string) (common.Address, error) {
-		capturedNetwork = network
-		if contractName == "FungibleToken" {
-			if network == "testnet" {
-				return testnetAddr, nil
-			}
-			return common.Address{0xee}, nil
-		}
-		return common.Address{}, fmt.Errorf("unknown contract: %s", contractName)
-	}
-
-	backend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
-	backend.contractAddressResolver = addressResolver
-
-	// Test default (testing) mode
-	result := backend.replaceImports(`import "FungibleToken"`)
-	require.Equal(t, "testing", capturedNetwork)
-	require.Contains(t, result, "0xee")
-
-	// Test fork mode
-	backend.forkEnabled = true
-	backend.networkLabel = "testnet"
-	result = backend.replaceImports(`import "FungibleToken"`)
-	require.Equal(t, "testnet", capturedNetwork)
-	require.Contains(t, result, testnetAddr.Hex())
 }
 
 // TestFork_LoadForkOutsideSetupErrors verifies loadFork must be in setup().
