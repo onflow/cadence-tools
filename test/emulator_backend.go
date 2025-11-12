@@ -138,17 +138,8 @@ type EmulatorBackend struct {
 	// fork configuration
 	forkEnabled bool
 
-	// logger used for server logging and preserved on reload
-	logger zerolog.Logger
-
-	// coverage report passed at construction (optional)
-	coverageReport *runtime.CoverageReport
-
 	// networkLabel is the network identifier used for contract address resolution
 	networkLabel string
-
-	// networkResolver maps network labels to host:port addresses
-	networkResolver func(network string) (host string, found bool)
 
 	// contractAddressResolver is an optional callback to resolve contract addresses dynamically
 	contractAddressResolver ContractAddressResolver
@@ -357,23 +348,6 @@ func buildEmulator(
 	return selectedChain, blockchain, locationHandler, nil
 }
 
-// applyChain centralizes switching the backend to a new blockchain and chain config.
-// It reuses the existing clock and optionally merges system/common contracts in fork mode.
-func (e *EmulatorBackend) applyChain(
-	newChain *emulator.Blockchain,
-	selectedChain flow.Chain,
-	locationHandler sema.LocationHandlerFunc,
-	forkEnabled bool,
-) {
-	// Reuse clock and update fields
-	newChain.SetClock(e.clock)
-	e.blockchain = newChain
-	e.blockOffset = 0
-	e.locationHandler = locationHandler
-	e.chain = selectedChain
-	e.forkEnabled = forkEnabled
-}
-
 func NewEmulatorBackend(
 	logger zerolog.Logger,
 	stdlibHandler stdlib.StandardLibraryHandler,
@@ -383,19 +357,15 @@ func NewEmulatorBackend(
 	logHook := newLogCollectionHook()
 	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
 
-	// Extract ContractAddressResolver from options (if provided)
+	// Extract network label and contract address resolver from options
+	var networkLabel string
 	var contractAddressResolver ContractAddressResolver
 	if backendOptions != nil {
+		networkLabel = backendOptions.NetworkLabel
 		contractAddressResolver = backendOptions.ContractAddressResolver
 	}
 
-	// Extract network resolver from options (if provided)
-	var networkResolver func(string) (string, bool)
-	if backendOptions != nil {
-		networkResolver = backendOptions.NetworkResolver
-	}
-
-	// Create backend struct with shared fields
+	// Create backend struct
 	emulatorBackend := &EmulatorBackend{
 		blockchain:              nil,
 		blockOffset:             0,
@@ -406,31 +376,30 @@ func NewEmulatorBackend(
 		keys:                    map[common.Address]*stdlib.PublicKey{},
 		chain:                   nil,
 		forkEnabled:             false,
-		logger:                  logger,
-		coverageReport:          coverageReport,
-		networkResolver:         networkResolver,
+		networkLabel:            networkLabel,
 		contractAddressResolver: contractAddressResolver,
 	}
 
-	// Store the network label for contract resolution (if provided)
-	if backendOptions != nil && backendOptions.NetworkLabel != "" {
-		emulatorBackend.networkLabel = backendOptions.NetworkLabel
+	// Build blockchain
+	selectedChain, blockchain, locationHandler, err := buildEmulator(
+		logger,
+		coverageReport,
+		backendOptions,
+		logHook,
+	)
+	if err != nil {
+		panic(err)
 	}
 
-	// Initialize state depending on fork mode. In non-fork mode, bootstrap test accounts.
-	if forkEnabled {
-		// Build the forked blockchain first (without committing a local block yet)
-		selectedChain, blockchain, locationHandler, err := buildEmulator(
-			logger,
-			coverageReport,
-			backendOptions,
-			logHook,
-		)
-		if err != nil {
-			panic(err)
-		}
-		emulatorBackend.applyChain(blockchain, selectedChain, locationHandler, true)
+	// Configure blockchain and backend
+	blockchain.SetClock(emulatorBackend.clock)
+	emulatorBackend.blockchain = blockchain
+	emulatorBackend.locationHandler = locationHandler
+	emulatorBackend.chain = selectedChain
+	emulatorBackend.forkEnabled = forkEnabled
 
+	// Initialize state depending on fork mode
+	if forkEnabled {
 		// Create the initial local block needed as a reference block for the forked blockchain.
 		if _, _, err := blockchain.ExecuteAndCommitBlock(); err != nil {
 			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
@@ -443,60 +412,11 @@ func NewEmulatorBackend(
 		}
 		emulatorBackend.forkStartHeight = latestBlock.Height - 1
 	} else {
-		// Build a non-fork emulator and bootstrap accounts
-		selectedChain, blockchain, locationHandler, err := buildEmulator(
-			logger,
-			coverageReport,
-			backendOptions,
-			logHook,
-		)
-		if err != nil {
-			panic(err)
-		}
-		emulatorBackend.applyChain(blockchain, selectedChain, locationHandler, false)
+		// Bootstrap test accounts in non-fork mode
 		emulatorBackend.bootstrapAccounts()
 	}
 
 	return emulatorBackend
-}
-
-// applyFork configures the current backend to fork from the given network at the specified height.
-func (e *EmulatorBackend) applyFork(network string, height uint64) error {
-	// Store the network label for contract resolution
-	e.networkLabel = network
-
-	// Resolve network to host:port address
-	if e.networkResolver == nil {
-		return fmt.Errorf("cannot resolve network %q: no network resolver provided", network)
-	}
-	forkHost, ok := e.networkResolver(network)
-	if !ok {
-		return fmt.Errorf("network resolver could not resolve network %q", network)
-	}
-
-	selectedChain, newChain, locationHandler, err := buildEmulator(
-		e.logger,
-		e.coverageReport,
-		&BackendOptions{ForkHost: forkHost, ForkHeight: height},
-		e.logCollection,
-	)
-	if err != nil {
-		return err
-	}
-	e.applyChain(newChain, selectedChain, locationHandler, true)
-
-	// Create the initial local block
-	if _, _, err := e.blockchain.ExecuteAndCommitBlock(); err != nil {
-		return fmt.Errorf("failed to commit initial block in fork mode: %w", err)
-	}
-
-	// Capture fork start height: the block before our first local block
-	latestBlock, err := e.blockchain.GetLatestBlock()
-	if err != nil {
-		return fmt.Errorf("failed to get latest block for fork start height: %w", err)
-	}
-	e.forkStartHeight = latestBlock.Height - 1
-	return nil
 }
 
 // NetworkLabel returns the network identifier used for contract resolution
@@ -504,7 +424,7 @@ func (e *EmulatorBackend) NetworkLabel() string { return e.networkLabel }
 
 // LoadFork is a noop when called at runtime from Cadence code.
 // Fork loading is handled via AST-based pre-execution in parseCheckAndInterpret(),
-// which extracts Test.loadFork() calls from setup() and calls applyFork() before type-checking.
+// which extracts Test.loadFork() calls from setup() and passes the config to NewEmulatorBackend.
 // This ensures imports are resolved against the correct network context.
 //
 // This method exists to satisfy the stdlib.Blockchain interface, but does nothing when

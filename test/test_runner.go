@@ -441,32 +441,20 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	*interpreter.Interpreter,
 	error,
 ) {
-	// Parse AST first to detect Test.loadFork calls in setup() (hoisted before check/interpret)
+	// Parse AST for validation
 	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// TODO: move this eventually to the `NewTestRunner`
-	env, ctx := r.initializeEnvironment()
-
-	// Pre-execute: extract and execute any Test.loadFork(...) calls in setup() before type-checking
-	// This ensures the fork is loaded before imports are resolved
-	if network, height, err := extractTopLevelLoadFork(astProgram); err != nil {
+	// Validate: ensure loadFork is only called in setup() where it's pre-executed
+	if err := validateNoLoadForkOutsideSetup(astProgram); err != nil {
 		return nil, nil, err
-	} else if network != "" {
-		var h uint64
-		if height != nil {
-			h = *height
-		}
-		// applyFork will store the network label and resolve the host
-		if err := r.backend.applyFork(network, h); err != nil {
-			return nil, nil, err
-		}
 	}
 
-	// Validate: ensure loadFork is only called in setup() where it will be pre-executed
-	if err := validateNoLoadForkOutsideSetup(astProgram); err != nil {
+	// TODO: move this eventually to the `NewTestRunner`
+	env, ctx, err := r.initializeEnvironment(astProgram)
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -507,9 +495,10 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	return program, inter, nil
 }
 
-func (r *TestRunner) initializeEnvironment() (
+func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	runtime.Environment,
 	runtime.Context,
+	error,
 ) {
 	config := runtime.Config{
 		CoverageReport: r.coverageReport,
@@ -519,6 +508,7 @@ func (r *TestRunner) initializeEnvironment() (
 
 	r.testRuntime = runtime.NewRuntime(config)
 
+	// Build backend options from static fork config (may have been set by dynamic extraction)
 	var backendOptions *BackendOptions
 	if r.forkConfig != nil {
 		backendOptions = &BackendOptions{
@@ -530,7 +520,7 @@ func (r *TestRunner) initializeEnvironment() (
 			ContractAddressResolver: r.contractAddressResolver,
 		}
 	} else if r.contractAddressResolver != nil || r.networkResolver != nil || r.networkLabel != "" {
-		// Even without fork config, pass network label and resolvers if provided
+		// No fork, but pass network label and resolvers if provided
 		backendOptions = &BackendOptions{
 			NetworkLabel:            r.networkLabel,
 			NetworkResolver:         r.networkResolver,
@@ -540,6 +530,35 @@ func (r *TestRunner) initializeEnvironment() (
 
 	// Reuse existing framework/backend across test scripts to preserve fork state
 	if r.testFramework == nil {
+		// Extract dynamic fork from Test.loadFork() in setup() before creating backend
+		dynamicFork, err := extractTopLevelLoadFork(astProgram)
+		if err != nil {
+			return nil, runtime.Context{}, err
+		}
+
+		// If dynamic fork found, convert to static fork config
+		if dynamicFork != nil {
+			if r.networkResolver == nil {
+				return nil, runtime.Context{}, fmt.Errorf("Test.loadFork() requires a network resolver to be configured")
+			}
+			forkHost, ok := r.networkResolver(dynamicFork.Network)
+			if !ok {
+				return nil, runtime.Context{}, fmt.Errorf("network resolver could not resolve network %q", dynamicFork.Network)
+			}
+			forkHeight := uint64(0)
+			if dynamicFork.Height != nil {
+				forkHeight = *dynamicFork.Height
+			}
+			// Override with dynamic fork config
+			backendOptions = &BackendOptions{
+				ForkHost:                forkHost,
+				ForkHeight:              forkHeight,
+				NetworkLabel:            dynamicFork.Network,
+				NetworkResolver:         r.networkResolver,
+				ContractAddressResolver: r.contractAddressResolver,
+			}
+		}
+
 		r.testFramework = NewTestFrameworkProvider(
 			r.logger,
 			r.fileResolver,
@@ -594,10 +613,10 @@ func (r *TestRunner) initializeEnvironment() (
 
 	err := setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 	if err != nil {
-		panic(err)
+		return nil, runtime.Context{}, err
 	}
 
-	return env, ctx
+	return env, ctx, nil
 }
 
 func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandlerFunc {
@@ -892,16 +911,21 @@ func setupEVMEnvironment(
 	)
 }
 
+// DynamicForkConfig represents a fork configuration extracted from Test.loadFork() in the test script.
+type DynamicForkConfig struct {
+	Network string
+	Height  *uint64
+}
+
 // extractTopLevelLoadFork walks the AST to find loadFork calls in the setup() function:
 //
 //	access(all) fun setup() {
 //	    Test.loadFork(network: "mainnet", height: nil)
 //	}
 //
-// Returns the network string, optional height pointer, and true if found.
-// The detected loadFork call is executed before type-checking to ensure the fork
-// is loaded before imports are resolved (similar to jest.mock() preprocessing).
-func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
+// Returns the fork config if found. The detected loadFork call is preprocessed before type-checking
+// to ensure the fork is loaded before imports are resolved (similar to jest.mock() preprocessing).
+func extractTopLevelLoadFork(program *ast.Program) (*DynamicForkConfig, error) {
 	// Find the setup() function
 	var setupFunc *ast.FunctionDeclaration
 	for _, funcDecl := range program.FunctionDeclarations() {
@@ -912,7 +936,7 @@ func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
 	}
 
 	if setupFunc == nil {
-		return "", nil, nil
+		return nil, nil
 	}
 
 	// Find loadFork call within setup()
@@ -941,7 +965,7 @@ func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
 	})
 
 	if foundInvocation == nil {
-		return "", nil, nil
+		return nil, nil
 	}
 
 	// Extract arguments: network (string) and height (optional uint or nil)
@@ -958,7 +982,7 @@ func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
 			if strExpr, ok := arg.Expression.(*ast.StringExpression); ok {
 				network = strExpr.Value
 			} else {
-				return "", nil, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"Test.loadFork() network argument must be a string literal, got %T. "+
 						"Variables are not supported because loadFork is pre-executed via AST analysis",
 					arg.Expression,
@@ -974,10 +998,10 @@ func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
 					h := val
 					heightPtr = &h
 				} else {
-					return "", nil, fmt.Errorf("Test.loadFork() height argument is not a valid uint64: %w", err)
+					return nil, fmt.Errorf("Test.loadFork() height argument is not a valid uint64: %w", err)
 				}
 			} else {
-				return "", nil, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"Test.loadFork() height argument must be an integer literal or nil, got %T. "+
 						"Variables are not supported because loadFork is pre-executed via AST analysis",
 					arg.Expression,
@@ -987,16 +1011,16 @@ func extractTopLevelLoadFork(program *ast.Program) (string, *uint64, error) {
 	}
 
 	if !networkFound || !heightFound {
-		return "", nil, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"Test.loadFork() requires both 'network' and 'height' arguments",
 		)
 	}
 
 	if network == "" {
-		return "", nil, fmt.Errorf("Test.loadFork() network argument cannot be empty")
+		return nil, fmt.Errorf("Test.loadFork() network argument cannot be empty")
 	}
 
-	return network, heightPtr, nil
+	return &DynamicForkConfig{Network: network, Height: heightPtr}, nil
 }
 
 // validateNoLoadForkOutsideSetup ensures Test.loadFork() is only called in setup()
