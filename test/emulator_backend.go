@@ -71,7 +71,7 @@ type BackendOptions struct {
 	ChainID flow.ChainID
 	// NetworkResolver maps network labels to Access node host:port addresses (e.g., "mainnet" -> "access.mainnet.nodes.onflow.org:9000").
 	NetworkResolver func(network string) (host string, found bool)
-	// ContractAddressResolver is an optional resolver for dynamic contract address resolution
+	// ContractAddressResolver resolves contract addresses based on network
 	ContractAddressResolver ContractAddressResolver
 }
 
@@ -141,7 +141,7 @@ type EmulatorBackend struct {
 	// networkLabel is the network identifier used for contract address resolution
 	networkLabel string
 
-	// contractAddressResolver is an optional callback to resolve contract addresses dynamically
+	// contractAddressResolver resolves contract addresses dynamically based on network
 	contractAddressResolver ContractAddressResolver
 
 	// forkStartHeight is the block height when the fork was loaded (0 if not in fork mode)
@@ -273,16 +273,23 @@ func configureForkMode(
 	return selectedChain, forkOpts, nil
 }
 
-// buildEmulator constructs an emulator blockchain, determines the chain,
-// prepares common emulator options, and returns a fresh blockchain and
-// a location handler for that chain. The provided log hook is attached
-// to the server logger.
-func buildEmulator(
+func NewEmulatorBackend(
 	logger zerolog.Logger,
+	stdlibHandler stdlib.StandardLibraryHandler,
 	coverageReport *runtime.CoverageReport,
 	backendOptions *BackendOptions,
-	logHook *logCollectionHook,
-) (flow.Chain, *emulator.Blockchain, sema.LocationHandlerFunc, error) {
+) *EmulatorBackend {
+	logHook := newLogCollectionHook()
+	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
+
+	// Extract network label and contract address resolver from options
+	var networkLabel string
+	var contractAddressResolver ContractAddressResolver
+	if backendOptions != nil {
+		networkLabel = backendOptions.NetworkLabel
+		contractAddressResolver = backendOptions.ContractAddressResolver
+	}
+
 	// Build emulator options
 	opts := make([]emulator.Option, 0)
 	if coverageReport != nil {
@@ -297,14 +304,13 @@ func buildEmulator(
 	)
 
 	// Configure fork mode or non-fork mode
-	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
 	var selectedChain flow.Chain
 	if forkEnabled {
 		var forkOpts []emulator.Option
 		var err error
 		selectedChain, forkOpts, err = configureForkMode(backendOptions, &testLogger)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to configure fork mode: %w", err)
+			panic(fmt.Errorf("failed to configure fork mode: %w", err))
 		}
 		opts = append(opts, forkOpts...)
 	} else {
@@ -345,26 +351,6 @@ func buildEmulator(
 		)
 	}
 
-	return selectedChain, blockchain, locationHandler, nil
-}
-
-func NewEmulatorBackend(
-	logger zerolog.Logger,
-	stdlibHandler stdlib.StandardLibraryHandler,
-	coverageReport *runtime.CoverageReport,
-	backendOptions *BackendOptions,
-) *EmulatorBackend {
-	logHook := newLogCollectionHook()
-	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
-
-	// Extract network label and contract address resolver from options
-	var networkLabel string
-	var contractAddressResolver ContractAddressResolver
-	if backendOptions != nil {
-		networkLabel = backendOptions.NetworkLabel
-		contractAddressResolver = backendOptions.ContractAddressResolver
-	}
-
 	// Create backend struct
 	emulatorBackend := &EmulatorBackend{
 		blockchain:              nil,
@@ -378,17 +364,6 @@ func NewEmulatorBackend(
 		forkEnabled:             false,
 		networkLabel:            networkLabel,
 		contractAddressResolver: contractAddressResolver,
-	}
-
-	// Build blockchain
-	selectedChain, blockchain, locationHandler, err := buildEmulator(
-		logger,
-		coverageReport,
-		backendOptions,
-		logHook,
-	)
-	if err != nil {
-		panic(err)
 	}
 
 	// Configure blockchain and backend

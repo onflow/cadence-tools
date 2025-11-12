@@ -509,23 +509,15 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	r.testRuntime = runtime.NewRuntime(config)
 
 	// Build backend options from static fork config (may have been set by dynamic extraction)
-	var backendOptions *BackendOptions
+	backendOptions := &BackendOptions{
+		NetworkLabel:            r.networkLabel,
+		NetworkResolver:         r.networkResolver,
+		ContractAddressResolver: r.contractAddressResolver,
+	}
 	if r.forkConfig != nil {
-		backendOptions = &BackendOptions{
-			ForkHost:                r.forkConfig.ForkHost,
-			ForkHeight:              r.forkConfig.ForkHeight,
-			NetworkLabel:            r.networkLabel,
-			NetworkResolver:         r.networkResolver,
-			ChainID:                 r.forkConfig.ChainID,
-			ContractAddressResolver: r.contractAddressResolver,
-		}
-	} else if r.contractAddressResolver != nil || r.networkResolver != nil || r.networkLabel != "" {
-		// No fork, but pass network label and resolvers if provided
-		backendOptions = &BackendOptions{
-			NetworkLabel:            r.networkLabel,
-			NetworkResolver:         r.networkResolver,
-			ContractAddressResolver: r.contractAddressResolver,
-		}
+		backendOptions.ForkHost = r.forkConfig.ForkHost
+		backendOptions.ForkHeight = r.forkConfig.ForkHeight
+		backendOptions.ChainID = r.forkConfig.ChainID
 	}
 
 	// Reuse existing framework/backend across test scripts to preserve fork state
