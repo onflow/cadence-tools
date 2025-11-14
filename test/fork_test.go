@@ -570,7 +570,7 @@ func TestFork_ImportResolverAlias(t *testing.T) {
 
 	importResolver := func(network string, location common.Location) (string, error) {
 		if loc, ok := location.(common.AddressLocation); ok {
-			if loc.Name == "Helper" && common.Address(loc.Address) == helperAddr {
+			if loc.Name == "Helper" && loc.Address == helperAddr {
 				return helperContract, nil
 			}
 		}
