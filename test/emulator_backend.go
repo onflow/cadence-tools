@@ -334,6 +334,9 @@ func NewEmulatorBackend(
 	// Create blockchain
 	blockchain := newBlockchain(opts...)
 
+	// Wrap user contract resolver with built-in contracts fallback
+	contractAddressResolver = newContractResolverWithBuiltins(selectedChain, blockchain, contractAddressResolver)
+
 	// Build location handler for the selected chain
 	sc := systemcontracts.SystemContractsForChain(selectedChain.ChainID())
 	cryptoContractAddress := common.Address(sc.Crypto.Address)
@@ -1045,6 +1048,50 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 	sb.WriteString(code[importDeclEnd:])
 
 	return sb.String()
+}
+
+// wrapWithBuiltins wraps a user-provided resolver with fallback to built-in contracts.
+func (e *EmulatorBackend) wrapWithBuiltins(userResolver ContractAddressResolver) ContractAddressResolver {
+	return newContractResolverWithBuiltins(e.chain, e.blockchain, userResolver)
+}
+
+// newContractResolverWithBuiltins creates a contract resolver that tries a user-provided
+// resolver first, then falls back to built-in system and common contracts.
+func newContractResolverWithBuiltins(
+	chain flow.Chain,
+	blockchain *emulator.Blockchain,
+	userResolver ContractAddressResolver,
+) ContractAddressResolver {
+	// Build static map of built-in contracts (system + common)
+	builtinContracts := make(map[string]common.Address)
+
+	// Add system contracts
+	for _, location := range systemAddressLocationsForChain(chain) {
+		builtinContracts[location.Name] = location.Address
+	}
+
+	// Add common contracts from emulator
+	for _, contract := range emulator.NewCommonContracts(chain) {
+		address, _ := common.HexToAddress(contract.Address.String())
+		builtinContracts[contract.Name] = address
+	}
+
+	return func(network string, contractName string) (common.Address, error) {
+		// First, try user-provided resolver if it exists
+		if userResolver != nil {
+			addr, err := userResolver(network, contractName)
+			if err == nil {
+				return addr, nil
+			}
+		}
+
+		// Fall back to built-in contracts
+		if addr, ok := builtinContracts[contractName]; ok {
+			return addr, nil
+		}
+
+		return common.Address{}, fmt.Errorf("contract %s not found", contractName)
+	}
 }
 
 // newBlockchain returns an emulator blockchain for testing.

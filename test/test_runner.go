@@ -629,8 +629,10 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
 	}
 	backend.fileResolver = r.fileResolver
-	// Update resolver in case it was set after initial backend creation
-	backend.contractAddressResolver = r.contractAddressResolver
+	// Update resolver and network label in case they were set after initial backend creation
+	// Wrap user resolver with built-in contracts fallback
+	backend.contractAddressResolver = backend.wrapWithBuiltins(r.contractAddressResolver)
+	backend.networkLabel = r.networkLabel
 	r.backend = backend
 
 	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
