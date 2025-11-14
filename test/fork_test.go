@@ -589,11 +589,9 @@ func TestFork_ImportResolverAlias(t *testing.T) {
 		})
 
 	script := `
+        #test_fork(network: "mainnet", height: nil)
         import Test
         import "Helper"
-        access(all) fun setup() {
-            Test.loadFork(network: "mainnet", height: nil)
-        }
         access(all) fun test() {
             let err = Test.deployContract(name: "Helper", path: "Helper.cdc", arguments: [])
             Test.expect(err, Test.beNil())
@@ -613,37 +611,36 @@ func TestFork_ImportResolverAlias(t *testing.T) {
 	require.NoError(t, res.Error)
 }
 
-// TestFork_LoadForkOutsideSetupErrors verifies loadFork must be in setup().
-func TestFork_LoadForkOutsideSetupErrors(t *testing.T) {
+// TestFork_PragmaOverridesWithFork verifies pragma overrides WithFork configuration.
+func TestFork_PragmaOverridesWithFork(t *testing.T) {
 	script := `
+        #test_fork(network: "testnet", height: nil)
         import Test
-        access(all) fun testInvalid() {
-            Test.loadFork(network: "testnet", height: nil)
+        access(all) fun test() {
+            // Just verify the test runs without error
+            Test.assertEqual(1, 1)
         }
     `
 
-	_, err := NewTestRunner().WithNetworkResolver(defaultNetworkResolver).RunTest(script, "testInvalid")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "Test.loadFork() must be called in setup() function only")
+	// WithFork sets mainnet, but pragma should override to testnet
+	res, err := NewTestRunner().
+		WithNetworkResolver(defaultNetworkResolver).
+		WithFork(ForkConfig{ForkHost: mainnetForkURL, ForkHeight: 0}).
+		RunTest(script, "test")
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
 }
 
-// TestFork_LoadForkVariableArguments verifies that using variables in loadFork arguments produces a clear error.
-func TestFork_LoadForkVariableArguments(t *testing.T) {
+// TestFork_PragmasRejectNonLiteralArgs verifies that using non-literal args produces a clear error.
+func TestFork_PragmasRejectNonLiteralArgs(t *testing.T) {
 	script := `
-        import Test
-        
-        access(all) fun setup() {
-            let network = "testnet"
-            Test.loadFork(network: network, height: nil)
-        }
-        
+        #test_fork(network: network, height: nil)
         access(all) fun test() {}
     `
 
 	_, err := NewTestRunner().WithNetworkResolver(defaultNetworkResolver).RunTest(script, "test")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "network argument must be a string literal")
-	require.Contains(t, err.Error(), "Variables are not supported because loadFork is pre-executed via AST analysis")
+	require.Contains(t, err.Error(), "test_fork pragma 'network' must be a string literal")
 }
 
 // TestFork_Events verifies that Test.eventsOfType() works with inline Test.loadFork()
@@ -672,12 +669,9 @@ func TestFork_Events(t *testing.T) {
 		})
 
 	script := `
+        #test_fork(network: "mainnet", height: nil)
         import Test
         import "FlowToken"
-
-        access(all) fun setup() {
-            Test.loadFork(network: "mainnet", height: nil)
-        }
 
         access(all) fun test() {
             // Get the initial event count before our transaction

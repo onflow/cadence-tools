@@ -61,6 +61,8 @@ const beforeEachFunctionName = "beforeEach"
 
 const afterEachFunctionName = "afterEach"
 
+const forkPragmaName = "test_fork"
+
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
 var quotedLog = regexp.MustCompile("\"(.*)\"")
@@ -223,6 +225,79 @@ type ForkConfig struct {
 func (r *TestRunner) WithFork(cfg ForkConfig) *TestRunner {
 	r.forkConfig = &cfg
 	return r
+}
+
+// extractForkPragma inspects the AST for a top-level pragma of the form:
+//
+//	#test_fork(network: "mainnet", height: nil)
+//
+// Returns the network name and height if present; errors on duplicates or invalid args.
+func extractForkPragma(program *ast.Program) (network string, height *uint64, err error) {
+	pragmas := program.PragmaDeclarations()
+	if len(pragmas) == 0 {
+		return "", nil, nil
+	}
+
+	var foundPragma bool
+	for _, pragma := range pragmas {
+		invocation, ok := pragma.Expression.(*ast.InvocationExpression)
+		if !ok {
+			continue
+		}
+
+		ident, ok := invocation.InvokedExpression.(*ast.IdentifierExpression)
+		if !ok || ident.Identifier.Identifier != forkPragmaName {
+			continue
+		}
+
+		if foundPragma {
+			return "", nil, fmt.Errorf("multiple test_fork pragmas found; only one is allowed per file")
+		}
+		foundPragma = true
+
+		var (
+			networkFound bool
+			heightFound  bool
+		)
+
+		for _, arg := range invocation.Arguments {
+			label := arg.Label
+			switch label {
+			case "network":
+				networkFound = true
+				if strExpr, ok := arg.Expression.(*ast.StringExpression); ok {
+					network = strExpr.Value
+				} else {
+					return "", nil, fmt.Errorf("test_fork pragma 'network' must be a string literal")
+				}
+			case "height":
+				heightFound = true
+				if _, ok := arg.Expression.(*ast.NilExpression); ok {
+					// leave height nil
+				} else if intExpr, ok := arg.Expression.(*ast.IntegerExpression); ok {
+					val, parseErr := strconv.ParseUint(intExpr.Value.String(), 10, 64)
+					if parseErr != nil {
+						return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
+					}
+					h := val
+					height = &h
+				} else {
+					return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
+				}
+			default:
+				return "", nil, fmt.Errorf("unknown test_fork pragma argument %q", label)
+			}
+		}
+
+		if !networkFound || !heightFound {
+			return "", nil, fmt.Errorf("test_fork pragma requires both 'network' and 'height' arguments")
+		}
+		if network == "" {
+			return "", nil, fmt.Errorf("test_fork pragma 'network' cannot be empty")
+		}
+	}
+
+	return network, height, nil
 }
 
 // RunTest runs a single test in the provided test script.
@@ -441,14 +516,8 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	*interpreter.Interpreter,
 	error,
 ) {
-	// Parse AST for validation
 	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
 	if err != nil {
-		return nil, nil, err
-	}
-
-	// Validate: ensure loadFork is only called in setup() where it's pre-executed
-	if err := validateNoLoadForkOutsideSetup(astProgram); err != nil {
 		return nil, nil, err
 	}
 
@@ -500,6 +569,31 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	runtime.Context,
 	error,
 ) {
+	// Extract fork pragma and apply it (overrides any WithFork configuration)
+	network, height, err := extractForkPragma(astProgram)
+	if err != nil {
+		return nil, runtime.Context{}, err
+	}
+	if network != "" {
+		// Pragma found: resolve and override any existing fork config
+		if r.networkResolver == nil {
+			return nil, runtime.Context{}, fmt.Errorf("test_fork pragma requires a network resolver to be configured")
+		}
+		forkHost, ok := r.networkResolver(network)
+		if !ok {
+			return nil, runtime.Context{}, fmt.Errorf("network resolver could not resolve network %q", network)
+		}
+		forkHeight := uint64(0)
+		if height != nil {
+			forkHeight = *height
+		}
+		r.forkConfig = &ForkConfig{
+			ForkHost:   forkHost,
+			ForkHeight: forkHeight,
+		}
+		r.networkLabel = network
+	}
+
 	config := runtime.Config{
 		CoverageReport: r.coverageReport,
 	}
@@ -508,7 +602,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 
 	r.testRuntime = runtime.NewRuntime(config)
 
-	// Build backend options from static fork config (may have been set by dynamic extraction)
+	// Build backend options from fork config (set via WithFork or pragma)
 	backendOptions := &BackendOptions{
 		NetworkLabel:            r.networkLabel,
 		NetworkResolver:         r.networkResolver,
@@ -522,35 +616,6 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 
 	// Reuse existing framework/backend across test scripts to preserve fork state
 	if r.testFramework == nil {
-		// Extract dynamic fork from Test.loadFork() in setup() before creating backend
-		dynamicFork, err := extractTopLevelLoadFork(astProgram)
-		if err != nil {
-			return nil, runtime.Context{}, err
-		}
-
-		// If dynamic fork found, convert to static fork config
-		if dynamicFork != nil {
-			if r.networkResolver == nil {
-				return nil, runtime.Context{}, fmt.Errorf("Test.loadFork() requires a network resolver to be configured")
-			}
-			forkHost, ok := r.networkResolver(dynamicFork.Network)
-			if !ok {
-				return nil, runtime.Context{}, fmt.Errorf("network resolver could not resolve network %q", dynamicFork.Network)
-			}
-			forkHeight := uint64(0)
-			if dynamicFork.Height != nil {
-				forkHeight = *dynamicFork.Height
-			}
-			// Override with dynamic fork config
-			backendOptions = &BackendOptions{
-				ForkHost:                forkHost,
-				ForkHeight:              forkHeight,
-				NetworkLabel:            dynamicFork.Network,
-				NetworkResolver:         r.networkResolver,
-				ContractAddressResolver: r.contractAddressResolver,
-			}
-		}
-
 		r.testFramework = NewTestFrameworkProvider(
 			r.logger,
 			r.fileResolver,
@@ -603,8 +668,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 		nil,
 	)
 
-	err := setupEVMEnvironment(r.backend.chain, fvmEnv, env)
-	if err != nil {
+	if err = setupEVMEnvironment(r.backend.chain, fvmEnv, env); err != nil {
 		return nil, runtime.Context{}, err
 	}
 
@@ -901,167 +965,6 @@ func setupEVMEnvironment(
 		fvmEnv,
 		runtimeEnv,
 	)
-}
-
-// DynamicForkConfig represents a fork configuration extracted from Test.loadFork() in the test script.
-type DynamicForkConfig struct {
-	Network string
-	Height  *uint64
-}
-
-// extractTopLevelLoadFork walks the AST to find loadFork calls in the setup() function:
-//
-//	access(all) fun setup() {
-//	    Test.loadFork(network: "mainnet", height: nil)
-//	}
-//
-// Returns the fork config if found. The detected loadFork call is preprocessed before type-checking
-// to ensure the fork is loaded before imports are resolved (similar to jest.mock() preprocessing).
-func extractTopLevelLoadFork(program *ast.Program) (*DynamicForkConfig, error) {
-	// Find the setup() function
-	var setupFunc *ast.FunctionDeclaration
-	for _, funcDecl := range program.FunctionDeclarations() {
-		if funcDecl.Identifier.Identifier == "setup" {
-			setupFunc = funcDecl
-			break
-		}
-	}
-
-	if setupFunc == nil {
-		return nil, nil
-	}
-
-	// Find loadFork call within setup()
-	var foundInvocation *ast.InvocationExpression
-	ast.Inspect(setupFunc, func(element ast.Element) bool {
-		invocation, ok := element.(*ast.InvocationExpression)
-		if !ok {
-			return true
-		}
-
-		memberExpr, ok := invocation.InvokedExpression.(*ast.MemberExpression)
-		if !ok {
-			return true
-		}
-
-		identExpr, ok := memberExpr.Expression.(*ast.IdentifierExpression)
-		if !ok || identExpr.Identifier.Identifier != "Test" {
-			return true
-		}
-		if memberExpr.Identifier.Identifier != "loadFork" {
-			return true
-		}
-
-		foundInvocation = invocation
-		return false
-	})
-
-	if foundInvocation == nil {
-		return nil, nil
-	}
-
-	// Extract arguments: network (string) and height (optional uint or nil)
-	var network string
-	var heightPtr *uint64
-	var networkFound bool
-	var heightFound bool
-
-	for _, arg := range foundInvocation.Arguments {
-		switch arg.Label {
-		case "network":
-			networkFound = true
-			// Expect a string literal
-			if strExpr, ok := arg.Expression.(*ast.StringExpression); ok {
-				network = strExpr.Value
-			} else {
-				return nil, fmt.Errorf(
-					"Test.loadFork() network argument must be a string literal, got %T. "+
-						"Variables are not supported because loadFork is pre-executed via AST analysis",
-					arg.Expression,
-				)
-			}
-		case "height":
-			heightFound = true
-			// Can be nil or an integer literal
-			if _, ok := arg.Expression.(*ast.NilExpression); ok {
-				// heightPtr stays nil
-			} else if intExpr, ok := arg.Expression.(*ast.IntegerExpression); ok {
-				if val, err := strconv.ParseUint(intExpr.Value.String(), 10, 64); err == nil {
-					h := val
-					heightPtr = &h
-				} else {
-					return nil, fmt.Errorf("Test.loadFork() height argument is not a valid uint64: %w", err)
-				}
-			} else {
-				return nil, fmt.Errorf(
-					"Test.loadFork() height argument must be an integer literal or nil, got %T. "+
-						"Variables are not supported because loadFork is pre-executed via AST analysis",
-					arg.Expression,
-				)
-			}
-		}
-	}
-
-	if !networkFound || !heightFound {
-		return nil, fmt.Errorf(
-			"Test.loadFork() requires both 'network' and 'height' arguments",
-		)
-	}
-
-	if network == "" {
-		return nil, fmt.Errorf("Test.loadFork() network argument cannot be empty")
-	}
-
-	return &DynamicForkConfig{Network: network, Height: heightPtr}, nil
-}
-
-// validateNoLoadForkOutsideSetup ensures Test.loadFork() is only called in setup()
-// where it will be pre-executed. Calling it elsewhere (e.g., in test functions) will
-// cause import binding issues since imports are resolved before the test runs.
-func validateNoLoadForkOutsideSetup(program *ast.Program) error {
-	for _, funcDecl := range program.FunctionDeclarations() {
-		// Skip setup() - it's allowed
-		if funcDecl.Identifier.Identifier == "setup" {
-			continue
-		}
-
-		// Check all other functions for loadFork calls
-		var foundForbiddenCall *ast.InvocationExpression
-		ast.Inspect(funcDecl, func(element ast.Element) bool {
-			invocation, ok := element.(*ast.InvocationExpression)
-			if !ok {
-				return true
-			}
-
-			memberExpr, ok := invocation.InvokedExpression.(*ast.MemberExpression)
-			if !ok {
-				return true
-			}
-
-			identExpr, ok := memberExpr.Expression.(*ast.IdentifierExpression)
-			if !ok || identExpr.Identifier.Identifier != "Test" {
-				return true
-			}
-
-			if memberExpr.Identifier.Identifier == "loadFork" {
-				foundForbiddenCall = invocation
-				return false
-			}
-
-			return true
-		})
-
-		if foundForbiddenCall != nil {
-			return fmt.Errorf(
-				"Test.loadFork() must be called in setup() function only (found in %s). "+
-					"Calling loadFork outside setup() will not execute before type-checking, "+
-					"causing imports to resolve against the wrong network",
-				funcDecl.Identifier.Identifier,
-			)
-		}
-	}
-
-	return nil
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.
