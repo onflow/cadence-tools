@@ -400,18 +400,6 @@ func NewEmulatorBackend(
 // NetworkLabel returns the network identifier used for contract resolution
 func (e *EmulatorBackend) NetworkLabel() string { return e.networkLabel }
 
-// LoadFork is a noop when called at runtime from Cadence code.
-// Fork loading is configured before import resolution by the test runner,
-// based on a top-level pragma (e.g., `#test_fork(...)`), and passed to NewEmulatorBackend.
-// This ensures imports are resolved against the correct network context.
-//
-// This method exists to satisfy the stdlib.Blockchain interface, but does nothing when
-// invoked during test execution (after type-checking has already occurred).
-func (e *EmulatorBackend) LoadFork(network string, height *uint64) error {
-	// Noop - the real work happens before type-checking via pragma processing
-	return nil
-}
-
 // detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.
 func detectRemoteChainID(url string) (flow.ChainID, error) {
 	conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
