@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	flowaccess "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -223,12 +224,23 @@ func configureForkMode(
 		return nil, nil, fmt.Errorf("unexpected sqlite storage type")
 	}
 
-	// Create remote storage provider
+	// Create gRPC connection with retry policy for all remote requests
+	conn, err := newGRPCConnection(backendOptions.ForkHost)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create gRPC connection: %w", err)
+	}
+
+	// Create remote storage provider with custom clients
+	// This ensures all remote calls use consistent retry policy
 	provider, err := remote.New(
 		sqliteStore,
 		testLogger,
 		remote.WithForkHost(backendOptions.ForkHost),
 		remote.WithForkHeight(backendOptions.ForkHeight),
+		remote.WithClient(
+			executiondata.NewExecutionDataAPIClient(conn),
+			flowaccess.NewAccessAPIClient(conn),
+		),
 	)
 	if err != nil {
 		return nil, nil, err
@@ -361,9 +373,34 @@ func NewEmulatorBackend(
 	return emulatorBackend
 }
 
+// newGRPCConnection creates a gRPC connection with retry policy for handling transient failures.
+// This is used consistently across all remote Access node connections to ensure reliability.
+func newGRPCConnection(url string) (*grpc.ClientConn, error) {
+	// Retry policy matching flow-emulator's utils.DefaultGRPCServiceConfig
+	// Retries on transient network errors and rate limiting
+	retryPolicy := `{
+		"methodConfig": [{
+			"name": [{"service": ""}],
+			"retryPolicy": {
+				"maxAttempts": 5,
+				"initialBackoff": "0.1s",
+				"maxBackoff": "30s",
+				"backoffMultiplier": 2,
+				"retryableStatusCodes": ["UNAVAILABLE", "RESOURCE_EXHAUSTED", "UNKNOWN"]
+			}
+		}]
+	}`
+
+	return grpc.NewClient(url,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)),
+		grpc.WithDefaultServiceConfig(retryPolicy),
+	)
+}
+
 // detectRemoteChainID connects to a remote Access node and fetches network parameters to obtain the chain ID.
 func detectRemoteChainID(url string) (flow.ChainID, error) {
-	conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := newGRPCConnection(url)
 	if err != nil {
 		return "", err
 	}
@@ -371,7 +408,7 @@ func detectRemoteChainID(url string) (flow.ChainID, error) {
 
 	client := flowaccess.NewAccessAPIClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	resp, err := client.GetNetworkParameters(ctx, &flowaccess.GetNetworkParametersRequest{})
