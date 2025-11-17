@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/onflow/atree"
@@ -33,7 +34,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
-	"github.com/onflow/flow-emulator/emulator"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/model/flow"
@@ -60,6 +60,8 @@ const tearDownFunctionName = "tearDown"
 const beforeEachFunctionName = "beforeEach"
 
 const afterEachFunctionName = "afterEach"
+
+const forkPragmaName = "test_fork"
 
 var testScriptLocation = common.NewScriptLocation(nil, []byte("test"))
 
@@ -109,9 +111,14 @@ func (h *logCollectionHook) Run(e *zerolog.Event, level zerolog.Level, msg strin
 	}
 }
 
-// ImportResolver is used to resolve and get the source code for imports.
-// Must be provided by the user of the TestRunner.
-type ImportResolver func(location common.Location) (string, error)
+// ImportResolver resolves imports by providing source code for a given location.
+// The network parameter indicates the current network context ("emulator", "testnet", "mainnet", etc.).
+type ImportResolver func(network string, location common.Location) (code string, error error)
+
+// ContractAddressResolver resolves contract names to addresses based on the current network.
+// This is used during import rewriting to convert string imports like `import "Foo"`
+// into address imports like `import Foo from 0xADDRESS`.
+type ContractAddressResolver func(network string, contractName string) (address common.Address, error error)
 
 // FileResolver is used to resolve and get local files.
 // Returns the content of the file as a string.
@@ -128,6 +135,10 @@ type TestRunner struct {
 	// Users need to use configurations to set the import mapping for the testing code.
 	importResolver ImportResolver
 
+	// contractAddressResolver is used to resolve contract names to addresses based on network.
+	// This is called during import rewriting to convert string imports to address imports.
+	contractAddressResolver ContractAddressResolver
+
 	// fileResolver is used to resolve local files.
 	fileResolver FileResolver
 
@@ -138,11 +149,15 @@ type TestRunner struct {
 	// randomSeed is used for randomized test case execution.
 	randomSeed int64
 
-	contracts map[string]common.Address
-
 	testFramework stdlib.TestFramework
 
 	backend *EmulatorBackend
+
+	// networkLabel is the network identifier for contract address resolution (e.g., "mainnet", "testnet", "emulator")
+	networkLabel string
+
+	// networkResolver maps network labels to host:port addresses
+	networkResolver func(network string) (host string, found bool)
 
 	// fork configuration
 	forkConfig *ForkConfig
@@ -150,8 +165,7 @@ type TestRunner struct {
 
 func NewTestRunner() *TestRunner {
 	return &TestRunner{
-		logger:    zerolog.Nop(),
-		contracts: baseContracts(),
+		logger: zerolog.Nop(),
 	}
 }
 
@@ -180,19 +194,30 @@ func (r *TestRunner) WithRandomSeed(seed int64) *TestRunner {
 	return r
 }
 
-func (r *TestRunner) WithContracts(contracts map[string]common.Address) *TestRunner {
-	for contract, address := range contracts {
-		// We do not want to override the base configuration,
-		// which includes the mapping for system/common contracts.
-		r.contracts[contract] = address
-	}
+// WithContractAddressResolver sets a resolver to dynamically determine contract addresses
+// based on the current network. This is used during import rewriting.
+func (r *TestRunner) WithContractAddressResolver(resolver ContractAddressResolver) *TestRunner {
+	r.contractAddressResolver = resolver
+	return r
+}
+
+// WithNetworkLabel sets the network identifier used for contract address resolution.
+// Defaults to "emulator" if not set.
+func (r *TestRunner) WithNetworkLabel(label string) *TestRunner {
+	r.networkLabel = label
+	return r
+}
+
+// WithNetworkResolver sets a resolver for mapping network labels to host:port addresses.
+func (r *TestRunner) WithNetworkResolver(resolver func(network string) (host string, found bool)) *TestRunner {
+	r.networkResolver = resolver
 	return r
 }
 
 // ForkConfig configures a single forked environment for the entire test run.
 type ForkConfig struct {
-	ForkHost   string
-	ForkHeight uint64       // Block height to fork from (lastest sealed if empty)
+	ForkHost   string       // Access node host:port to fork from
+	ForkHeight uint64       // Block height to fork from (latest sealed if empty)
 	ChainID    flow.ChainID // Chain ID to use (optional, will auto-detect if empty)
 }
 
@@ -200,6 +225,75 @@ type ForkConfig struct {
 func (r *TestRunner) WithFork(cfg ForkConfig) *TestRunner {
 	r.forkConfig = &cfg
 	return r
+}
+
+// extractForkPragma inspects the AST for a top-level pragma of the form:
+//
+//	#test_fork(network: "mainnet", height: nil)
+//
+// Returns the network name and height if present; errors on duplicates or invalid args.
+func extractForkPragma(program *ast.Program) (network string, height *uint64, err error) {
+	pragmas := program.PragmaDeclarations()
+	if len(pragmas) == 0 {
+		return "", nil, nil
+	}
+
+	var foundPragma bool
+	for _, pragma := range pragmas {
+		invocation, ok := pragma.Expression.(*ast.InvocationExpression)
+		if !ok {
+			continue
+		}
+
+		ident, ok := invocation.InvokedExpression.(*ast.IdentifierExpression)
+		if !ok || ident.Identifier.Identifier != forkPragmaName {
+			continue
+		}
+
+		if foundPragma {
+			return "", nil, fmt.Errorf("multiple test_fork pragmas found; only one is allowed per file")
+		}
+		foundPragma = true
+
+		// Validate argument count
+		if len(invocation.Arguments) != 2 {
+			return "", nil, fmt.Errorf("test_fork pragma requires exactly 2 arguments (network, height), got %d", len(invocation.Arguments))
+		}
+
+		// Validate first argument is 'network'
+		firstArg := invocation.Arguments[0]
+		if firstArg.Label != "network" {
+			return "", nil, fmt.Errorf("test_fork pragma first argument must be 'network', got %q", firstArg.Label)
+		}
+		if strExpr, ok := firstArg.Expression.(*ast.StringExpression); ok {
+			network = strExpr.Value
+			if network == "" {
+				return "", nil, fmt.Errorf("test_fork pragma 'network' cannot be empty")
+			}
+		} else {
+			return "", nil, fmt.Errorf("test_fork pragma 'network' must be a string literal")
+		}
+
+		// Validate second argument is 'height'
+		secondArg := invocation.Arguments[1]
+		if secondArg.Label != "height" {
+			return "", nil, fmt.Errorf("test_fork pragma second argument must be 'height', got %q", secondArg.Label)
+		}
+		if _, ok := secondArg.Expression.(*ast.NilExpression); ok {
+			// leave height nil
+		} else if intExpr, ok := secondArg.Expression.(*ast.IntegerExpression); ok {
+			val, parseErr := strconv.ParseUint(intExpr.Value.String(), 10, 64)
+			if parseErr != nil {
+				return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
+			}
+			h := val
+			height = &h
+		} else {
+			return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
+		}
+	}
+
+	return network, height, nil
 }
 
 // RunTest runs a single test in the provided test script.
@@ -418,10 +512,13 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	*interpreter.Interpreter,
 	error,
 ) {
-	// TODO: move this eventually to the `NewTestRunner`
-	env, ctx := r.initializeEnvironment()
-
 	astProgram, err := parser.ParseProgram(nil, []byte(script), parser.Config{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO: move this eventually to the `NewTestRunner`
+	env, ctx, err := r.initializeEnvironment(astProgram)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -463,10 +560,37 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 	return program, inter, nil
 }
 
-func (r *TestRunner) initializeEnvironment() (
+func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	runtime.Environment,
 	runtime.Context,
+	error,
 ) {
+	// Extract fork pragma and apply it (overrides any WithFork configuration)
+	network, height, err := extractForkPragma(astProgram)
+	if err != nil {
+		return nil, runtime.Context{}, err
+	}
+	if network != "" {
+		// Pragma found: resolve and override any existing fork config
+		if r.networkResolver == nil {
+			return nil, runtime.Context{}, fmt.Errorf("test_fork pragma requires a network resolver to be configured")
+		}
+		forkHost, ok := r.networkResolver(network)
+		if !ok {
+			return nil, runtime.Context{}, fmt.Errorf("network resolver could not resolve network %q", network)
+		}
+		forkHeight := uint64(0)
+		if height != nil {
+			forkHeight = *height
+		}
+		r.forkConfig = &ForkConfig{
+			ForkHost:   forkHost,
+			ForkHeight: forkHeight,
+		}
+		r.networkLabel = network
+
+	}
+
 	config := runtime.Config{
 		CoverageReport: r.coverageReport,
 	}
@@ -475,28 +599,44 @@ func (r *TestRunner) initializeEnvironment() (
 
 	r.testRuntime = runtime.NewRuntime(config)
 
-	var backendOptions *BackendOptions
+	// Build backend options from fork config (set via WithFork or pragma)
+	backendOptions := &BackendOptions{
+		NetworkLabel:            r.networkLabel,
+		NetworkResolver:         r.networkResolver,
+		ContractAddressResolver: r.contractAddressResolver,
+	}
 	if r.forkConfig != nil {
-		backendOptions = &BackendOptions{
-			ForkHost:   r.forkConfig.ForkHost,
-			ForkHeight: r.forkConfig.ForkHeight,
-			ChainID:    r.forkConfig.ChainID,
-		}
+		backendOptions.ForkHost = r.forkConfig.ForkHost
+		backendOptions.ForkHeight = r.forkConfig.ForkHeight
+		backendOptions.ChainID = r.forkConfig.ChainID
 	}
 
-	r.testFramework = NewTestFrameworkProvider(
-		r.logger,
-		r.fileResolver,
-		env,
-		r.coverageReport,
-		backendOptions,
-	)
+	// Reuse existing framework/backend across test scripts to preserve fork state
+	// BUT if pragma changed the network, recreate to get correct chain and fork connection
+	if r.testFramework != nil && network != "" && r.backend != nil && r.backend.networkLabel != network {
+		// Network changed - recreate backend to connect to the new network's fork host
+		r.testFramework = nil
+		r.backend = nil
+	}
+
+	if r.testFramework == nil {
+		r.testFramework = NewTestFrameworkProvider(
+			r.logger,
+			r.fileResolver,
+			env,
+			r.coverageReport,
+			backendOptions,
+		)
+	}
 	backend, ok := r.testFramework.EmulatorBackend().(*EmulatorBackend)
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve EmulatorBackend"))
 	}
 	backend.fileResolver = r.fileResolver
-	backend.contracts = r.contracts
+	// Update resolver and network label in case they were set after initial backend creation
+	// Wrap user resolver with built-in contracts fallback
+	backend.contractAddressResolver = backend.wrapWithBuiltins(r.contractAddressResolver)
+	backend.networkLabel = r.networkLabel
 	r.backend = backend
 
 	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
@@ -534,12 +674,11 @@ func (r *TestRunner) initializeEnvironment() (
 		nil,
 	)
 
-	err := setupEVMEnvironment(r.backend.chain, fvmEnv, env)
-	if err != nil {
-		panic(err)
+	if err = setupEVMEnvironment(r.backend.chain, fvmEnv, env); err != nil {
+		return nil, runtime.Context{}, err
 	}
 
-	return env, ctx
+	return env, ctx, nil
 }
 
 func (r *TestRunner) checkerImportHandler(ctx runtime.Context) sema.ImportHandlerFunc {
@@ -737,7 +876,13 @@ func (r *TestRunner) parseAndCheckImport(
 		return nil, nil, ImportResolverNotProvidedError{}
 	}
 
-	code, err := r.importResolver(location)
+	// Resolve code using current network label (raw string passed by caller for fork) or default
+	network := defaultNetworkLabel
+	if r.backend.forkEnabled && r.backend.NetworkLabel() != "" {
+		network = r.backend.NetworkLabel()
+	}
+	code, err := r.importResolver(network, location)
+
 	if err != nil {
 		addressLocation, ok := location.(common.AddressLocation)
 		if ok {
@@ -755,7 +900,7 @@ func (r *TestRunner) parseAndCheckImport(
 		}
 	}
 
-	// Create a new (child) context, with new environment.
+	// Create a new (child) context, reuse the provided interface
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
@@ -826,27 +971,6 @@ func setupEVMEnvironment(
 		fvmEnv,
 		runtimeEnv,
 	)
-}
-
-func baseContracts() map[string]common.Address {
-	contracts := make(map[string]common.Address, 0)
-	ch := flow.MonotonicEmulator.Chain()
-	serviceAddress := common.Address(ch.ServiceAddress())
-	contracts["NonFungibleToken"] = serviceAddress
-	contracts["MetadataViews"] = serviceAddress
-	contracts["ViewResolver"] = serviceAddress
-	for _, addressLocation := range systemAddressLocationsForChain(ch) {
-		contract := addressLocation.Name
-		address := addressLocation.Address
-		contracts[contract] = address
-	}
-	for _, contractDescription := range emulator.NewCommonContracts(ch) {
-		contract := contractDescription.Name
-		address := common.Address(contractDescription.Address)
-		contracts[contract] = address
-	}
-
-	return contracts
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.

@@ -65,9 +65,15 @@ type BackendOptions struct {
 	ForkHost string
 	// ForkHeight indicates the block height to fork from (0 means latest sealed block).
 	ForkHeight uint64
+	// NetworkLabel is the network identifier used for resolving contract addresses (e.g., "mainnet", "testnet").
+	NetworkLabel string
 	// ChainID is the chain ID to use for the emulator. If empty, the emulator will use the default chain ID.
 	// For fork mode, the ChainID will use the ChainID of the forked network.
 	ChainID flow.ChainID
+	// NetworkResolver maps network labels to Access node host:port addresses (e.g., "mainnet" -> "access.mainnet.nodes.onflow.org:9000").
+	NetworkResolver func(network string) (host string, found bool)
+	// ContractAddressResolver resolves contract addresses based on network
+	ContractAddressResolver ContractAddressResolver
 }
 
 // The "\x00helper/" prefix is used in order to prevent
@@ -77,6 +83,9 @@ const helperFilePrefix = "\x00helper/"
 // The number of predefined accounts that are created
 // upon initialization of EmulatorBackend.
 const initialAccountsNumber = 20
+
+// The default network label used when no specific network is configured.
+const defaultNetworkLabel = "testing"
 
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
@@ -121,10 +130,6 @@ type EmulatorBackend struct {
 	// given a relative path.
 	fileResolver FileResolver
 
-	// contracts is a mapping of contract identifiers to their
-	// deployed account address.
-	contracts map[string]common.Address
-
 	// locationHandler is used for resolving locations
 	locationHandler sema.LocationHandlerFunc
 
@@ -133,6 +138,15 @@ type EmulatorBackend struct {
 
 	// fork configuration
 	forkEnabled bool
+
+	// networkLabel is the network identifier used for contract address resolution
+	networkLabel string
+
+	// contractAddressResolver resolves contract addresses dynamically based on network
+	contractAddressResolver ContractAddressResolver
+
+	// forkStartHeight is the block height when the fork was loaded (0 if not in fork mode)
+	forkStartHeight uint64
 }
 
 type keyInfo struct {
@@ -198,7 +212,10 @@ func systemAddressLocationsForChain(ch flow.Chain) []common.AddressLocation {
 
 	locations := make([]common.AddressLocation, 0)
 	for name, address := range contracts {
-		addr, _ := common.HexToAddress(address)
+		addr, err := common.HexToAddress(address)
+		if err != nil {
+			panic(fmt.Errorf("invalid address %q for contract %q: %w", address, name, err))
+		}
 		locations = append(locations, common.AddressLocation{
 			Address: addr,
 			Name:    name,
@@ -274,7 +291,16 @@ func NewEmulatorBackend(
 	coverageReport *runtime.CoverageReport,
 	backendOptions *BackendOptions,
 ) *EmulatorBackend {
-	logCollectionHook := newLogCollectionHook()
+	logHook := newLogCollectionHook()
+	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
+
+	// Extract network label and contract address resolver from options
+	var networkLabel string
+	var contractAddressResolver ContractAddressResolver
+	if backendOptions != nil {
+		networkLabel = backendOptions.NetworkLabel
+		contractAddressResolver = backendOptions.ContractAddressResolver
+	}
 
 	// Build emulator options
 	opts := make([]emulator.Option, 0)
@@ -282,8 +308,7 @@ func NewEmulatorBackend(
 		opts = append(opts, emulator.WithCoverageReport(coverageReport))
 	}
 
-	testLogger := logger.With().Timestamp().
-		Logger().Hook(logCollectionHook).Level(zerolog.InfoLevel)
+	testLogger := logger.With().Timestamp().Logger().Hook(logHook).Level(zerolog.InfoLevel)
 
 	opts = append(opts,
 		emulator.WithStorageLimitEnabled(false),
@@ -291,7 +316,6 @@ func NewEmulatorBackend(
 	)
 
 	// Configure fork mode or non-fork mode
-	forkEnabled := backendOptions != nil && backendOptions.ForkHost != ""
 	var selectedChain flow.Chain
 	if forkEnabled {
 		var forkOpts []emulator.Option
@@ -316,17 +340,18 @@ func NewEmulatorBackend(
 		excludeCommonLocationsForChain(coverageReport, selectedChain)
 	}
 
-	// Set chain ID after fork mode may have updated selectedChain
+	// Ensure emulator has correct chain ID
 	opts = append(opts, emulator.WithChainID(selectedChain.ChainID()))
 
+	// Create blockchain
 	blockchain := newBlockchain(opts...)
 
-	clock := newSystemClock()
-	blockchain.SetClock(clock)
+	// Wrap user contract resolver with built-in contracts fallback
+	contractAddressResolver = newContractResolverWithBuiltins(selectedChain, blockchain, contractAddressResolver)
 
+	// Build location handler for the selected chain
 	sc := systemcontracts.SystemContractsForChain(selectedChain.ChainID())
 	cryptoContractAddress := common.Address(sc.Crypto.Address)
-
 	locationHandler := func(
 		identifiers []ast.Identifier,
 		location common.Location,
@@ -341,34 +366,51 @@ func NewEmulatorBackend(
 		)
 	}
 
+	// Create backend struct
 	emulatorBackend := &EmulatorBackend{
-		blockchain:      blockchain,
-		blockOffset:     0,
-		accountKeys:     map[common.Address]map[string]keyInfo{},
-		stdlibHandler:   stdlibHandler,
-		logCollection:   logCollectionHook,
-		clock:           clock,
-		contracts:       map[string]common.Address{},
-		keys:            map[common.Address]*stdlib.PublicKey{},
-		locationHandler: locationHandler,
-		chain:           selectedChain,
-		forkEnabled:     forkEnabled,
+		blockchain:              nil,
+		blockOffset:             0,
+		accountKeys:             map[common.Address]map[string]keyInfo{},
+		stdlibHandler:           stdlibHandler,
+		logCollection:           logHook,
+		clock:                   newSystemClock(),
+		keys:                    map[common.Address]*stdlib.PublicKey{},
+		chain:                   nil,
+		forkEnabled:             false,
+		networkLabel:            networkLabel,
+		contractAddressResolver: contractAddressResolver,
 	}
 
-	// Initialize state depending on fork mode:
-	// - In fork mode, create an initial local block to establish a valid reference block ID in the remote store
-	// - In non-fork mode, bootstrap test accounts
+	// Configure blockchain and backend
+	blockchain.SetClock(emulatorBackend.clock)
+	emulatorBackend.blockchain = blockchain
+	emulatorBackend.locationHandler = locationHandler
+	emulatorBackend.chain = selectedChain
+	emulatorBackend.forkEnabled = forkEnabled
+
+	// Initialize state depending on fork mode
 	if forkEnabled {
-		_, _, err := blockchain.ExecuteAndCommitBlock()
-		if err != nil {
+		// Create the initial local block needed as a reference block for the forked blockchain.
+		if _, _, err := blockchain.ExecuteAndCommitBlock(); err != nil {
 			panic(fmt.Errorf("failed to commit initial block in fork mode: %w", err))
 		}
+
+		// Capture fork start height: the block before our first local block
+		latestBlock, err := blockchain.GetLatestBlock()
+		if err != nil {
+			panic(fmt.Errorf("failed to get latest block for fork start height: %w", err))
+		}
+		emulatorBackend.forkStartHeight = latestBlock.Height - 1
 	} else {
+		// Bootstrap test accounts in non-fork mode
 		emulatorBackend.bootstrapAccounts()
 	}
 
 	return emulatorBackend
 }
+
+// NetworkLabel returns the network identifier used for contract resolution
+func (e *EmulatorBackend) NetworkLabel() string { return e.networkLabel }
 
 // newGRPCConnection creates a gRPC connection with retry policy for all remote Access node calls.
 func newGRPCConnection(url string) (*grpc.ClientConn, error) {
@@ -719,10 +761,21 @@ func (e *EmulatorBackend) DeployContract(
 		hexEncodedCode,
 	)
 
-	address, ok := e.contracts[name]
-	if !ok {
-		return fmt.Errorf("could not find the address of contract: %s", name)
+	// Resolve contract address using the resolver
+	if e.contractAddressResolver == nil {
+		return fmt.Errorf("could not find the address of contract: %s (no resolver provided)", name)
 	}
+
+	network := defaultNetworkLabel
+	if e.networkLabel != "" {
+		network = e.networkLabel
+	}
+
+	address, err := e.contractAddressResolver(network, name)
+	if err != nil {
+		return fmt.Errorf("could not resolve address of contract %s: %w", name, err)
+	}
+
 	account, err := e.GetAccount(interpreter.AddressValue(address))
 	if err != nil {
 		return err
@@ -779,6 +832,7 @@ func (e *EmulatorBackend) Reset(height uint64) {
 
 // Events returns all the emitted events up until the latest block,
 // optionally filtered by event type.
+// In fork mode, events are bounded to [forkStartHeight + 1, latest] (local blocks only).
 func (e *EmulatorBackend) Events(
 	context stdlib.TestFrameworkEventsContext,
 	eventType interpreter.StaticType,
@@ -789,7 +843,14 @@ func (e *EmulatorBackend) Events(
 	}
 
 	latestBlockHeight := latestBlock.Height
-	height := uint64(0)
+
+	// In fork mode, only include local blocks by starting after the fork start height
+	// Outside fork mode, use existing (unbounded) behavior starting from 0
+	startHeight := uint64(0)
+	if e.forkEnabled {
+		startHeight = e.forkStartHeight + 1
+	}
+
 	values := make([]interpreter.Value, 0)
 
 	var eventTypeString string
@@ -802,7 +863,7 @@ func (e *EmulatorBackend) Events(
 		panic(errors.NewUnreachableError())
 	}
 
-	for height <= latestBlockHeight {
+	for height := startHeight; height <= latestBlockHeight; height++ {
 		events, err := e.blockchain.GetEventsByHeight(height, eventTypeString)
 		if err != nil {
 			panic(err)
@@ -827,7 +888,6 @@ func (e *EmulatorBackend) Events(
 			values = append(values, value)
 
 		}
-		height += 1
 	}
 
 	arrayType := interpreter.NewVariableSizedStaticType(
@@ -961,20 +1021,34 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 		location, ok := importDeclaration.Location.(common.StringLocation)
 		if !ok {
-			// keep the import statement it as-is
+			// keep the import statement as-is
 			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
 			continue
 		}
 
-		var address common.Address
-		var found bool
+		// Determine contract name to look up
+		var contractName string
 		if len(importDeclaration.Imports) > 0 {
-			address, found = e.contracts[importDeclaration.Imports[0].Identifier.Identifier]
+			contractName = importDeclaration.Imports[0].Identifier.Identifier
 		} else {
-			address, found = e.contracts[location.String()]
+			contractName = location.String()
 		}
-		if !found {
-			// keep import statement it as-is
+
+		// Resolve address using ContractAddressResolver
+		if e.contractAddressResolver == nil {
+			// No resolver provided, keep import statement as-is
+			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
+			continue
+		}
+
+		network := defaultNetworkLabel
+		if e.networkLabel != "" {
+			network = e.networkLabel
+		}
+
+		address, err := e.contractAddressResolver(network, contractName)
+		if err != nil {
+			// Cannot resolve, keep import statement as-is
 			sb.WriteString(code[prevImportDeclEnd:importDeclEnd])
 			continue
 		}
@@ -999,6 +1073,50 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 	return sb.String()
 }
 
+// wrapWithBuiltins wraps a user-provided resolver with fallback to built-in contracts.
+func (e *EmulatorBackend) wrapWithBuiltins(userResolver ContractAddressResolver) ContractAddressResolver {
+	return newContractResolverWithBuiltins(e.chain, e.blockchain, userResolver)
+}
+
+// newContractResolverWithBuiltins creates a contract resolver that tries a user-provided
+// resolver first, then falls back to built-in system and common contracts.
+func newContractResolverWithBuiltins(
+	chain flow.Chain,
+	blockchain *emulator.Blockchain,
+	userResolver ContractAddressResolver,
+) ContractAddressResolver {
+	// Build static map of built-in contracts (system + common)
+	builtinContracts := make(map[string]common.Address)
+
+	// Add system contracts
+	for _, location := range systemAddressLocationsForChain(chain) {
+		builtinContracts[location.Name] = location.Address
+	}
+
+	// Add common contracts from emulator
+	for _, contract := range emulator.NewCommonContracts(chain) {
+		address := common.Address(contract.Address)
+		builtinContracts[contract.Name] = address
+	}
+
+	return func(network string, contractName string) (common.Address, error) {
+		// First, try user-provided resolver if it exists
+		if userResolver != nil {
+			addr, err := userResolver(network, contractName)
+			if err == nil {
+				return addr, nil
+			}
+		}
+
+		// Fall back to built-in contracts
+		if addr, ok := builtinContracts[contractName]; ok {
+			return addr, nil
+		}
+
+		return common.Address{}, fmt.Errorf("contract %s not found", contractName)
+	}
+}
+
 // newBlockchain returns an emulator blockchain for testing.
 func newBlockchain(opts ...emulator.Option) *emulator.Blockchain {
 	b, err := emulator.New(opts...)
@@ -1016,7 +1134,7 @@ func excludeCommonLocationsForChain(coverageReport *runtime.CoverageReport, ch f
 		coverageReport.ExcludeLocation(location)
 	}
 	for _, contract := range emulator.NewCommonContracts(ch) {
-		address, _ := common.HexToAddress(contract.Address.String())
+		address := common.Address(contract.Address)
 		location := common.AddressLocation{
 			Address: address,
 			Name:    contract.Name,

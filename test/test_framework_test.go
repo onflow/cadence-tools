@@ -42,6 +42,24 @@ var firstAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 6}
 var secondAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 7}
 var thirdAccountAddress = common.Address{0, 0, 0, 0, 0, 0, 0, 8}
 
+// simpleImportResolver wraps a simple code-only resolver to work with the new ImportResolver signature.
+// Returns nil address since these tests don't need dynamic address resolution.
+func simpleImportResolver(codeResolver func(location common.Location) (string, error)) ImportResolver {
+	return func(_ string, location common.Location) (string, error) {
+		return codeResolver(location)
+	}
+}
+
+// contractsToResolver converts a static contract map to a ContractAddressResolver.
+func contractsToResolver(contracts map[string]common.Address) ContractAddressResolver {
+	return func(network string, contractName string) (common.Address, error) {
+		if addr, ok := contracts[contractName]; ok {
+			return addr, nil
+		}
+		return common.Address{}, fmt.Errorf("contract not found: %s", contractName)
+	}
+}
+
 func TestRunningMultipleTests(t *testing.T) {
 	t.Parallel()
 
@@ -366,9 +384,9 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -446,9 +464,9 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -471,7 +489,7 @@ func TestImportContract(t *testing.T) {
 			return "", errors.New("cannot import location")
 		}
 
-		runner := NewTestRunner().WithImportResolver(importResolver)
+		runner := NewTestRunner().WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) }))
 
 		_, err := runner.RunTest(code, "test")
 		require.Error(t, err)
@@ -631,8 +649,8 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
-			WithContracts(contracts).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+			WithContractAddressResolver(contractsToResolver(contracts)).
 			WithFileResolver(fileResolver)
 
 		result, err := runner.RunTest(code, "test")
@@ -869,8 +887,8 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
-			WithContracts(contracts).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+			WithContractAddressResolver(contractsToResolver(contracts)).
 			WithFileResolver(fileResolver)
 
 		result, err := runner.RunTest(code, "test")
@@ -932,8 +950,8 @@ func TestImportContract(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
-			WithContracts(contracts).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+			WithContractAddressResolver(contractsToResolver(contracts)).
 			WithFileResolver(fileResolver)
 
 		result, err := runner.RunTest(code, "test")
@@ -1023,8 +1041,8 @@ func TestImportCryptoContract(t *testing.T) {
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
-		WithContracts(contracts).
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(contracts)).
 		WithFileResolver(fileResolver)
 
 	result, err := runner.RunTest(code, "test")
@@ -1149,10 +1167,10 @@ func TestImportBuiltinContracts(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(map[string]common.Address{
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(map[string]common.Address{
 			"TestHandler": firstAccountAddress,
-		})
+		}))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -1273,9 +1291,9 @@ func TestUsingEnv(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -1383,7 +1401,7 @@ func TestCreateAccount(t *testing.T) {
 		return "", nil
 	}
 
-	runner := NewTestRunner().WithImportResolver(importResolver)
+	runner := NewTestRunner().WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) }))
 	result, err := runner.RunTest(code, "test")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
@@ -1416,7 +1434,7 @@ func TestGetAccount(t *testing.T) {
 		return "", nil
 	}
 
-	runner := NewTestRunner().WithImportResolver(importResolver)
+	runner := NewTestRunner().WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) }))
 	result, err := runner.RunTest(code, "testMissingAccount")
 	require.NoError(t, err)
 	require.ErrorContains(
@@ -2410,7 +2428,7 @@ func TestDeployingContracts(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
@@ -2488,7 +2506,7 @@ func TestDeployingContracts(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
@@ -2545,7 +2563,7 @@ func TestErrors(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
@@ -3370,7 +3388,7 @@ func TestReplacingImports(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -3447,7 +3465,7 @@ func TestReplacingImports(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -3531,7 +3549,7 @@ func TestReplacingImports(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -3610,7 +3628,7 @@ func TestReplacingImports(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -3627,11 +3645,11 @@ func TestReplaceImports(t *testing.T) {
 	t.Parallel()
 
 	emulatorBackend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
-	emulatorBackend.contracts = map[string]common.Address{
+	emulatorBackend.contractAddressResolver = contractsToResolver(map[string]common.Address{
 		"C1": {0, 0, 0, 0, 0, 0, 0, 1},
 		"C2": {0, 0, 0, 0, 0, 0, 0, 2},
 		"C3": {0, 0, 0, 0, 0, 0, 0, 1},
-	}
+	})
 
 	const code = `
         import C1 from "./sample/contract1.cdc"
@@ -4081,9 +4099,9 @@ func TestServiceAccount(t *testing.T) {
 		}
 
 		runner := NewTestRunner().
-			WithImportResolver(importResolver).
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 			WithFileResolver(fileResolver).
-			WithContracts(contracts)
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
@@ -4218,9 +4236,9 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 	})
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 		WithCoverageReport(coverageReport).
-		WithContracts(contracts)
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(code)
 
@@ -4467,7 +4485,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
 		WithCoverageReport(coverageReport).
-		WithContracts(contracts)
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -4661,9 +4679,9 @@ func TestRetrieveLogsFromUnitTests(t *testing.T) {
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 		WithFileResolver(fileResolver).
-		WithContracts(contracts)
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(code)
 	require.NoError(t, err)
@@ -4773,9 +4791,9 @@ func TestRetrieveEmptyLogsFromUnitTests(t *testing.T) {
 	}
 
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 		WithFileResolver(fileResolver).
-		WithContracts(contracts)
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(code)
 	require.NoError(t, err)
@@ -4915,7 +4933,7 @@ func TestRetrieveLogsFromIntegrationTests(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(contracts)
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5043,7 +5061,7 @@ func TestRetrieveEmptyLogsFromIntegrationTests(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(contracts)
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5224,8 +5242,8 @@ func TestGetEventsFromIntegrationTests(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(contracts)
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5306,8 +5324,8 @@ func TestImportingHelperFile(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(map[string]common.Address{"TestHandler": firstAccountAddress})
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(map[string]common.Address{"TestHandler": firstAccountAddress}))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5532,8 +5550,8 @@ func TestBlockchainMoveTime(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(contracts)
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5720,10 +5738,10 @@ func TestScheduledTransactions(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(map[string]common.Address{
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(map[string]common.Address{
 			"ScheduledHandler": firstAccountAddress,
-		})
+		}))
 
 	results, err := runner.RunTests(testCode)
 	require.NoError(t, err)
@@ -5844,8 +5862,8 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithImportResolver(importResolver).
-			WithContracts(contracts)
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		results, err := runner.RunTests(testCode)
 		require.NoError(t, err)
@@ -5972,8 +5990,8 @@ func TestReferenceDeployedContractTypes(t *testing.T) {
 
 		runner := NewTestRunner().
 			WithFileResolver(fileResolver).
-			WithImportResolver(importResolver).
-			WithContracts(contracts)
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+			WithContractAddressResolver(contractsToResolver(contracts))
 
 		results, err := runner.RunTests(testCode)
 		require.NoError(t, err)
@@ -6139,8 +6157,8 @@ func TestEnvironmentForUnitTests(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithImportResolver(importResolver).
-		WithContracts(contracts)
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(contracts))
 
 	results, err := runner.RunTests(code)
 
@@ -6201,7 +6219,7 @@ func TestEVMContract(t *testing.T) {
 	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
 	log := zerolog.New(output).With().Timestamp().Logger()
 	runner := NewTestRunner().
-		WithImportResolver(importResolver).
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
 		WithLogger(log)
 
 	results, err := runner.RunTests(testCode)

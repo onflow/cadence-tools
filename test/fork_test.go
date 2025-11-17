@@ -34,6 +34,22 @@ const (
 	testnetForkURL = "access.testnet.nodes.onflow.org:9000"
 )
 
+// defaultNetworkResolver provides network-to-host mappings for fork tests.
+func defaultNetworkResolver(network string) (string, bool) {
+	switch strings.ToLower(network) {
+	case "mainnet":
+		return mainnetForkURL, true
+	case "testnet":
+		return testnetForkURL, true
+	default:
+		// If it looks like a host:port, return it as-is
+		if strings.Contains(network, ":") {
+			return network, true
+		}
+		return "", false
+	}
+}
+
 // All tests in this file connect to live networks and run sequentially
 // to avoid overwhelming the remote Access nodes.
 //
@@ -68,8 +84,11 @@ func TestForkTestnet_FlowTokenSupply(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "FlowToken" {
+				return flowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
 		WithFork(ForkConfig{ForkHost: testnetForkURL, ChainID: flowmodel.Testnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -103,8 +122,11 @@ func TestForkMainnet_WriteAndReadState(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "FlowToken" {
+				return flowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -187,9 +209,15 @@ func TestForkMainnet_DeployAndCallContract(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
-			"Counter":   testAccount,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "Counter":
+				return testAccount, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -308,9 +336,15 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
-			"Counter":   testAccount,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "Counter":
+				return testAccount, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -367,9 +401,15 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 	currentContract = counterV2
 	runner2 := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken": flowTokenAddr,
-			"Counter":   testAccount,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "Counter":
+				return testAccount, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -451,9 +491,15 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
 
 	runner := NewTestRunner().
 		WithFileResolver(fileResolver).
-		WithContracts(map[string]common.Address{
-			"FlowToken":    flowTokenAddr,
-			"TestContract": arbitraryAddr,
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			switch name {
+			case "FlowToken":
+				return flowTokenAddr, nil
+			case "TestContract":
+				return arbitraryAddr, nil
+			default:
+				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+			}
 		}).
 		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
 
@@ -505,6 +551,217 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
         }
     `, "test")
 
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+// TestFork_ImportResolverAlias verifies that Test.executeScript returns types from the emulator
+// that match the test framework's types when using custom import resolution.
+func TestFork_ImportResolverAlias(t *testing.T) {
+	helperContract := `access(all) contract Helper {}`
+	helperAddr := common.MustBytesToAddress([]byte{0x16, 0x54, 0x65, 0x33, 0x99, 0x04, 0x0a, 0x61})
+
+	fileResolver := func(path string) (string, error) {
+		if path == "Helper.cdc" {
+			return helperContract, nil
+		}
+		return "", fmt.Errorf("unknown path: %s", path)
+	}
+
+	importResolver := func(network string, location common.Location) (string, error) {
+		if loc, ok := location.(common.AddressLocation); ok {
+			if loc.Name == "Helper" && loc.Address == helperAddr {
+				return helperContract, nil
+			}
+		}
+		return "", fmt.Errorf("unknown import: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(importResolver).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "Helper" {
+				return helperAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		})
+
+	script := `
+        #test_fork(network: "mainnet", height: nil)
+        import Test
+        import "Helper"
+        access(all) fun test() {
+            let err = Test.deployContract(name: "Helper", path: "Helper.cdc", arguments: [])
+            Test.expect(err, Test.beNil())
+            Test.commitBlock()
+            
+            let script = "import \"Helper\"\naccess(all) fun main(): Type { return Type<Helper>() }"
+            let result = Test.executeScript(script, [])
+            Test.expect(result, Test.beSucceeded())
+            
+            let emulatorType = result.returnValue! as! Type
+            Test.assertEqual(Type<Helper>(), emulatorType)
+        }
+    `
+
+	res, err := runner.RunTest(script, "test")
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+}
+
+// TestFork_PragmaOverridesWithFork verifies pragma overrides WithFork and WithNetworkLabel.
+func TestFork_PragmaOverridesWithFork(t *testing.T) {
+	testnetSC := systemcontracts.SystemContractsForChain(flowmodel.Testnet.Chain().ChainID())
+	testnetFlowTokenAddr := common.Address(testnetSC.FlowToken.Address)
+
+	var capturedNetwork string
+
+	script := `
+        #test_fork(network: "testnet", height: nil)
+        import Test
+        import "FlowToken"
+        
+        access(all) fun test() {
+            Test.assertEqual(1, 1)
+        }
+    `
+
+	// WithFork and WithNetworkLabel set mainnet, but pragma should override to testnet
+	res, err := NewTestRunner().
+		WithNetworkLabel("mainnet").
+		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(func(network string, location common.Location) (string, error) {
+			return "", fmt.Errorf("no import resolver for: %s", location.ID())
+		}).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			capturedNetwork = network
+			if name == "FlowToken" {
+				return testnetFlowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		}).
+		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: 0}).
+		RunTest(script, "test")
+
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+	require.Equal(t, "testnet", capturedNetwork, "pragma should override to testnet")
+}
+
+// TestFork_PragmaWithoutInitialConfig verifies pragma works standalone.
+func TestFork_PragmaWithoutInitialConfig(t *testing.T) {
+	mainnetSC := systemcontracts.SystemContractsForChain(flowmodel.Mainnet.Chain().ChainID())
+	mainnetFlowTokenAddr := common.Address(mainnetSC.FlowToken.Address)
+
+	var capturedNetwork string
+
+	script := `
+        #test_fork(network: "mainnet", height: nil)
+        import Test
+        import "FlowToken"
+        
+        access(all) fun test() {
+            Test.assertEqual(1, 1)
+        }
+    `
+
+	res, err := NewTestRunner().
+		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(func(network string, location common.Location) (string, error) {
+			return "", fmt.Errorf("no import resolver for: %s", location.ID())
+		}).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			capturedNetwork = network
+			if name == "FlowToken" {
+				return mainnetFlowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		}).
+		RunTest(script, "test")
+
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+	require.Equal(t, "mainnet", capturedNetwork, "pragma should set mainnet")
+}
+
+// TestFork_PragmasRejectNonLiteralArgs verifies that using non-literal args produces a clear error.
+func TestFork_PragmasRejectNonLiteralArgs(t *testing.T) {
+	script := `
+        #test_fork(network: network, height: nil)
+        access(all) fun test() {}
+    `
+
+	_, err := NewTestRunner().WithNetworkResolver(defaultNetworkResolver).RunTest(script, "test")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "test_fork pragma 'network' must be a string literal")
+}
+
+// TestFork_Events verifies that Test.eventsOfType() works with inline Test.loadFork()
+// without hanging or scanning remote blocks.
+func TestFork_Events(t *testing.T) {
+	sc := systemcontracts.SystemContractsForChain(flowmodel.Mainnet.Chain().ChainID())
+	flowTokenAddr := common.Address(sc.FlowToken.Address)
+	fungibleTokenAddr := common.Address(sc.FungibleToken.Address)
+
+	importResolver := func(network string, location common.Location) (string, error) {
+		// No custom imports needed - rely on fork mode's built-in resolution
+		return "", fmt.Errorf("cannot resolve import: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(importResolver).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			if name == "FlowToken" {
+				return flowTokenAddr, nil
+			}
+			if name == "FungibleToken" {
+				return fungibleTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		})
+
+	script := `
+        #test_fork(network: "mainnet", height: nil)
+        import Test
+        import "FlowToken"
+
+        access(all) fun test() {
+            // Get the initial event count before our transaction
+            let eventsBefore = Test.eventsOfType(Type<FlowToken.TokensWithdrawn>())
+            let countBefore = eventsBefore.length
+            
+            // Get a funded account that has a FlowToken vault
+            let acct = Test.getAccount(0x42a06f24a1049154)
+            
+            // Execute a transaction that withdraws tokens (definitely emits TokensWithdrawn)
+            let tx = Test.Transaction(
+                code: "import FlowToken from 0x1654653399040a61\nimport FungibleToken from 0xf233dcee88fe0abe\ntransaction { prepare(acct: auth(BorrowValue) &Account) { let vault = acct.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!; let withdrawn <- vault.withdraw(amount: 0.00000001); destroy withdrawn } }",
+                authorizers: [acct.address],
+                signers: [acct],
+                arguments: []
+            )
+            let res = Test.executeTransaction(tx)
+            Test.expect(res, Test.beSucceeded())
+            
+            // Fetch events after - should NOT hang and should only return local events
+            let eventsAfter = Test.eventsOfType(Type<FlowToken.TokensWithdrawn>())
+            let countAfter = eventsAfter.length
+            
+            // Verify that we got at least one new event from our transaction
+            log("Events before:")
+            log(countBefore)
+            log("Events after:")
+            log(countAfter)
+            
+            // Assert that our event shows up
+            Test.assert(countAfter > countBefore, message: "Expected new TokensWithdrawn event from withdraw")
+        }
+    `
+
+	result, err := runner.RunTest(script, "test")
 	require.NoError(t, err)
 	require.NoError(t, result.Error)
 }
