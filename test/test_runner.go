@@ -592,6 +592,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 			ForkHeight: forkHeight,
 		}
 		r.networkLabel = network
+
 	}
 
 	config := runtime.Config{
@@ -615,6 +616,13 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	}
 
 	// Reuse existing framework/backend across test scripts to preserve fork state
+	// BUT if pragma changed the network, recreate to get correct chain and fork connection
+	if r.testFramework != nil && network != "" && r.backend != nil && r.backend.networkLabel != network {
+		// Network changed - recreate backend to connect to the new network's fork host
+		r.testFramework = nil
+		r.backend = nil
+	}
+
 	if r.testFramework == nil {
 		r.testFramework = NewTestFrameworkProvider(
 			r.logger,

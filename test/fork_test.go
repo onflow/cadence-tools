@@ -611,24 +611,79 @@ func TestFork_ImportResolverAlias(t *testing.T) {
 	require.NoError(t, res.Error)
 }
 
-// TestFork_PragmaOverridesWithFork verifies pragma overrides WithFork configuration.
+// TestFork_PragmaOverridesWithFork verifies pragma overrides WithFork and WithNetworkLabel.
 func TestFork_PragmaOverridesWithFork(t *testing.T) {
+	testnetSC := systemcontracts.SystemContractsForChain(flowmodel.Testnet.Chain().ChainID())
+	testnetFlowTokenAddr := common.Address(testnetSC.FlowToken.Address)
+
+	var capturedNetwork string
+
 	script := `
         #test_fork(network: "testnet", height: nil)
         import Test
+        import "FlowToken"
+        
         access(all) fun test() {
-            // Just verify the test runs without error
             Test.assertEqual(1, 1)
         }
     `
 
-	// WithFork sets mainnet, but pragma should override to testnet
+	// WithFork and WithNetworkLabel set mainnet, but pragma should override to testnet
 	res, err := NewTestRunner().
+		WithNetworkLabel("mainnet").
 		WithNetworkResolver(defaultNetworkResolver).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ForkHeight: 0}).
+		WithImportResolver(func(network string, location common.Location) (string, error) {
+			return "", fmt.Errorf("no import resolver for: %s", location.ID())
+		}).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			capturedNetwork = network
+			if name == "FlowToken" {
+				return testnetFlowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		}).
+		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: 0}).
 		RunTest(script, "test")
+
 	require.NoError(t, err)
 	require.NoError(t, res.Error)
+	require.Equal(t, "testnet", capturedNetwork, "pragma should override to testnet")
+}
+
+// TestFork_PragmaWithoutInitialConfig verifies pragma works standalone.
+func TestFork_PragmaWithoutInitialConfig(t *testing.T) {
+	mainnetSC := systemcontracts.SystemContractsForChain(flowmodel.Mainnet.Chain().ChainID())
+	mainnetFlowTokenAddr := common.Address(mainnetSC.FlowToken.Address)
+
+	var capturedNetwork string
+
+	script := `
+        #test_fork(network: "mainnet", height: nil)
+        import Test
+        import "FlowToken"
+        
+        access(all) fun test() {
+            Test.assertEqual(1, 1)
+        }
+    `
+
+	res, err := NewTestRunner().
+		WithNetworkResolver(defaultNetworkResolver).
+		WithImportResolver(func(network string, location common.Location) (string, error) {
+			return "", fmt.Errorf("no import resolver for: %s", location.ID())
+		}).
+		WithContractAddressResolver(func(network string, name string) (common.Address, error) {
+			capturedNetwork = network
+			if name == "FlowToken" {
+				return mainnetFlowTokenAddr, nil
+			}
+			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
+		}).
+		RunTest(script, "test")
+
+	require.NoError(t, err)
+	require.NoError(t, res.Error)
+	require.Equal(t, "mainnet", capturedNetwork, "pragma should set mainnet")
 }
 
 // TestFork_PragmasRejectNonLiteralArgs verifies that using non-literal args produces a clear error.
