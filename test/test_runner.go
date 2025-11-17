@@ -255,45 +255,41 @@ func extractForkPragma(program *ast.Program) (network string, height *uint64, er
 		}
 		foundPragma = true
 
-		var (
-			networkFound bool
-			heightFound  bool
-		)
+		// Validate argument count
+		if len(invocation.Arguments) != 2 {
+			return "", nil, fmt.Errorf("test_fork pragma requires exactly 2 arguments (network, height), got %d", len(invocation.Arguments))
+		}
 
-		for _, arg := range invocation.Arguments {
-			label := arg.Label
-			switch label {
-			case "network":
-				networkFound = true
-				if strExpr, ok := arg.Expression.(*ast.StringExpression); ok {
-					network = strExpr.Value
-				} else {
-					return "", nil, fmt.Errorf("test_fork pragma 'network' must be a string literal")
-				}
-			case "height":
-				heightFound = true
-				if _, ok := arg.Expression.(*ast.NilExpression); ok {
-					// leave height nil
-				} else if intExpr, ok := arg.Expression.(*ast.IntegerExpression); ok {
-					val, parseErr := strconv.ParseUint(intExpr.Value.String(), 10, 64)
-					if parseErr != nil {
-						return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
-					}
-					h := val
-					height = &h
-				} else {
-					return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
-				}
-			default:
-				return "", nil, fmt.Errorf("unknown test_fork pragma argument %q", label)
+		// Validate first argument is 'network'
+		firstArg := invocation.Arguments[0]
+		if firstArg.Label != "network" {
+			return "", nil, fmt.Errorf("test_fork pragma first argument must be 'network', got %q", firstArg.Label)
+		}
+		if strExpr, ok := firstArg.Expression.(*ast.StringExpression); ok {
+			network = strExpr.Value
+			if network == "" {
+				return "", nil, fmt.Errorf("test_fork pragma 'network' cannot be empty")
 			}
+		} else {
+			return "", nil, fmt.Errorf("test_fork pragma 'network' must be a string literal")
 		}
 
-		if !networkFound || !heightFound {
-			return "", nil, fmt.Errorf("test_fork pragma requires both 'network' and 'height' arguments")
+		// Validate second argument is 'height'
+		secondArg := invocation.Arguments[1]
+		if secondArg.Label != "height" {
+			return "", nil, fmt.Errorf("test_fork pragma second argument must be 'height', got %q", secondArg.Label)
 		}
-		if network == "" {
-			return "", nil, fmt.Errorf("test_fork pragma 'network' cannot be empty")
+		if _, ok := secondArg.Expression.(*ast.NilExpression); ok {
+			// leave height nil
+		} else if intExpr, ok := secondArg.Expression.(*ast.IntegerExpression); ok {
+			val, parseErr := strconv.ParseUint(intExpr.Value.String(), 10, 64)
+			if parseErr != nil {
+				return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
+			}
+			h := val
+			height = &h
+		} else {
+			return "", nil, fmt.Errorf("test_fork pragma 'height' must be an integer literal or nil")
 		}
 	}
 

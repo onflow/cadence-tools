@@ -211,7 +211,10 @@ func systemAddressLocationsForChain(ch flow.Chain) []common.AddressLocation {
 
 	locations := make([]common.AddressLocation, 0)
 	for name, address := range contracts {
-		addr, _ := common.HexToAddress(address)
+		addr, err := common.HexToAddress(address)
+		if err != nil {
+			panic(fmt.Errorf("invalid address %q for contract %q: %w", address, name, err))
+		}
 		locations = append(locations, common.AddressLocation{
 			Address: addr,
 			Name:    name,
@@ -1060,7 +1063,7 @@ func newContractResolverWithBuiltins(
 
 	// Add common contracts from emulator
 	for _, contract := range emulator.NewCommonContracts(chain) {
-		address, _ := common.HexToAddress(contract.Address.String())
+		address := common.Address(contract.Address)
 		builtinContracts[contract.Name] = address
 	}
 
@@ -1099,7 +1102,7 @@ func excludeCommonLocationsForChain(coverageReport *runtime.CoverageReport, ch f
 		coverageReport.ExcludeLocation(location)
 	}
 	for _, contract := range emulator.NewCommonContracts(ch) {
-		address, _ := common.HexToAddress(contract.Address.String())
+		address := common.Address(contract.Address)
 		location := common.AddressLocation{
 			Address: address,
 			Name:    contract.Name,
