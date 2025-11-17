@@ -224,14 +224,11 @@ func configureForkMode(
 		return nil, nil, fmt.Errorf("unexpected sqlite storage type")
 	}
 
-	// Create gRPC connection with retry policy for all remote requests
 	conn, err := newGRPCConnection(backendOptions.ForkHost)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create gRPC connection: %w", err)
 	}
 
-	// Create remote storage provider with custom clients
-	// This ensures all remote calls use consistent retry policy
 	provider, err := remote.New(
 		sqliteStore,
 		testLogger,
@@ -373,17 +370,15 @@ func NewEmulatorBackend(
 	return emulatorBackend
 }
 
-// newGRPCConnection creates a gRPC connection with retry policy for handling transient failures.
-// This is used consistently across all remote Access node connections to ensure reliability.
+// newGRPCConnection creates a gRPC connection with retry policy for all remote Access node calls.
 func newGRPCConnection(url string) (*grpc.ClientConn, error) {
-	// Retry policy matching flow-emulator's utils.DefaultGRPCServiceConfig
-	// Retries on transient network errors and rate limiting
+	// Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s
 	retryPolicy := `{
 		"methodConfig": [{
 			"name": [{"service": ""}],
 			"retryPolicy": {
-				"maxAttempts": 5,
-				"initialBackoff": "0.1s",
+				"maxAttempts": 8,
+				"initialBackoff": "1s",
 				"maxBackoff": "30s",
 				"backoffMultiplier": 2,
 				"retryableStatusCodes": ["UNAVAILABLE", "RESOURCE_EXHAUSTED", "UNKNOWN"]
@@ -408,7 +403,7 @@ func detectRemoteChainID(url string) (flow.ChainID, error) {
 
 	client := flowaccess.NewAccessAPIClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	resp, err := client.GetNetworkParameters(ctx, &flowaccess.GetNetworkParametersRequest{})
