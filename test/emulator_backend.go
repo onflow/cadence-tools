@@ -414,10 +414,12 @@ func (e *EmulatorBackend) NetworkLabel() string { return e.networkLabel }
 
 // newGRPCConnection creates a gRPC connection with retry policy for all remote Access node calls.
 func newGRPCConnection(url string) (*grpc.ClientConn, error) {
-	// Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s
 	retryPolicy := `{
 		"methodConfig": [{
-			"name": [{"service": ""}],
+			"name": [
+				{"service": "flow.access.AccessAPI"},
+				{"service": "flow.executiondata.ExecutionDataAPI"}
+			],
 			"retryPolicy": {
 				"maxAttempts": 8,
 				"initialBackoff": "1s",
