@@ -6,7 +6,7 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.11.0
 	github.com/onflow/cadence v1.8.3
-	github.com/onflow/flow-emulator v1.12.3
+	github.com/onflow/flow-emulator v1.13.0
 	github.com/onflow/flow-go v0.44.0-experimental-cadence-v1.8.3.0.20251117184523-ab0655178589
 	github.com/onflow/flow-go-sdk v1.9.3
 	github.com/onflow/flow/protobuf/go/flow v0.4.18
