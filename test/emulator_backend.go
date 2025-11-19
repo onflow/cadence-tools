@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-emulator/storage/sqlite"
 	"github.com/onflow/flow-emulator/storage/util"
 	"github.com/onflow/flow-emulator/types"
+	"github.com/onflow/flow-emulator/utils"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkTest "github.com/onflow/flow-go-sdk/test"
@@ -412,26 +413,12 @@ func NewEmulatorBackend(
 // NetworkLabel returns the network identifier used for contract resolution
 func (e *EmulatorBackend) NetworkLabel() string { return e.networkLabel }
 
-// newGRPCConnection creates a gRPC connection with retry policy for all remote Access node calls.
+// newGRPCConnection creates a gRPC connection with retry interceptor for all remote Access node calls.
 func newGRPCConnection(url string) (*grpc.ClientConn, error) {
-	// Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s
-	retryPolicy := `{
-		"methodConfig": [{
-			"name": [{"service": ""}],
-			"retryPolicy": {
-				"maxAttempts": 8,
-				"initialBackoff": "1s",
-				"maxBackoff": "30s",
-				"backoffMultiplier": 2,
-				"retryableStatusCodes": ["UNAVAILABLE", "RESOURCE_EXHAUSTED", "UNKNOWN"]
-			}
-		}]
-	}`
-
 	return grpc.NewClient(url,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)),
-		grpc.WithDefaultServiceConfig(retryPolicy),
+		utils.DefaultGRPCRetryInterceptor(),
 	)
 }
 
