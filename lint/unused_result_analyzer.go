@@ -24,6 +24,19 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
+func reportUnusedResultType(ty sema.Type) bool {
+	switch ty {
+	case nil, sema.VoidType, sema.NeverType:
+		return false
+	}
+
+	if optionalType, ok := ty.(*sema.OptionalType); ok {
+		return reportUnusedResultType(optionalType.Type)
+	}
+
+	return true
+}
+
 var UnusedResultAnalyzer = (func() *analysis.Analyzer {
 
 	elementFilter := []ast.Element{
@@ -53,10 +66,7 @@ var UnusedResultAnalyzer = (func() *analysis.Analyzer {
 					}
 
 					ty := elaboration.ExpressionTypes(expressionStatement.Expression).ActualType
-					switch ty {
-					case nil, sema.VoidType, sema.NeverType:
-						// NO-OP
-					default:
+					if reportUnusedResultType(ty) {
 						report(
 							analysis.Diagnostic{
 								Location: location,
