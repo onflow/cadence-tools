@@ -1,0 +1,2 @@
+access(all)
+contract A {}

@@ -1,0 +1,32 @@
+{
+  "name": "@onflow/cadence-language-server",
+  "version": "1.7.2",
+  "description": "The Cadence Language Server",
+  "homepage": "https://github.com/onflow/cadence",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onflow/cadence.git"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && cd ../../languageserver && GOARCH=wasm GOOS=js go build -o ../npm-packages/cadence-language-server/dist/cadence-language-server.wasm -tags no_cgo ./cmd/languageserver && cd ../npm-packages/cadence-language-server",
+    "test": "jest"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/jest": "^26.0.24",
+    "@types/node": "^20.9.0",
+    "jest": "^29.7.0",
+    "node-fetch": "^2.6.1",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.2.2",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "dependencies": {
+    "vscode-jsonrpc": "^8.2.0"
+  }
+}

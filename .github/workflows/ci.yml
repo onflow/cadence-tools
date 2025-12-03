@@ -1,0 +1,239 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - 'feature/**'
+      - 'v**'
+  pull_request:
+    branches:
+      - master
+      - 'feature/**'
+      - 'v**'
+
+env:
+  GO_VERSION: '1.25'
+  GOLANGCI_LINT_VERSION: ' v2.4'
+
+jobs:
+  paths-filter:
+    runs-on: ubuntu-24.04
+    outputs:
+      test: ${{ steps.filter.outputs.test }}
+      lint: ${{ steps.filter.outputs.lint }}
+      languageserver: ${{ steps.filter.outputs.languageserver }}
+      docgen: ${{ steps.filter.outputs.docgen }}
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          test:
+            - 'test/**'
+          lint:
+            - 'lint/**'
+          languageserver:
+            - 'languageserver/**'
+          docgen:
+            - 'docgen/**'
+
+  test-test:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.test == 'true' }}
+    name: Test (Test Framework)
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    - uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Test
+      working-directory: test
+      run: make test
+    - name: Check tidy
+      working-directory: test
+      run: make check-tidy
+
+  lint-test:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.test == 'true' }}
+    name: Lint (Test Framework)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: test
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+
+  test-lint:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.lint == 'true' }}
+    name: Test (Lint)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test
+        working-directory: lint
+        run: make test
+      - name: Check tidy
+        working-directory: lint
+        run: make check-tidy
+
+  lint-lint:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.lint == 'true' }}
+    name: Lint (Lint)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: lint
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+
+  test-languageserver:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
+    name: Test (Language Server)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install wabt
+      - name: Install Flow CLI
+        run: sh -ci "$(curl -fsSL https://raw.githubusercontent.com/onflow/flow-cli/master/install.sh)"
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Build
+        working-directory: languageserver
+        run: make build
+      - name: Test
+        working-directory: languageserver
+        run: make test
+      - name: Check tidy
+        working-directory: languageserver
+        run: make check-tidy
+
+  lint-languageserver:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.languageserver == 'true' }}
+    name: Lint (Language Server)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: languageserver
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+
+  test-docgen:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
+    name: Test (Docgen)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install wabt
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test
+        working-directory: docgen
+        run: make test
+      - name: Check tidy
+        working-directory: docgen
+        run: make check-tidy
+
+  lint-docgen:
+    needs: paths-filter
+    if: ${{ needs.paths-filter.outputs.docgen == 'true' }}
+    name: Lint (Docgen)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          working-directory: docgen
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: -v --timeout=5m
+
+  check-license-headers:
+    name: Check license headers
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    - uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Check license headers
+      run: make check-headers
