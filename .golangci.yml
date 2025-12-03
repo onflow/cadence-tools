@@ -1,0 +1,28 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - copyloopvar
+    - errcheck
+    - forbidigo
+    - gocritic
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - singleCaseSwitch
+        - unslice
+        - commentFormatting
+        - exitAfterDefer
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
