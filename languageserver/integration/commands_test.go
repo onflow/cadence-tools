@@ -76,7 +76,7 @@ func Test_ExecuteScript(t *testing.T) {
 			{args: []json.RawMessage{[]byte("1"), []byte("2")}, err: "invalid URI argument: 1"},
 			{args: []json.RawMessage{locationURL, []byte("3")}, err: "invalid script arguments: 3"},
 			{args: []json.RawMessage{locationURL, invalidCadenceArg}, err: "invalid script arguments cadence encoding format: {foo}, error: invalid character 'f' looking for beginning of object key string"},
-			{args: []json.RawMessage{locationURL, invalidCadenceValue}, err: `invalid script arguments cadence encoding format: [{ "type": "Bool", "value": "we are the knights who say niii" }], error: failed to decode JSON-Cadence value: expected JSON bool, got we are the knights who say niii`},
+			{args: []json.RawMessage{locationURL, invalidCadenceValue}, err: `invalid script arguments cadence encoding format: [{ "type": "Bool", "value": "we are the knights who say niii" }], error: failed to decode JSON-Cadence value: expected JSON bool, got we are the knights who say niii (at .value)`},
 		})
 
 	t.Run("successful script execution with arguments", func(t *testing.T) {
