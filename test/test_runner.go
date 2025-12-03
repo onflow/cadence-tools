@@ -966,11 +966,12 @@ func setupEVMEnvironment(
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
 ) error {
-	return evm.SetupEnvironment(
+	evm.SetupEnvironment(
 		ch.ChainID(),
 		fvmEnv,
 		runtimeEnv,
 	)
+	return nil
 }
 
 // PrettyPrintResults is a utility function to pretty print the test results.
