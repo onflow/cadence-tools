@@ -32,6 +32,7 @@ const (
 	UnusedResultCategory    = "unused-result-hint"
 	DeprecatedCategory      = "deprecated"
 	CadenceV1Category       = "cadence-v1"
+	SecurityCategory        = "security"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
