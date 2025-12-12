@@ -21,6 +21,9 @@ package lint_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/sema"
+	. "github.com/onflow/cadence/test_utils/sema_utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence/ast"
@@ -229,6 +232,35 @@ func TestUnusedResultAnalyzer(t *testing.T) {
 					Message:  "unused result",
 				},
 			},
+			diagnostics,
+		)
+	})
+
+	t.Run("invalid type", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics, err := testAnalyzersWithCheckerError(t,
+			`
+              // NOTE: return type Bar is not declared
+              access(all) fun foo(): Bar {
+                  panic("not implemented")
+              }
+
+              access(all) fun test() {
+                  foo()
+              }
+            `,
+			lint.UnusedResultAnalyzer,
+		)
+
+		errs := RequireCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
 			diagnostics,
 		)
 	})

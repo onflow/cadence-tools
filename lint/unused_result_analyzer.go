@@ -26,7 +26,7 @@ import (
 
 func reportUnusedResultType(ty sema.Type) bool {
 	switch ty {
-	case nil, sema.VoidType, sema.NeverType:
+	case nil, sema.VoidType, sema.NeverType, sema.InvalidType:
 		return false
 	}
 
