@@ -71,13 +71,16 @@ func (d *diagnostic) WithSimpleReplacement(replacement string) *diagnostic {
 		Message: message,
 		TextEdits: []ast.TextEdit{
 			{
-				Range:       ast.NewRangeFromPositioned(nil, d.diagnostic.Range),
+				Range:       d.diagnostic.Range,
 				Replacement: replacement,
 			},
 		},
 	}
 
-	d.diagnostic.SuggestedFixes = append(d.diagnostic.SuggestedFixes, suggestedFix)
+	d.diagnostic.SuggestedFixes = append(
+		d.diagnostic.SuggestedFixes,
+		suggestedFix,
+	)
 	return d
 }
 
