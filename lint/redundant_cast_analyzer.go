@@ -282,10 +282,6 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 							EndPos:   castingExpression.TypeAnnotation.EndPosition(nil),
 						}
 
-						replacementStartOffset := castingExpression.Expression.StartPosition().Offset
-						replacementEndOffset := castingExpression.Expression.EndPosition(nil).Offset
-						replacement := string(program.Code[replacementStartOffset : replacementEndOffset+1])
-
 						report(
 							analysis.Diagnostic{
 								Location: location,
@@ -297,8 +293,8 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 										Message: "Remove redundant cast",
 										TextEdits: []analysis.TextEdit{
 											{
-												Range:       ast.NewRangeFromPositioned(nil, castingExpression),
-												Replacement: replacement,
+												Range:       diagnosticRange,
+												Replacement: "",
 											},
 										},
 									},

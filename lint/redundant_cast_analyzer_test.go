@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/tools/analysis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence-tools/lint"
@@ -37,14 +38,16 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 
 		t.Parallel()
 
+		const code = `
+          access(all) contract Test {
+              access(all) fun test() {
+                  let x = true as Bool
+              }
+          }
+        `
+
 		diagnostics := testAnalyzers(t,
-			`
-			access(all) contract Test {
-				access(all) fun test() {
-					let x = true as Bool
-				}
-			}
-			`,
+			code,
 			lint.RedundantCastAnalyzer,
 		)
 
@@ -53,8 +56,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 78, Line: 4, Column: 17},
-						EndPos:   ast.Position{Offset: 85, Line: 4, Column: 24},
+						StartPos: ast.Position{Offset: 108, Line: 4, Column: 30},
+						EndPos:   ast.Position{Offset: 115, Line: 4, Column: 37},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
@@ -64,10 +67,10 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 							Message: "Remove redundant cast",
 							TextEdits: []ast.TextEdit{
 								{
-									Replacement: "true",
+									Replacement: "",
 									Range: ast.Range{
-										StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
-										EndPos:   ast.Position{Offset: 85, Line: 4, Column: 24},
+										StartPos: ast.Position{Offset: 108, Line: 4, Column: 30},
+										EndPos:   ast.Position{Offset: 115, Line: 4, Column: 37},
 									},
 								},
 							},
@@ -77,6 +80,19 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			},
 			diagnostics,
 		)
+
+		const expectedFixedCode = `
+          access(all) contract Test {
+              access(all) fun test() {
+                  let x = true
+              }
+          }
+        `
+
+		assert.Equal(t,
+			expectedFixedCode,
+			diagnostics[0].SuggestedFixes[0].TextEdits[0].ApplyTo(code),
+		)
 	})
 
 	t.Run("always succeeding force", func(t *testing.T) {
@@ -85,12 +101,12 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			access(all) contract Test {
-				access(all) fun test() {
-					let x = true as! Bool
-				}
-			}
-			`,
+              access(all) contract Test {
+                  access(all) fun test() {
+                      let x = true as! Bool
+                  }
+              }
+            `,
 			lint.RedundantCastAnalyzer,
 		)
 
@@ -99,8 +115,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
-						EndPos:   ast.Position{Offset: 86, Line: 4, Column: 25},
+						StartPos: ast.Position{Offset: 116, Line: 4, Column: 30},
+						EndPos:   ast.Position{Offset: 128, Line: 4, Column: 42},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
@@ -117,12 +133,12 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-			access(all) contract Test {
-				access(all) fun test() {
-					let x = true as? Bool
-				}
-			}
-			`,
+              access(all) contract Test {
+                  access(all) fun test() {
+                      let x = true as? Bool
+                  }
+              }
+            `,
 			lint.RedundantCastAnalyzer,
 		)
 
@@ -131,8 +147,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
-						EndPos:   ast.Position{Offset: 86, Line: 4, Column: 25},
+						StartPos: ast.Position{Offset: 116, Line: 4, Column: 30},
+						EndPos:   ast.Position{Offset: 128, Line: 4, Column: 42},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
