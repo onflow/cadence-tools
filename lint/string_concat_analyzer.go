@@ -171,19 +171,6 @@ var StringConcatAnalyzer = (func() *analysis.Analyzer {
 						program.Code,
 					)
 
-					// Only suggest if there is at least one literal part
-					var hasLiteralPart bool
-					for _, part := range parts {
-						if part.isLiteral {
-							hasLiteralPart = true
-							break
-						}
-					}
-					if !hasLiteralPart {
-						// Ignore this expression, but continue traversal down the AST
-						return true
-					}
-
 					// Build the string template replacement
 					replacement := buildStringTemplateFromStringConcatParts(parts)
 

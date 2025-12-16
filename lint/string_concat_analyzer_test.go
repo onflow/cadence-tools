@@ -175,7 +175,31 @@ func TestStringConcatAnalyzer(t *testing.T) {
 
 		require.Equal(
 			t,
-			[]analysis.Diagnostic(nil),
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 102, Line: 4, Column: 25},
+						EndPos:   ast.Position{Offset: 112, Line: 4, Column: 35},
+					},
+					Location: testLocation,
+					Category: lint.ReplacementCategory,
+					Message:  "string concatenation can be replaced with string template",
+					SuggestedFixes: []analysis.SuggestedFix{
+						{
+							Message: "Replace with `\"\\(a)\\(b)\"`",
+							TextEdits: []analysis.TextEdit{
+								{
+									Range: ast.Range{
+										StartPos: ast.Position{Offset: 102, Line: 4, Column: 25},
+										EndPos:   ast.Position{Offset: 112, Line: 4, Column: 35},
+									},
+									Replacement: `"\(a)\(b)"`,
+								},
+							},
+						},
+					},
+				},
+			},
 			diagnostics,
 		)
 	})
