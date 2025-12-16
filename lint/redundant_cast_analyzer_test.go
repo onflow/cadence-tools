@@ -53,12 +53,12 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
-						StartPos: ast.Position{Offset: 82, Line: 4, Column: 21},
+						StartPos: ast.Position{Offset: 78, Line: 4, Column: 17},
 						EndPos:   ast.Position{Offset: 85, Line: 4, Column: 24},
 					},
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
-					Message:  "cast to `Bool` is redundant",
+					Message:  "static cast is redundant",
 					SuggestedFixes: []errors.SuggestedFix[ast.TextEdit]{
 						{
 							Message: "Remove redundant cast",
