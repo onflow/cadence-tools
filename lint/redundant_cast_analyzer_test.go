@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/errors"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
@@ -58,6 +59,20 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 					Location: testLocation,
 					Category: lint.UnnecessaryCastCategory,
 					Message:  "cast to `Bool` is redundant",
+					SuggestedFixes: []errors.SuggestedFix[ast.TextEdit]{
+						{
+							Message: "Remove redundant cast",
+							TextEdits: []ast.TextEdit{
+								{
+									Replacement: "true",
+									Range: ast.Range{
+										StartPos: ast.Position{Offset: 74, Line: 4, Column: 13},
+										EndPos:   ast.Position{Offset: 85, Line: 4, Column: 24},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			diagnostics,

@@ -277,12 +277,27 @@ var RedundantCastAnalyzer = (func() *analysis.Analyzer {
 						redundantType.TargetType,
 						redundantType.ExpectedType,
 					) {
+						replacementStartOffset := castingExpression.Expression.StartPosition().Offset
+						replacementEndOffset := castingExpression.Expression.EndPosition(nil).Offset
+						replacement := string(program.Code[replacementStartOffset : replacementEndOffset+1])
+
 						report(
 							analysis.Diagnostic{
 								Location: location,
 								Range:    ast.NewRangeFromPositioned(nil, castingExpression.TypeAnnotation),
 								Category: UnnecessaryCastCategory,
 								Message:  fmt.Sprintf("cast to `%s` is redundant", redundantType.TargetType),
+								SuggestedFixes: []analysis.SuggestedFix{
+									{
+										Message: "Remove redundant cast",
+										TextEdits: []analysis.TextEdit{
+											{
+												Range:       ast.NewRangeFromPositioned(nil, castingExpression),
+												Replacement: replacement,
+											},
+										},
+									},
+								},
 							},
 						)
 						return
