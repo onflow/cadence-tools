@@ -26,12 +26,13 @@ import (
 )
 
 const (
-	ReplacementCategory     = "replacement-hint"
-	RemovalCategory         = "removal-hint"
-	UnnecessaryCastCategory = "unnecessary-cast-hint"
-	UnusedResultCategory    = "unused-result-hint"
-	DeprecatedCategory      = "deprecated"
-	CadenceV1Category       = "cadence-v1"
+	ReplacementCategory               = "replacement-hint"
+	RemovalCategory                   = "removal-hint"
+	UnnecessaryCastCategory           = "unnecessary-cast-hint"
+	UnnecessaryTypeAnnotationCategory = "unnecessary-type-annotation-hint"
+	UnusedResultCategory              = "unused-result-hint"
+	DeprecatedCategory                = "deprecated"
+	CadenceV1Category                 = "cadence-v1"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
