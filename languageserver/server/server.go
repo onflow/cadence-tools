@@ -1216,24 +1216,39 @@ func (s *Server) CodeAction(
 				}
 
 			case *ast.FunctionDeclaration:
+				parameterList := element.ParameterList
 				if codeAction := maybeSplitLinesContainerElementsCodeAction(
 					uri,
 					document,
 					params.Range,
-					element.ParameterList,
-					element.ParameterList.Parameters,
+					parameterList,
+					parameterList.Parameters,
+					"parameters",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.SpecialFunctionDeclaration:
+				parameterList := element.FunctionDeclaration.ParameterList
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					parameterList,
+					parameterList.Parameters,
 					"parameters",
 				); codeAction != nil {
 					codeActions = append(codeActions, codeAction)
 				}
 
 			case *ast.FunctionExpression:
+				parameterList := element.ParameterList
 				if codeAction := maybeSplitLinesContainerElementsCodeAction(
 					uri,
 					document,
 					params.Range,
-					element.ParameterList,
-					element.ParameterList.Parameters,
+					parameterList,
+					parameterList.Parameters,
 					"parameters",
 				); codeAction != nil {
 					codeActions = append(codeActions, codeAction)
