@@ -1179,6 +1179,42 @@ func (s *Server) CodeAction(
 					codeActions = append(codeActions, codeAction)
 				}
 
+			case *ast.ArrayExpression:
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element,
+					element.Values,
+					"elements",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.DictionaryExpression:
+				// TODO: pass element.Entries directly once ast.DictionaryEntry implements ast.HasPosition
+				var entryPositions []ast.HasPosition
+				for _, entry := range element.Entries {
+					entryPositions = append(
+						entryPositions,
+						ast.NewUnmeteredRange(
+							entry.Key.StartPosition(),
+							entry.Value.EndPosition(nil),
+						),
+					)
+				}
+
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element,
+					entryPositions,
+					"entries",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
 			case *ast.FunctionDeclaration:
 				if codeAction := maybeSplitLinesContainerElementsCodeAction(
 					uri,
