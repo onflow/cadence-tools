@@ -1168,11 +1168,37 @@ func (s *Server) CodeAction(
 		ast.Inspect(checker.Program, func(element ast.Element) bool {
 			switch element := element.(type) {
 			case *ast.InvocationExpression:
-				if codeAction := s.maybeSplitLinesInvocationArgumentsCodeAction(
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
 					uri,
 					document,
 					params.Range,
 					element,
+					element.Arguments,
+					"arguments",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.FunctionDeclaration:
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element.ParameterList,
+					element.ParameterList.Parameters,
+					"parameters",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.FunctionExpression:
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element.ParameterList,
+					element.ParameterList.Parameters,
+					"parameters",
 				); codeAction != nil {
 					codeActions = append(codeActions, codeAction)
 				}
@@ -1185,73 +1211,76 @@ func (s *Server) CodeAction(
 	return
 }
 
-func (s *Server) maybeSplitLinesInvocationArgumentsCodeAction(
+func maybeSplitLinesContainerElementsCodeAction[E ast.HasPosition](
 	uri protocol.DocumentURI,
 	document Document,
 	requestedRange protocol.Range,
-	invocation *ast.InvocationExpression,
+	container ast.HasPosition,
+	elements []E,
+	pluralElementDescription string,
 ) *protocol.CodeAction {
-	arguments := invocation.Arguments
-	argumentCount := len(arguments)
+	elementCount := len(elements)
 
-	if argumentCount < 2 {
+	if elementCount < 2 {
 		return nil
 	}
 
-	firstArgument := arguments[0]
-	lastArgument := arguments[argumentCount-1]
+	firstElement := elements[0]
+	lastElement := elements[elementCount-1]
 
-	firstArgumentStartPos := arguments[0].StartPosition()
-	lastArgumentEndPos := lastArgument.EndPosition(nil)
+	firstElementStartPos := firstElement.StartPosition()
+	lastElementEndPos := lastElement.EndPosition(nil)
 
-	lastArgumentEndProtocolPosition := conversion.ASTToProtocolPosition(
-		lastArgumentEndPos.Shifted(nil, 1),
+	lastElementEndProtocolPos := conversion.ASTToProtocolPosition(
+		lastElementEndPos.Shifted(nil, 1),
 	)
 
-	if conversion.ASTToProtocolPosition(firstArgumentStartPos).Compare(requestedRange.Start) > 0 ||
-		lastArgumentEndProtocolPosition.Compare(requestedRange.End) < 0 {
+	if conversion.ASTToProtocolPosition(firstElementStartPos).Compare(requestedRange.Start) > 0 ||
+		lastElementEndProtocolPos.Compare(requestedRange.End) < 0 {
 
 		return nil
 	}
 
-	indentation := extractIndentation(document.Text, invocation.StartPosition())
-	argumentIndentation := indentation + strings.Repeat(" ", indentationCount)
+	containerStartPos := container.StartPosition()
+
+	indentation := extractIndentation(document.Text, containerStartPos)
+	elementIndentation := indentation + strings.Repeat(" ", indentationCount)
 
 	var textEdits []protocol.TextEdit
 
-	// Insert a newline before the first argument if the argument is not already on a new line
+	// Insert a newline before the first element if the element is not already on a new line
 
-	if firstArgument.StartPosition().Line == invocation.StartPosition().Line {
+	if firstElementStartPos.Line == containerStartPos.Line {
 
-		firstArgumentStartPosition := conversion.ASTToProtocolPosition(firstArgument.StartPosition())
+		firstElementStartElementPos := conversion.ASTToProtocolPosition(firstElementStartPos)
 
 		textEdits = append(
 			textEdits,
 			protocol.TextEdit{
 				Range: protocol.Range{
-					Start: firstArgumentStartPosition,
-					End:   firstArgumentStartPosition,
+					Start: firstElementStartElementPos,
+					End:   firstElementStartElementPos,
 				},
-				NewText: "\n" + argumentIndentation,
+				NewText: "\n" + elementIndentation,
 			},
 		)
 
 	}
 
-	// Insert a newline before each argument that is on the same line as the previous argument
+	// Insert a newline before each element that is on the same line as the previous element
 
-	for i := 1; i < len(arguments); i++ {
-		argument := arguments[i]
-		previousArgument := arguments[i-1]
+	for i := 1; i < len(elements); i++ {
+		currentElement := elements[i]
+		previousElement := elements[i-1]
 
-		startPosition := argument.StartPosition()
-		previousEndPosition := previousArgument.EndPosition(nil)
+		currentStartPosition := currentElement.StartPosition()
+		previousEndPosition := previousElement.EndPosition(nil)
 
-		if startPosition.Line != previousEndPosition.Line {
+		if currentStartPosition.Line != previousEndPosition.Line {
 			continue
 		}
 
-		newlinePosition := conversion.ASTToProtocolPosition(startPosition)
+		newlinePosition := conversion.ASTToProtocolPosition(currentStartPosition)
 
 		textEdits = append(textEdits,
 			protocol.TextEdit{
@@ -1259,20 +1288,20 @@ func (s *Server) maybeSplitLinesInvocationArgumentsCodeAction(
 					Start: newlinePosition,
 					End:   newlinePosition,
 				},
-				NewText: "\n" + argumentIndentation,
+				NewText: "\n" + elementIndentation,
 			},
 		)
 	}
 
-	// Insert a newline after the last argument if it's not already on a new line
+	// Insert a newline after the last element if it's not already on a new line
 
-	if lastArgumentEndPos.Line == invocation.EndPosition(nil).Line {
+	if lastElementEndPos.Line == container.EndPosition(nil).Line {
 
 		textEdits = append(textEdits,
 			protocol.TextEdit{
 				Range: protocol.Range{
-					Start: lastArgumentEndProtocolPosition,
-					End:   lastArgumentEndProtocolPosition,
+					Start: lastElementEndProtocolPos,
+					End:   lastElementEndProtocolPos,
 				},
 				NewText: "\n" + indentation,
 			},
@@ -1284,7 +1313,7 @@ func (s *Server) maybeSplitLinesInvocationArgumentsCodeAction(
 	}
 
 	return &protocol.CodeAction{
-		Title: "Split arguments onto separate lines",
+		Title: fmt.Sprintf("Split %s onto separate lines", pluralElementDescription),
 		Kind:  protocol.RefactorRewrite,
 		Edit: &protocol.WorkspaceEdit{
 			Changes: map[protocol.DocumentURI][]protocol.TextEdit{
