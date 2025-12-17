@@ -1945,6 +1945,8 @@ func (s *Server) InlayHint(
 
 	var variableDeclarations []*ast.VariableDeclaration
 
+	// Find all variable declarations without type annotations within the requested range
+
 	ast.Inspect(checker.Program, func(element ast.Element) bool {
 
 		variableDeclaration, ok := element.(*ast.VariableDeclaration)
@@ -1952,25 +1954,30 @@ func (s *Server) InlayHint(
 			return true
 		}
 
-		variableDeclarations = append(variableDeclarations, variableDeclaration)
+		declRange := conversion.ASTToProtocolRange(
+			variableDeclaration.StartPos,
+			variableDeclaration.EndPosition(nil),
+		)
+
+		if params.Range.Overlaps(declRange) {
+			variableDeclarations = append(
+				variableDeclarations,
+				variableDeclaration,
+			)
+		}
 
 		return true
 	})
 
+	// For each variable declaration, get its inferred type and create an inlay hint
+
 	for _, variableDeclaration := range variableDeclarations {
 		targetType := checker.Elaboration.VariableDeclarationTypes(variableDeclaration).TargetType
-		if targetType == nil { // bugfix getting nil target
-			continue // todo this should never occur
-		}
-
-		if targetType.IsInvalidType() {
+		if targetType == nil || targetType.IsInvalidType() {
 			continue
 		}
 
-		typeAnnotation := sema.TypeAnnotation{
-			Type:       targetType,
-			IsResource: targetType.IsResourceType(),
-		}
+		typeAnnotation := sema.NewTypeAnnotation(targetType)
 		typeAnnotationString := fmt.Sprintf(": %s", typeAnnotation.QualifiedString())
 
 		identifierEndPosition := variableDeclaration.Identifier.EndPosition(nil)
