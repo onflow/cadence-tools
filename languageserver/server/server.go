@@ -1133,11 +1133,14 @@ func (s *Server) CodeAction(
 	codeActions = []*protocol.CodeAction{}
 
 	uri := params.TextDocument.URI
+
 	checker := s.checkerForDocument(uri)
 	if checker == nil {
 		// Can we ensure this doesn't happen?
 		return
 	}
+
+	document := s.documents[uri]
 
 	codeActionsResolvers := s.codeActionsResolvers[uri]
 
@@ -1159,7 +1162,136 @@ func (s *Server) CodeAction(
 		}
 	}
 
+	triggerKind := params.Context.TriggerKind
+	if triggerKind != nil && *triggerKind == protocol.CodeActionInvoked {
+
+		ast.Inspect(checker.Program, func(element ast.Element) bool {
+			switch element := element.(type) {
+			case *ast.InvocationExpression:
+				if codeAction := s.maybeSplitLinesInvocationArgumentsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element,
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+			}
+
+			return true
+		})
+	}
+
 	return
+}
+
+func (s *Server) maybeSplitLinesInvocationArgumentsCodeAction(
+	uri protocol.DocumentURI,
+	document Document,
+	requestedRange protocol.Range,
+	invocation *ast.InvocationExpression,
+) *protocol.CodeAction {
+	arguments := invocation.Arguments
+	argumentCount := len(arguments)
+
+	if argumentCount < 2 {
+		return nil
+	}
+
+	firstArgument := arguments[0]
+	lastArgument := arguments[argumentCount-1]
+
+	firstArgumentStartPos := arguments[0].StartPosition()
+	lastArgumentEndPos := lastArgument.EndPosition(nil)
+
+	lastArgumentEndProtocolPosition := conversion.ASTToProtocolPosition(
+		lastArgumentEndPos.Shifted(nil, 1),
+	)
+
+	if conversion.ASTToProtocolPosition(firstArgumentStartPos).Compare(requestedRange.Start) > 0 ||
+		lastArgumentEndProtocolPosition.Compare(requestedRange.End) < 0 {
+
+		return nil
+	}
+
+	indentation := extractIndentation(document.Text, invocation.StartPosition())
+	argumentIndentation := indentation + strings.Repeat(" ", indentationCount)
+
+	var textEdits []protocol.TextEdit
+
+	// Insert a newline before the first argument if the argument is not already on a new line
+
+	if firstArgument.StartPosition().Line == invocation.StartPosition().Line {
+
+		firstArgumentStartPosition := conversion.ASTToProtocolPosition(firstArgument.StartPosition())
+
+		textEdits = append(
+			textEdits,
+			protocol.TextEdit{
+				Range: protocol.Range{
+					Start: firstArgumentStartPosition,
+					End:   firstArgumentStartPosition,
+				},
+				NewText: "\n" + argumentIndentation,
+			},
+		)
+
+	}
+
+	// Insert a newline before each argument that is on the same line as the previous argument
+
+	for i := 1; i < len(arguments); i++ {
+		argument := arguments[i]
+		previousArgument := arguments[i-1]
+
+		startPosition := argument.StartPosition()
+		previousEndPosition := previousArgument.EndPosition(nil)
+
+		if startPosition.Line != previousEndPosition.Line {
+			continue
+		}
+
+		newlinePosition := conversion.ASTToProtocolPosition(startPosition)
+
+		textEdits = append(textEdits,
+			protocol.TextEdit{
+				Range: protocol.Range{
+					Start: newlinePosition,
+					End:   newlinePosition,
+				},
+				NewText: "\n" + argumentIndentation,
+			},
+		)
+	}
+
+	// Insert a newline after the last argument if it's not already on a new line
+
+	if lastArgumentEndPos.Line == invocation.EndPosition(nil).Line {
+
+		textEdits = append(textEdits,
+			protocol.TextEdit{
+				Range: protocol.Range{
+					Start: lastArgumentEndProtocolPosition,
+					End:   lastArgumentEndProtocolPosition,
+				},
+				NewText: "\n" + indentation,
+			},
+		)
+	}
+
+	if len(textEdits) == 0 {
+		return nil
+	}
+
+	return &protocol.CodeAction{
+		Title: "Split arguments onto separate lines",
+		Kind:  protocol.RefactorRewrite,
+		Edit: &protocol.WorkspaceEdit{
+			Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+				uri: textEdits,
+			},
+		},
+	}
 }
 
 // CodeLens is called every time the document contents change and returns a
