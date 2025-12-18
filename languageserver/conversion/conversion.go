@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
-// ASTToProtocolPosition converts an AST position to a LSP position
+// ASTToProtocolPosition converts an AST position to an LSP position
 func ASTToProtocolPosition(pos ast.Position) protocol.Position {
 	return protocol.Position{
 		Line:      uint32(pos.Line - 1),
@@ -35,7 +35,7 @@ func ASTToProtocolPosition(pos ast.Position) protocol.Position {
 	}
 }
 
-// ASTToProtocolRange converts an AST range to a LSP range
+// ASTToProtocolRange converts an AST range to an LSP range
 func ASTToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	return protocol.Range{
 		Start: ASTToProtocolPosition(startPos),
@@ -43,7 +43,7 @@ func ASTToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	}
 }
 
-// ProtocolToSemaPosition converts a LSP position to a sema position
+// ProtocolToSemaPosition converts an LSP position to a sema position
 func ProtocolToSemaPosition(pos protocol.Position) sema.Position {
 	return sema.Position{
 		Line:   int(pos.Line + 1),
