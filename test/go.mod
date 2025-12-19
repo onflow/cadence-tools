@@ -5,10 +5,10 @@ go 1.25.0
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.12.0
-	github.com/onflow/cadence v1.8.7
-	github.com/onflow/flow-emulator v1.13.2
-	github.com/onflow/flow-go v0.45.0-experimental-cadence-v1.8.7-vm-test.1
-	github.com/onflow/flow-go-sdk v1.9.6
+	github.com/onflow/cadence v1.9.2
+	github.com/onflow/flow-emulator v1.15.0
+	github.com/onflow/flow-go v0.45.0-experimental-cadence-v1.8.7.0.20251219170433-76749cca9738
+	github.com/onflow/flow-go-sdk v1.9.8
 	github.com/onflow/flow/protobuf/go/flow v0.4.18
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
@@ -204,12 +204,12 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/term v0.37.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	golang.org/x/time v0.12.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251124214823-79d6a2a48846 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
