@@ -3675,29 +3675,31 @@ func convertDiagnostic(
 
 	switch linterDiagnostic.Category {
 	case linter.ReplacementCategory:
-		message = fmt.Sprintf(
-			"%s `%s`",
-			linterDiagnostic.Message,
-			linterDiagnostic.SecondaryMessage,
-		)
-		codeActionsResolver = func() []*protocol.CodeAction {
-			return []*protocol.CodeAction{
-				{
-					Title:       message,
-					Kind:        protocol.QuickFix,
-					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-					Edit: &protocol.WorkspaceEdit{
-						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-							uri: {
-								{
-									Range:   protocolRange,
-									NewText: linterDiagnostic.SecondaryMessage,
+		if len(linterDiagnostic.SuggestedFixes) == 0 {
+			message = fmt.Sprintf(
+				"%s `%s`",
+				linterDiagnostic.Message,
+				linterDiagnostic.SecondaryMessage,
+			)
+			codeActionsResolver = func() []*protocol.CodeAction {
+				return []*protocol.CodeAction{
+					{
+						Title:       message,
+						Kind:        protocol.QuickFix,
+						Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+						Edit: &protocol.WorkspaceEdit{
+							Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+								uri: {
+									{
+										Range:   protocolRange,
+										NewText: linterDiagnostic.SecondaryMessage,
+									},
 								},
 							},
 						},
+						IsPreferred: true,
 					},
-					IsPreferred: true,
-				},
+				}
 			}
 		}
 
