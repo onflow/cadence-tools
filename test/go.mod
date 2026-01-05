@@ -6,8 +6,8 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.12.0
 	github.com/onflow/cadence v1.9.2
-	github.com/onflow/flow-emulator v1.15.0
-	github.com/onflow/flow-go v0.45.0-experimental-cadence-v1.8.7.0.20251219170433-76749cca9738
+	github.com/onflow/flow-emulator v1.15.1
+	github.com/onflow/flow-go v0.44.17
 	github.com/onflow/flow-go-sdk v1.9.8
 	github.com/onflow/flow/protobuf/go/flow v0.4.18
 	github.com/rs/zerolog v1.34.0
@@ -168,7 +168,7 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
-	github.com/spf13/cobra v1.10.1 // indirect
+	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
@@ -218,5 +218,5 @@ require (
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.40.1 // indirect
+	modernc.org/sqlite v1.41.0 // indirect
 )
