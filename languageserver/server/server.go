@@ -1133,11 +1133,14 @@ func (s *Server) CodeAction(
 	codeActions = []*protocol.CodeAction{}
 
 	uri := params.TextDocument.URI
+
 	checker := s.checkerForDocument(uri)
 	if checker == nil {
 		// Can we ensure this doesn't happen?
 		return
 	}
+
+	document := s.documents[uri]
 
 	codeActionsResolvers := s.codeActionsResolvers[uri]
 
@@ -1159,7 +1162,216 @@ func (s *Server) CodeAction(
 		}
 	}
 
+	triggerKind := params.Context.TriggerKind
+	if triggerKind != nil && *triggerKind == protocol.CodeActionInvoked {
+
+		ast.Inspect(checker.Program, func(element ast.Element) bool {
+			switch element := element.(type) {
+			case *ast.InvocationExpression:
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element,
+					element.Arguments,
+					"arguments",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.ArrayExpression:
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element,
+					element.Values,
+					"elements",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.DictionaryExpression:
+				// TODO: pass element.Entries directly once ast.DictionaryEntry implements ast.HasPosition
+				var entryPositions []ast.HasPosition
+				for _, entry := range element.Entries {
+					entryPositions = append(
+						entryPositions,
+						ast.NewUnmeteredRange(
+							entry.Key.StartPosition(),
+							entry.Value.EndPosition(nil),
+						),
+					)
+				}
+
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					element,
+					entryPositions,
+					"entries",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.FunctionDeclaration:
+				parameterList := element.ParameterList
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					parameterList,
+					parameterList.Parameters,
+					"parameters",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.SpecialFunctionDeclaration:
+				parameterList := element.FunctionDeclaration.ParameterList
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					parameterList,
+					parameterList.Parameters,
+					"parameters",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+
+			case *ast.FunctionExpression:
+				parameterList := element.ParameterList
+				if codeAction := maybeSplitLinesContainerElementsCodeAction(
+					uri,
+					document,
+					params.Range,
+					parameterList,
+					parameterList.Parameters,
+					"parameters",
+				); codeAction != nil {
+					codeActions = append(codeActions, codeAction)
+				}
+			}
+
+			return true
+		})
+	}
+
 	return
+}
+
+func maybeSplitLinesContainerElementsCodeAction[E ast.HasPosition](
+	uri protocol.DocumentURI,
+	document Document,
+	requestedRange protocol.Range,
+	container ast.HasPosition,
+	elements []E,
+	pluralElementDescription string,
+) *protocol.CodeAction {
+	elementCount := len(elements)
+
+	if elementCount < 2 {
+		return nil
+	}
+
+	firstElement := elements[0]
+	lastElement := elements[elementCount-1]
+
+	firstElementStartPos := firstElement.StartPosition()
+	lastElementEndPos := lastElement.EndPosition(nil)
+
+	lastElementEndProtocolPos := conversion.ASTToProtocolPosition(
+		lastElementEndPos.Shifted(nil, 1),
+	)
+
+	if conversion.ASTToProtocolPosition(firstElementStartPos).Compare(requestedRange.Start) > 0 ||
+		lastElementEndProtocolPos.Compare(requestedRange.End) < 0 {
+
+		return nil
+	}
+
+	containerStartPos := container.StartPosition()
+
+	indentation := extractIndentation(document.Text, containerStartPos)
+	elementIndentation := indentation + strings.Repeat(" ", indentationCount)
+
+	var textEdits []protocol.TextEdit
+
+	// Insert a newline before the first element if the element is not already on a new line
+
+	if firstElementStartPos.Line == containerStartPos.Line {
+
+		firstElementStartElementPos := conversion.ASTToProtocolPosition(firstElementStartPos)
+
+		textEdits = append(
+			textEdits,
+			protocol.TextEdit{
+				Range: protocol.Range{
+					Start: firstElementStartElementPos,
+					End:   firstElementStartElementPos,
+				},
+				NewText: "\n" + elementIndentation,
+			},
+		)
+
+	}
+
+	// Insert a newline before each element that is on the same line as the previous element
+
+	for i := 1; i < len(elements); i++ {
+		currentElement := elements[i]
+		previousElement := elements[i-1]
+
+		currentStartPosition := currentElement.StartPosition()
+		previousEndPosition := previousElement.EndPosition(nil)
+
+		if currentStartPosition.Line != previousEndPosition.Line {
+			continue
+		}
+
+		newlinePosition := conversion.ASTToProtocolPosition(currentStartPosition)
+
+		textEdits = append(textEdits,
+			protocol.TextEdit{
+				Range: protocol.Range{
+					Start: newlinePosition,
+					End:   newlinePosition,
+				},
+				NewText: "\n" + elementIndentation,
+			},
+		)
+	}
+
+	// Insert a newline after the last element if it's not already on a new line
+
+	if lastElementEndPos.Line == container.EndPosition(nil).Line {
+
+		textEdits = append(textEdits,
+			protocol.TextEdit{
+				Range: protocol.Range{
+					Start: lastElementEndProtocolPos,
+					End:   lastElementEndProtocolPos,
+				},
+				NewText: "\n" + indentation,
+			},
+		)
+	}
+
+	if len(textEdits) == 0 {
+		return nil
+	}
+
+	return &protocol.CodeAction{
+		Title: fmt.Sprintf("Split %s onto separate lines", pluralElementDescription),
+		Kind:  protocol.RefactorRewrite,
+		Edit: &protocol.WorkspaceEdit{
+			Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+				uri: textEdits,
+			},
+		},
+	}
 }
 
 // CodeLens is called every time the document contents change and returns a
@@ -1945,6 +2157,8 @@ func (s *Server) InlayHint(
 
 	var variableDeclarations []*ast.VariableDeclaration
 
+	// Find all variable declarations without type annotations within the requested range
+
 	ast.Inspect(checker.Program, func(element ast.Element) bool {
 
 		variableDeclaration, ok := element.(*ast.VariableDeclaration)
@@ -1952,25 +2166,30 @@ func (s *Server) InlayHint(
 			return true
 		}
 
-		variableDeclarations = append(variableDeclarations, variableDeclaration)
+		declRange := conversion.ASTToProtocolRange(
+			variableDeclaration.StartPos,
+			variableDeclaration.EndPosition(nil),
+		)
+
+		if params.Range.Overlaps(declRange) {
+			variableDeclarations = append(
+				variableDeclarations,
+				variableDeclaration,
+			)
+		}
 
 		return true
 	})
 
+	// For each variable declaration, get its inferred type and create an inlay hint
+
 	for _, variableDeclaration := range variableDeclarations {
 		targetType := checker.Elaboration.VariableDeclarationTypes(variableDeclaration).TargetType
-		if targetType == nil { // bugfix getting nil target
-			continue // todo this should never occur
-		}
-
-		if targetType.IsInvalidType() {
+		if targetType == nil || targetType.IsInvalidType() {
 			continue
 		}
 
-		typeAnnotation := sema.TypeAnnotation{
-			Type:       targetType,
-			IsResource: targetType.IsResourceType(),
-		}
+		typeAnnotation := sema.NewTypeAnnotation(targetType)
 		typeAnnotationString := fmt.Sprintf(": %s", typeAnnotation.QualifiedString())
 
 		identifierEndPosition := variableDeclaration.Identifier.EndPosition(nil)
@@ -3456,29 +3675,31 @@ func convertDiagnostic(
 
 	switch linterDiagnostic.Category {
 	case linter.ReplacementCategory:
-		message = fmt.Sprintf(
-			"%s `%s`",
-			linterDiagnostic.Message,
-			linterDiagnostic.SecondaryMessage,
-		)
-		codeActionsResolver = func() []*protocol.CodeAction {
-			return []*protocol.CodeAction{
-				{
-					Title:       message,
-					Kind:        protocol.QuickFix,
-					Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
-					Edit: &protocol.WorkspaceEdit{
-						Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-							uri: {
-								{
-									Range:   protocolRange,
-									NewText: linterDiagnostic.SecondaryMessage,
+		if len(linterDiagnostic.SuggestedFixes) == 0 {
+			message = fmt.Sprintf(
+				"%s `%s`",
+				linterDiagnostic.Message,
+				linterDiagnostic.SecondaryMessage,
+			)
+			codeActionsResolver = func() []*protocol.CodeAction {
+				return []*protocol.CodeAction{
+					{
+						Title:       message,
+						Kind:        protocol.QuickFix,
+						Diagnostics: []protocol.Diagnostic{protocolDiagnostic},
+						Edit: &protocol.WorkspaceEdit{
+							Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+								uri: {
+									{
+										Range:   protocolRange,
+										NewText: linterDiagnostic.SecondaryMessage,
+									},
 								},
 							},
 						},
+						IsPreferred: true,
 					},
-					IsPreferred: true,
-				},
+				}
 			}
 		}
 
