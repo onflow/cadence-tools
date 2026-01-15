@@ -80,6 +80,53 @@ func TestRedundantTypeAnnotationAnalyzer(t *testing.T) {
 		)
 	})
 
+	t.Run("redundant", func(t *testing.T) {
+
+		t.Parallel()
+
+		const code = `access(all) let x: Int = 1`
+
+		diagnostics := testAnalyzers(t,
+			code,
+			lint.RedundantTypeAnnotationAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 17, Line: 1, Column: 17},
+						EndPos:   ast.Position{Offset: 21, Line: 1, Column: 21},
+					},
+					Location: testLocation,
+					Category: lint.UnnecessaryTypeAnnotationCategory,
+					Message:  "type annotation is redundant, type can be inferred",
+					SuggestedFixes: []analysis.SuggestedFix{
+						{
+							Message: "Remove redundant type annotation",
+							TextEdits: []analysis.TextEdit{
+								{
+									Range: ast.Range{
+										StartPos: ast.Position{Offset: 17, Line: 1, Column: 17},
+										EndPos:   ast.Position{Offset: 21, Line: 1, Column: 21},
+									},
+									Replacement: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
+
+		assert.Equal(t,
+			`access(all) let x = 1`,
+			diagnostics[0].SuggestedFixes[0].TextEdits[0].ApplyTo(code),
+		)
+	})
+
 	t.Run("not redundant", func(t *testing.T) {
 
 		t.Parallel()
@@ -87,6 +134,24 @@ func TestRedundantTypeAnnotationAnalyzer(t *testing.T) {
 		diagnostics := testAnalyzers(t,
 			`
 			  access(all) let x: Bool? = true
+			`,
+			lint.RedundantTypeAnnotationAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("not redundant", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+			  access(all) let x: UInt64 = 1
 			`,
 			lint.RedundantTypeAnnotationAnalyzer,
 		)

@@ -58,40 +58,43 @@ var RedundantTypeAnnotationAnalyzer = (func() *analysis.Analyzer {
 					}
 
 					variableDeclarationTypes := elaboration.VariableDeclarationTypes(variableDeclaration)
-					valueType := variableDeclarationTypes.ValueType
-					targetType := variableDeclarationTypes.TargetType
 
-					if valueType == nil ||
-						targetType == nil ||
-						!targetType.Equal(valueType) {
+					if variableDeclarationTypes.ValueActualType != nil && isRedundantCast(
+						variableDeclaration.Value,
+						variableDeclarationTypes.ValueActualType,
+						variableDeclarationTypes.TargetType,
+						// There is never "another" expected type without the type annotation
+						// of the variable declaration.
+						// In a casting expression, the expected type passed here is not the target type of the cast,
+						// but it is the expected type of the casting expression itself (if any).
+						nil,
+					) {
 
-						return
-					}
+						typeAnnotationRangeIncludingColon := ast.Range{
+							StartPos: variableDeclaration.Identifier.EndPosition(nil).Shifted(nil, 1),
+							EndPos:   typeAnnotation.EndPosition(nil),
+						}
 
-					typeAnnotationRangeIncludingColon := ast.Range{
-						StartPos: variableDeclaration.Identifier.EndPosition(nil).Shifted(nil, 1),
-						EndPos:   typeAnnotation.EndPosition(nil),
-					}
-
-					report(
-						analysis.Diagnostic{
-							Location: location,
-							Range:    typeAnnotationRangeIncludingColon,
-							Category: UnnecessaryTypeAnnotationCategory,
-							Message:  "type annotation is redundant, type can be inferred",
-							SuggestedFixes: []errors.SuggestedFix[ast.TextEdit]{
-								{
-									Message: "Remove redundant type annotation",
-									TextEdits: []ast.TextEdit{
-										{
-											Replacement: "",
-											Range:       typeAnnotationRangeIncludingColon,
+						report(
+							analysis.Diagnostic{
+								Location: location,
+								Range:    typeAnnotationRangeIncludingColon,
+								Category: UnnecessaryTypeAnnotationCategory,
+								Message:  "type annotation is redundant, type can be inferred",
+								SuggestedFixes: []errors.SuggestedFix[ast.TextEdit]{
+									{
+										Message: "Remove redundant type annotation",
+										TextEdits: []ast.TextEdit{
+											{
+												Replacement: "",
+												Range:       typeAnnotationRangeIncludingColon,
+											},
 										},
 									},
 								},
 							},
-						},
-					)
+						)
+					}
 				},
 			)
 

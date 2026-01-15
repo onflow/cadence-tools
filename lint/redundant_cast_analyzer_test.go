@@ -95,6 +95,54 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 		)
 	})
 
+	t.Run("not redundant", func(t *testing.T) {
+
+		t.Parallel()
+
+		const code = `
+          access(all) contract Test {
+              access(all) fun test() {
+                  let x = true as Bool?
+              }
+          }
+        `
+
+		diagnostics := testAnalyzers(t,
+			code,
+			lint.RedundantCastAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("not redundant", func(t *testing.T) {
+
+		t.Parallel()
+
+		const code = `
+          access(all) contract Test {
+              access(all) fun test() {
+                  let x = 1 as UInt64
+              }
+          }
+        `
+
+		diagnostics := testAnalyzers(t,
+			code,
+			lint.RedundantCastAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
 	t.Run("always succeeding force", func(t *testing.T) {
 
 		t.Parallel()
