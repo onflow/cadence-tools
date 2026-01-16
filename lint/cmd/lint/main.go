@@ -40,6 +40,8 @@ var transactionFlag = flag.String("transaction", "", "analyze transaction with g
 var loadOnlyFlag = flag.Bool("load-only", false, "only load (parse and check) programs")
 var silentFlag = flag.Bool("silent", false, "only show parsing/checking success/failure")
 var colorFlag = flag.Bool("color", true, "format using colors")
+var cyclomaticThresholdFlag = flag.Int("cyclo-threshold", 10, "minimum cyclomatic complexity to report (0 = report all)")
+var cyclomaticCountLogicalFlag = flag.Bool("cyclo-count-logical", true, "count && and || as complexity points")
 var analyzersFlag stringSliceFlag
 var pluginsFlag stringSliceFlag
 
@@ -75,6 +77,15 @@ func main() {
 	}
 
 	flag.Parse()
+
+	// Register cyclomatic complexity analyzer with command-line flag values
+	lint.RegisterAnalyzer(
+		"cyclomatic-complexity",
+		lint.NewCyclomaticComplexityAnalyzer(
+			*cyclomaticThresholdFlag,
+			*cyclomaticCountLogicalFlag,
+		),
+	)
 
 	loadPlugins()
 
