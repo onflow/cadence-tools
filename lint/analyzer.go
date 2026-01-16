@@ -34,6 +34,7 @@ const (
 	DeprecatedCategory                = "deprecated"
 	CadenceV1Category                 = "cadence-v1"
 	SecurityCategory                  = "security"
+	ComplexityCategory                = "complexity"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
