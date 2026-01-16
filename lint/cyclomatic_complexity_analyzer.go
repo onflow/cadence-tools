@@ -172,6 +172,7 @@ func (c complexityCalculator) statementComplexity(statement ast.Statement) int {
 
 	case *ast.VariableDeclaration:
 		complexity += c.countExpressionComplexity(stmt.Value)
+		complexity += c.countExpressionComplexity(stmt.SecondValue)
 
 	case *ast.EmitStatement:
 		complexity += c.countExpressionComplexity(stmt.InvocationExpression)
@@ -231,6 +232,7 @@ func (c complexityCalculator) countExpressionComplexity(expr ast.Expression) int
 		complexity += c.countExpressionComplexity(e.Else)
 
 	case *ast.InvocationExpression:
+		complexity += c.countExpressionComplexity(e.InvokedExpression)
 		for _, arg := range e.Arguments {
 			complexity += c.countExpressionComplexity(arg.Expression)
 		}
@@ -269,6 +271,11 @@ func (c complexityCalculator) countExpressionComplexity(expr ast.Expression) int
 		for _, entry := range e.Entries {
 			complexity += c.countExpressionComplexity(entry.Key)
 			complexity += c.countExpressionComplexity(entry.Value)
+		}
+
+	case *ast.StringTemplateExpression:
+		for _, part := range e.Expressions {
+			complexity += c.countExpressionComplexity(part)
 		}
 	}
 
