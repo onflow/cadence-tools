@@ -1379,6 +1379,64 @@ func TestUsingEnv(t *testing.T) {
 
 		assert.True(t, resolverInvoked)
 	})
+
+	t.Run("stdlib getTransactionIndex function", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+            import Test
+            import BlockchainHelpers
+
+            access(all)
+            fun test() {
+                let account = Test.createAccount()
+                let txResult = executeTransaction(
+                    "test_tx.cdc",
+                    [],
+                    account
+                )
+
+                Test.expect(txResult, Test.beSucceeded())
+
+                let result = executeScript("test_script.cdc", [])
+
+                Test.expect(result, Test.beSucceeded())
+				Test.assertEqual(UInt32(0), result.returnValue! as! UInt32)
+            }
+		`
+
+		const testTransaction = `
+            transaction {
+                prepare(signer: &Account) {
+                    let idx = getTransactionIndex()
+                    assert(idx == 0, message: "unexpected tx index")
+                }
+            }
+		`
+
+		const testScript = `
+            access(all)
+            fun main(): UInt32 {
+                return getTransactionIndex()
+            }
+		`
+
+		fileResolver := func(path string) (string, error) {
+			switch path {
+			case "test_tx.cdc":
+				return testTransaction, nil
+			case "test_script.cdc":
+				return testScript, nil
+			default:
+				return "", fmt.Errorf("cannot find file path: %s", path)
+			}
+		}
+
+		runner := NewTestRunner().WithFileResolver(fileResolver)
+		result, err := runner.RunTest(code, "test")
+		require.NoError(t, err)
+		require.NoError(t, result.Error)
+	})
 }
 
 func TestCreateAccount(t *testing.T) {
