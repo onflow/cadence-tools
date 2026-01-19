@@ -1386,6 +1386,18 @@ func TestUsingEnv(t *testing.T) {
 		const code = `
             import Test
             import BlockchainHelpers
+            import "FooContract"
+
+            access(all)
+            fun setup() {
+                let err = Test.deployContract(
+                    name: "FooContract",
+                    path: "./FooContract",
+                    arguments: []
+                )
+
+                Test.expect(err, Test.beNil())
+            }
 
             access(all)
             fun test() {
@@ -1401,7 +1413,12 @@ func TestUsingEnv(t *testing.T) {
                 let result = executeScript("test_script.cdc", [])
 
                 Test.expect(result, Test.beSucceeded())
-				Test.assertEqual(UInt32(0), result.returnValue! as! UInt32)
+                Test.assertEqual(UInt32(0), result.returnValue! as! UInt32)
+
+                let idx = getTransactionIndex()
+                Test.assertEqual(UInt32(0), idx)
+
+                Test.assertEqual(0.0, FooContract.getBalance())
             }
 		`
 
@@ -1421,18 +1438,59 @@ func TestUsingEnv(t *testing.T) {
             }
 		`
 
+		const fooContract = `
+            access(all)
+            contract FooContract {
+                init() {
+                    let idx = getTransactionIndex()
+                    assert(idx == 0, message: "unexpected tx index")
+                }
+
+                access(all)
+                fun getBalance(): UFix64 {
+                    let acc = getAccount(0x10)
+                    return acc.balance
+                }
+            }
+		`
+
 		fileResolver := func(path string) (string, error) {
 			switch path {
 			case "test_tx.cdc":
 				return testTransaction, nil
 			case "test_script.cdc":
 				return testScript, nil
+			case "./FooContract":
+				return fooContract, nil
 			default:
 				return "", fmt.Errorf("cannot find file path: %s", path)
 			}
 		}
 
-		runner := NewTestRunner().WithFileResolver(fileResolver)
+		importResolver := func(location common.Location) (string, error) {
+			switch location := location.(type) {
+			case common.AddressLocation:
+				if location.Name == "FooContract" {
+					return fooContract, nil
+				}
+			case common.StringLocation:
+				if location == "FooContract" {
+					return fooContract, nil
+				}
+			}
+
+			return "", fmt.Errorf("cannot find import location: %s", location.ID())
+		}
+
+		contracts := map[string]common.Address{
+			"FooContract": firstAccountAddress,
+		}
+
+		runner := NewTestRunner().
+			WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+			WithFileResolver(fileResolver).
+			WithContractAddressResolver(contractsToResolver(contracts))
+
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.NoError(t, result.Error)
