@@ -35,6 +35,7 @@ const (
 	CadenceV1Category                 = "cadence-v1"
 	SecurityCategory                  = "security"
 	ComplexityCategory                = "complexity"
+	IfLetHintCategory                 = "if-let-hint"
 )
 
 var Analyzers = map[string]*analysis.Analyzer{}
