@@ -5,10 +5,10 @@ go 1.25.0
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.12.0
-	github.com/onflow/cadence v1.9.4
-	github.com/onflow/flow-emulator v1.16.0
-	github.com/onflow/flow-go v0.45.0-experimental-cadence-v1.8.7.0.20260113150225-6d5c1e97a834
-	github.com/onflow/flow-go-sdk v1.9.10
+	github.com/onflow/cadence v1.9.5
+	github.com/onflow/flow-emulator v1.16.1
+	github.com/onflow/flow-go v0.45.0-experimental-cadence-v1.8.7.0.20260115230052-18a46246a4d6
+	github.com/onflow/flow-go-sdk v1.9.11
 	github.com/onflow/flow/protobuf/go/flow v0.4.19
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
@@ -127,7 +127,7 @@ require (
 	github.com/multiformats/go-multistream v0.6.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/crypto v0.25.3 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
@@ -198,7 +198,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
@@ -215,8 +215,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
-	modernc.org/libc v1.66.10 // indirect
+	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.41.0 // indirect
+	modernc.org/sqlite v1.44.2 // indirect
 )
