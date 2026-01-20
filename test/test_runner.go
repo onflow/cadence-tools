@@ -36,6 +36,12 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/backends"
+	evmEmulator "github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/impl"
+	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 
@@ -640,6 +646,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	r.backend = backend
 
 	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
+	
 	ctx := runtime.Context{
 		Interface:   fvmEnv,
 		Location:    testScriptLocation,
@@ -674,9 +681,8 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 		nil,
 	)
 
-	if err = setupEVMEnvironment(r.backend.chain, fvmEnv, env); err != nil {
-		return nil, runtime.Context{}, err
-	}
+	// Set up InternalEVM in the test runtime environment for execution
+	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
 	return env, ctx, nil
 }
@@ -901,7 +907,6 @@ func (r *TestRunner) parseAndCheckImport(
 	}
 
 	// Create a new (child) context, reuse the provided interface
-
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 	ctx := runtime.Context{
@@ -946,10 +951,9 @@ func (r *TestRunner) parseAndCheckImport(
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve FVM Environment"))
 	}
-	err = setupEVMEnvironment(r.backend.chain, fvmEnv, env)
-	if err != nil {
-		panic(err)
-	}
+
+	// Set up InternalEVM for type checking
+	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
 	code = r.replaceImports(code)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
@@ -961,15 +965,46 @@ func (r *TestRunner) parseAndCheckImport(
 	return program.Program, program.Elaboration, nil
 }
 
+// setupEVMEnvironment configures InternalEVM in the runtime environment.
+// This follows the same pattern as flow-go's ReusableCadenceRuntime.declareEVM()
 func setupEVMEnvironment(
-	ch flow.Chain,
+	chain flow.Chain,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
-) error {
-	return evm.SetupEnvironment(
-		ch.ChainID(),
-		fvmEnv,
+) {
+	chainID := chain.ChainID()
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	randomBeaconAddress := sc.RandomBeaconHistory.Address
+	flowTokenAddress := sc.FlowToken.Address
+
+	evmBackend := backends.NewWrappedEnvironment(fvmEnv)
+	evmEmulatorInstance := evmEmulator.NewEmulator(evmBackend, evm.StorageAccountAddress(chainID))
+	blockStore := handler.NewBlockStore(chainID, evmBackend, evm.StorageAccountAddress(chainID))
+	addressAllocator := handler.NewAddressAllocator()
+
+	evmContractAddress := evm.ContractAccountAddress(chainID)
+
+	contractHandler := handler.NewContractHandler(
+		chainID,
+		evmContractAddress,
+		common.Address(flowTokenAddress),
+		randomBeaconAddress,
+		blockStore,
+		addressAllocator,
+		evmBackend,
+		evmEmulatorInstance,
+	)
+
+	internalEVMContractValue := impl.NewInternalEVMContractValue(
+		nil,
+		contractHandler,
+		evmContractAddress,
+	)
+
+	evmStdlib.SetupEnvironment(
 		runtimeEnv,
+		internalEVMContractValue,
+		evmContractAddress,
 	)
 }
 
