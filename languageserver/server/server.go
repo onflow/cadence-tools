@@ -869,7 +869,13 @@ func (s *Server) Hover(
 		Kind:  protocol.Markdown,
 		Value: markup.String(),
 	}
-	return &protocol.Hover{Contents: contents}, nil
+	return &protocol.Hover{
+		Contents: contents,
+		Range: conversion.SemaToProtocolRange(
+			occurrence.StartPos,
+			occurrence.EndPos,
+		),
+	}, nil
 }
 
 func documentType(ty sema.Type) string {

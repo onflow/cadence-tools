@@ -43,6 +43,25 @@ func ASTToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	}
 }
 
+// SemaToProtocolPosition converts a sema position to an LSP position
+func SemaToProtocolPosition(pos sema.Position) protocol.Position {
+	return protocol.Position{
+		Line:      uint32(pos.Line - 1),
+		Character: uint32(pos.Column),
+	}
+}
+
+// SemaToProtocolRange converts a sema range to an LSP range
+func SemaToProtocolRange(startPos, endPos sema.Position) protocol.Range {
+	return protocol.Range{
+		Start: SemaToProtocolPosition(startPos),
+		End: SemaToProtocolPosition(sema.Position{
+			Line:   endPos.Line,
+			Column: endPos.Column + 1,
+		}),
+	}
+}
+
 // ProtocolToSemaPosition converts an LSP position to a sema position
 func ProtocolToSemaPosition(pos protocol.Position) sema.Position {
 	return sema.Position{
