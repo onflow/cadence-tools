@@ -36,6 +36,8 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
+	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
+	fvmRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 
@@ -674,9 +676,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 		nil,
 	)
 
-	if err = setupEVMEnvironment(r.backend.chain, fvmEnv, env); err != nil {
-		return nil, runtime.Context{}, err
-	}
+	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
 	return env, ctx, nil
 }
@@ -946,10 +946,8 @@ func (r *TestRunner) parseAndCheckImport(
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve FVM Environment"))
 	}
-	err = setupEVMEnvironment(r.backend.chain, fvmEnv, env)
-	if err != nil {
-		panic(err)
-	}
+
+	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
 	code = r.replaceImports(code)
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
@@ -962,14 +960,17 @@ func (r *TestRunner) parseAndCheckImport(
 }
 
 func setupEVMEnvironment(
-	ch flow.Chain,
+	chain flow.Chain,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
-) error {
-	return evm.SetupEnvironment(
-		ch.ChainID(),
-		fvmEnv,
+) {
+	chainID := chain.ChainID()
+	evmInternalContractValue := fvmRuntime.EVMInternalEVMContractValue(chainID, fvmEnv)
+	evmContractAddress := evm.ContractAccountAddress(chainID)
+	evmStdlib.SetupEnvironment(
 		runtimeEnv,
+		evmInternalContractValue,
+		evmContractAddress,
 	)
 }
 
