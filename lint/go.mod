@@ -4,8 +4,8 @@ go 1.25.0
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.9.5
-	github.com/onflow/flow-go-sdk v1.9.11
+	github.com/onflow/cadence v1.9.7
+	github.com/onflow/flow-go-sdk v1.9.13
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 )
@@ -28,7 +28,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/onflow/atree v0.12.0 // indirect
+	github.com/onflow/atree v0.12.1 // indirect
 	github.com/onflow/crypto v0.25.3 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.19 // indirect
