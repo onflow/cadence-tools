@@ -958,6 +958,11 @@ func (e *EmulatorBackend) signTransaction(
 ) error {
 	serviceKey := e.blockchain.ServiceKey()
 
+	authorizers := map[sdk.Address]struct{}{}
+	for _, auth := range tx.Authorizers {
+		authorizers[auth] = struct{}{}
+	}
+
 	// In fork mode, skip payload signing but still sign envelope for unique transaction IDs
 	if !e.forkEnabled {
 		for i := len(signerAccounts) - 1; i >= 0; i-- {
@@ -965,6 +970,11 @@ func (e *EmulatorBackend) signTransaction(
 			if signerAccount.Address == common.Address(serviceKey.Address) {
 				// Skip payload signing for service account, since we always
 				// sign the envelope with the service account below
+				continue
+			}
+
+			if _, ok := authorizers[sdk.Address(signerAccount.Address)]; !ok {
+				// Skip payload signing for non-authorizers
 				continue
 			}
 
