@@ -6,6 +6,7 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/onflow/atree v0.12.0
 	github.com/onflow/cadence v1.9.6
+	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow-emulator v1.16.2
 	github.com/onflow/flow-go v0.45.0-internal-rc.3.0.20260128181608-c85c51c544dd
 	github.com/onflow/flow-go-sdk v1.9.12
@@ -129,7 +130,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/crypto v0.25.4 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.9.2 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.9.2 // indirect
