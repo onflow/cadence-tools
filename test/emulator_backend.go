@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
+	crypto2 "github.com/onflow/crypto"
 	"github.com/onflow/flow-emulator/adapters"
 	"github.com/onflow/flow-emulator/convert"
 	"github.com/onflow/flow-emulator/emulator"
@@ -952,27 +953,55 @@ func (e *EmulatorBackend) newTransaction(code string, authorizers []common.Addre
 	return tx
 }
 
+var dummySignature crypto2.Signature = func() []byte {
+	sigLen := crypto2.SignatureLenECDSAP256
+	sig := make([]byte, sigLen)
+
+	// make sure the ECDSA signature passes the format check
+	sig[sigLen/2] = 0
+	sig[0] = 0
+	sig[sigLen/2-1] |= 1
+	sig[sigLen-1] |= 1
+	return sig
+}()
+
 func (e *EmulatorBackend) signTransaction(
 	tx *sdk.Transaction,
 	signerAccounts []*stdlib.Account,
 ) error {
 	serviceKey := e.blockchain.ServiceKey()
 
-	// In fork mode, skip payload signing but still sign envelope for unique transaction IDs
-	if !e.forkEnabled {
-		for i := len(signerAccounts) - 1; i >= 0; i-- {
-			signerAccount := signerAccounts[i]
-			if signerAccount.Address == common.Address(serviceKey.Address) {
-				// Skip payload signing for service account, since we always
-				// sign the envelope with the service account below
-				continue
-			}
+	authorizers := map[sdk.Address]struct{}{}
+	for _, auth := range tx.Authorizers {
+		authorizers[auth] = struct{}{}
+	}
 
-			publicKey := signerAccount.PublicKey.PublicKey
+	for i := len(signerAccounts) - 1; i >= 0; i-- {
+		signerAccount := signerAccounts[i]
+
+		if signerAccount.Address == common.Address(serviceKey.Address) {
+			// Skip payload signing for service account, since we always
+			// sign the envelope with the service account below
+			continue
+		}
+
+		signerAddress := sdk.Address(signerAccount.Address)
+
+		if _, ok := authorizers[signerAddress]; !ok {
+			// Skip payload signing for non-authorizers
+			continue
+		}
+
+		// In fork mode, use a dummy payload signature
+		if e.forkEnabled {
+			tx.AddPayloadSignature(signerAddress, 0, dummySignature)
+		} else {
 			accountKeys := e.accountKeys[signerAccount.Address]
+			publicKey := signerAccount.PublicKey.PublicKey
 			keyInfo := accountKeys[string(publicKey)]
+			signer := keyInfo.signer
 
-			err := tx.SignPayload(sdk.Address(signerAccount.Address), 0, keyInfo.signer)
+			err := tx.SignPayload(signerAddress, 0, signer)
 			if err != nil {
 				return err
 			}
