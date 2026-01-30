@@ -642,7 +642,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	r.backend = backend
 
 	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
-	env.DeclareValue(transactionIndexDeclaration(fvmEnv), testScriptLocation)
+	env.DeclareValue(fvmRuntime.TransactionIndexDeclaration(fvmEnv), testScriptLocation)
 	ctx := runtime.Context{
 		Interface:   fvmEnv,
 		Location:    testScriptLocation,
@@ -948,7 +948,7 @@ func (r *TestRunner) parseAndCheckImport(
 		panic(fmt.Errorf("failed to retrieve FVM Environment"))
 	}
 
-	env.DeclareValue(transactionIndexDeclaration(fvmEnv), location)
+	env.DeclareValue(fvmRuntime.TransactionIndexDeclaration(fvmEnv), location)
 
 	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
