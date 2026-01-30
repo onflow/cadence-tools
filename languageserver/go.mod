@@ -1,6 +1,6 @@
 module github.com/onflow/cadence-tools/languageserver
 
-go 1.25.0
+go 1.25.1
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
@@ -8,17 +8,17 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/cadence v1.9.4
-	github.com/onflow/cadence-tools/lint v1.7.1
-	github.com/onflow/cadence-tools/test v1.10.1
-	github.com/onflow/flow-go v0.45.0-experimental-cadence-v1.8.7.0.20260109014156-2abea7b5732a
-	github.com/onflow/flow-go-sdk v1.9.10
-	github.com/onflow/flowkit/v2 v2.10.1
+	github.com/onflow/cadence v1.9.7
+	github.com/onflow/cadence-tools/lint v1.7.3
+	github.com/onflow/cadence-tools/test v1.10.2
+	github.com/onflow/flow-go v0.45.0-internal-rc.3.0.20260129222115-cc0505f2afd5
+	github.com/onflow/flow-go-sdk v1.9.13
+	github.com/onflow/flowkit/v2 v2.10.2
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 )
 
 require (
@@ -32,7 +32,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.3 // indirect
-	cloud.google.com/go/kms v1.23.2 // indirect
+	cloud.google.com/go/kms v1.24.0 // indirect
 	cloud.google.com/go/longrunning v0.7.0 // indirect
 	github.com/DataDog/zstd v1.5.6-0.20230824185856-869dae002e5e // indirect
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
@@ -75,7 +75,7 @@ require (
 	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.5 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
-	github.com/ethereum/go-ethereum v1.16.7 // indirect
+	github.com/ethereum/go-ethereum v1.16.8 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
@@ -153,12 +153,12 @@ require (
 	github.com/multiformats/go-multistream v0.6.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.12.0 // indirect
-	github.com/onflow/crypto v0.25.3 // indirect
+	github.com/onflow/atree v0.12.1 // indirect
+	github.com/onflow/crypto v0.25.4 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
-	github.com/onflow/flow-emulator v1.15.3 // indirect
+	github.com/onflow/flow-emulator v1.16.3 // indirect
 	github.com/onflow/flow-evm-bridge v0.1.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.1 // indirect
@@ -247,8 +247,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
-	modernc.org/libc v1.66.10 // indirect
+	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.41.0 // indirect
+	modernc.org/sqlite v1.44.3 // indirect
 )
