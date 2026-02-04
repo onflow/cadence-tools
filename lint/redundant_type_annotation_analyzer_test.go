@@ -162,4 +162,22 @@ func TestRedundantTypeAnnotationAnalyzer(t *testing.T) {
 			diagnostics,
 		)
 	})
+
+	t.Run("type annotation needed", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) let x: [UInt8] = []
+            `,
+			lint.RedundantTypeAnnotationAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
 }

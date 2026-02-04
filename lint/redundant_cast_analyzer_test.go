@@ -207,4 +207,26 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 		)
 	})
 
+	t.Run("type annotation needed", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) contract Test {
+                  access(all) fun test() {
+                      let x = [] as [UInt8]
+                  }
+              }
+            `,
+			lint.RedundantCastAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
 }
