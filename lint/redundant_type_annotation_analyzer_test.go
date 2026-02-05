@@ -169,8 +169,8 @@ func TestRedundantTypeAnnotationAnalyzer(t *testing.T) {
 
 		diagnostics := testAnalyzers(t,
 			`
-              access(all) let xs = [] as [UInt8]
-              access(all) let ys = {} as {String: Int}
+              access(all) let xs: [UInt8] = []
+              access(all) let ys: {String: Int} = {}
             `,
 			lint.RedundantTypeAnnotationAnalyzer,
 		)
