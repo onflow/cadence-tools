@@ -231,6 +231,20 @@ func (d *CheckCastVisitor) isTypeRedundant(exprType, targetType sema.Type) bool 
 //   - Case I: Contextually expected type is same as the casted type (target type).
 //   - Case II: Expression is self typed, and is same as the casted type (target type).
 func isRedundantCast(expr ast.Expression, exprInferredType, targetType, expectedType sema.Type) bool {
+
+	switch expr := expr.(type) {
+	case *ast.ArrayExpression:
+		if len(expr.Values) == 0 {
+			// Empty array literals need a type annotation
+			return false
+		}
+	case *ast.DictionaryExpression:
+		if len(expr.Entries) == 0 {
+			// Empty dictionary literals need a type annotation
+			return false
+		}
+	}
+
 	if expectedType != nil &&
 		!expectedType.IsInvalidType() &&
 		expectedType.Equal(targetType) {

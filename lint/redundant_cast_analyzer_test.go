@@ -215,7 +215,8 @@ func TestRedundantCastAnalyzer(t *testing.T) {
 			`
               access(all) contract Test {
                   access(all) fun test() {
-                      let x = [] as [UInt8]
+                      let xs = [] as [UInt8]
+                      let ys = {} as {String: Int}
                   }
               }
             `,
