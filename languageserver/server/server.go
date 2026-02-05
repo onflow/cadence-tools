@@ -1991,10 +1991,10 @@ func (s *Server) maybeResolveMember(uri protocol.DocumentURI, id string, result 
 		typeString := member.TypeAnnotation.Type.QualifiedString()
 
 		result.Detail = fmt.Sprintf(
-			"(function) %s.%s%s",
+			"(function) %s.%s: %s",
 			member.ContainerType.String(),
 			member.Identifier,
-			typeString[1:len(typeString)-1],
+			typeString,
 		)
 
 	case common.DeclarationKindStructure,
@@ -2032,7 +2032,7 @@ func (s *Server) maybeResolveRange(uri protocol.DocumentURI, id string, result *
 
 		result.Detail = fmt.Sprintf(
 			"(constructor) %s",
-			typeString[1:len(typeString)-1],
+			typeString,
 		)
 
 	} else {
