@@ -31,6 +31,7 @@ const (
 	UnnecessaryCastCategory           = "unnecessary-cast-hint"
 	UnnecessaryTypeAnnotationCategory = "unnecessary-type-annotation-hint"
 	UnusedResultCategory              = "unused-result-hint"
+	UnusedImportCategory              = "unused-import-hint"
 	DeprecatedCategory                = "deprecated"
 	CadenceV1Category                 = "cadence-v1"
 	SecurityCategory                  = "security"
