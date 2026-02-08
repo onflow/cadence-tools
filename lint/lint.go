@@ -40,7 +40,7 @@ import (
 	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
 )
 
-const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
+const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration | analysis.NeedPositionInfo
 
 type Config struct {
 	Analyzers  []*analysis.Analyzer
