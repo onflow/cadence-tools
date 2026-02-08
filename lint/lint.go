@@ -253,6 +253,10 @@ func (l *Linter) readDirectoryEntries(
 			panic(fmt.Errorf("invalid location in file %q: %w", name, err))
 		}
 
+		if location == nil {
+			panic(fmt.Errorf("invalid location in file %q: missing location", name))
+		}
+
 		identifierParts := strings.Split(qualifiedIdentifier, ".")
 		if len(identifierParts) > 1 {
 			panic(fmt.Errorf(
