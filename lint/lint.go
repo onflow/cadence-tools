@@ -40,7 +40,7 @@ import (
 	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
 )
 
-const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
+const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration | analysis.NeedPositionInfo
 
 type Config struct {
 	Analyzers  []*analysis.Analyzer
@@ -251,6 +251,10 @@ func (l *Linter) readDirectoryEntries(
 		location, qualifiedIdentifier, err := common.DecodeTypeID(nil, typeID)
 		if err != nil {
 			panic(fmt.Errorf("invalid location in file %q: %w", name, err))
+		}
+
+		if location == nil {
+			panic(fmt.Errorf("invalid location in file %q: missing location", name))
 		}
 
 		identifierParts := strings.Split(qualifiedIdentifier, ".")
