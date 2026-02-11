@@ -40,6 +40,7 @@ var transactionFlag = flag.String("transaction", "", "analyze transaction with g
 var loadOnlyFlag = flag.Bool("load-only", false, "only load (parse and check) programs")
 var silentFlag = flag.Bool("silent", false, "only show parsing/checking success/failure")
 var colorFlag = flag.Bool("color", true, "format using colors")
+var fixAllFlag = flag.Bool("fix-all", false, "automatically apply all suggested fixes")
 var cyclomaticThresholdFlag = flag.Int("cyclo-threshold", 10, "minimum cyclomatic complexity to report (0 = report all)")
 var cyclomaticCountLogicalFlag = flag.Bool("cyclo-count-logical", true, "count && and || as complexity points")
 var analyzersFlag stringSliceFlag
@@ -114,12 +115,17 @@ func main() {
 		Analyzers: enabledAnalyzers,
 		Silent:    *silentFlag,
 		UseColor:  *colorFlag,
+		FixAll:    *fixAllFlag,
 	})
 
 	cvsPath := *csvPathFlag
 	directoryPath := *directoryPathFlag
 	address := *addressFlag
 	transaction := *transactionFlag
+
+	if *fixAllFlag && directoryPath == "" {
+		log.Println("Warning: -fix-all only works with -directory mode")
+	}
 
 	switch {
 	case cvsPath != "":
