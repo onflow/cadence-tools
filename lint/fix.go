@@ -88,8 +88,8 @@ func ApplyFixesInLocation(
 
 	// Sort edits by offset in descending order (highest offset first)
 	sort.Slice(nonOverlappingEdits, func(i, j int) bool {
-		offset1 := nonOverlappingEdits[i].Range.StartPos.Offset
-		offset2 := nonOverlappingEdits[j].Range.StartPos.Offset
+		offset1 := nonOverlappingEdits[i].StartPos.Offset
+		offset2 := nonOverlappingEdits[j].StartPos.Offset
 		return offset1 > offset2
 	})
 
@@ -111,10 +111,10 @@ func ApplyFixesInLocation(
 // editsOverlap returns true if the two edits overlap in their ranges,
 // false otherwise
 func editsOverlap(a, b ast.TextEdit) bool {
-	aStart := a.Range.StartPos.Offset
-	aEnd := a.Range.EndPos.Offset
-	bStart := b.Range.StartPos.Offset
-	bEnd := b.Range.EndPos.Offset
+	aStart := a.StartPos.Offset
+	aEnd := a.EndPos.Offset
+	bStart := b.StartPos.Offset
+	bEnd := b.EndPos.Offset
 
 	// Two ranges overlap if:
 	// - A's end is after B's start, AND
