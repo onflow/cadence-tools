@@ -11,3 +11,6 @@ languageserver/test/languageserver
 
 # Since there are tools that uses node
 node_modules
+
+# Flow emulator fork cache
+.flow-fork-cache
