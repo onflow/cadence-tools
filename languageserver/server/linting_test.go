@@ -44,6 +44,7 @@ func TestLinting(t *testing.T) {
 
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = Int8(-1)
+			log(x)
 		}`)
 
 		require.Equal(t, 1, len(diagnostics))
@@ -71,6 +72,7 @@ func TestLinting(t *testing.T) {
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = 3
 			let y = x!
+			log(y)
 		}`)
 
 		require.Equal(t, 1, len(diagnostics))
@@ -97,6 +99,7 @@ func TestLinting(t *testing.T) {
 
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = true as! Bool
+			log(x)
 		}`)
 
 		require.Equal(t, 1, len(diagnostics))
@@ -119,6 +122,8 @@ func TestLinting(t *testing.T) {
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = true as! Bool
 			let y: Bool = 3
+			log(x)
+			log(y)
 		}`)
 
 		require.Equal(t,
