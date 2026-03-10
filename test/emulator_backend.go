@@ -248,16 +248,24 @@ func configureForkMode(
 		return nil, nil, fmt.Errorf("failed to create gRPC connection: %w", err)
 	}
 
-	provider, err := remote.New(
-		sqliteStore,
-		testLogger,
+	// Build remote.New options
+	remoteOpts := []remote.Option{
 		remote.WithForkHost(backendOptions.ForkHost),
 		remote.WithForkHeight(backendOptions.ForkHeight),
 		remote.WithClient(
 			executiondata.NewExecutionDataAPIClient(conn),
 			flowaccess.NewAccessAPIClient(conn),
 		),
-	)
+	}
+
+	// Only use disk cache when fork height is explicitly set
+	// When ForkHeight is 0, it uses latest block which changes every run,
+	// making disk cache useless and wasteful. Use in-memory cache only.
+	if backendOptions.ForkHeight > 0 {
+		remoteOpts = append(remoteOpts, remote.WithForkCacheDir(remote.DefaultCacheDir))
+	}
+
+	provider, err := remote.New(sqliteStore, testLogger, remoteOpts...)
 	if err != nil {
 		return nil, nil, err
 	}
