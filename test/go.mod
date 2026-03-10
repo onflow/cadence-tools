@@ -8,7 +8,7 @@ require (
 	github.com/onflow/cadence v1.9.10
 	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow-emulator v1.17.0
-	github.com/onflow/flow-go v0.47.0-ledger-service.1.0.20260310110525-e346a97a4d0a
+	github.com/onflow/flow-go v0.47.0-ledger-service.1.0.20260306194353-7770192048a9
 	github.com/onflow/flow-go-sdk v1.9.16
 	github.com/onflow/flow/protobuf/go/flow v0.4.20
 	github.com/rs/zerolog v1.34.0
