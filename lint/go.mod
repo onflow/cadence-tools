@@ -3,6 +3,7 @@ module github.com/onflow/cadence-tools/lint
 go 1.25.0
 
 require (
+	github.com/itchyny/gojq v0.12.18
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/onflow/cadence v1.9.10
 	github.com/onflow/flow-go-sdk v1.9.16
@@ -22,6 +23,7 @@ require (
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
+	github.com/itchyny/timefmt-go v0.1.7 // indirect
 	github.com/k0kubun/pp/v3 v3.5.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
