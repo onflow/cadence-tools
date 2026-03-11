@@ -10,7 +10,7 @@ require (
 	github.com/onflow/flow-emulator v1.17.0
 	github.com/onflow/flow-go v0.47.0-ledger-service.1.0.20260306194353-7770192048a9
 	github.com/onflow/flow-go-sdk v1.9.16
-	github.com/onflow/flow/protobuf/go/flow v0.4.20
+	github.com/onflow/flow/protobuf/go/flow v0.4.19
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.79.2
