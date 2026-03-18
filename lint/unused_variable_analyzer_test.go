@@ -619,6 +619,25 @@ func TestUnusedVariableAnalyzer(t *testing.T) {
 		)
 	})
 
+	t.Run("interface function parameter", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) struct interface Foo {
+                  access(all) fun bar(baz: Int)
+              }
+            `,
+			lint.UnusedVariableAnalyzer,
+		)
+
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
 	t.Run("variable in loop", func(t *testing.T) {
 
 		t.Parallel()

@@ -32,6 +32,7 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 	elementFilter := []ast.Element{
 		(*ast.VariableDeclaration)(nil),
 		(*ast.FunctionDeclaration)(nil),
+		(*ast.InterfaceDeclaration)(nil),
 	}
 
 	return &analysis.Analyzer{
@@ -64,31 +65,47 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 
 			var identifiers []identifierToCheck
 
-			inspector.Preorder(elementFilter, func(element ast.Element) {
+			var inInterfaceDepth int
+
+			inspector.Elements(elementFilter, func(element ast.Element, push bool) bool {
 				switch decl := element.(type) {
+				case *ast.InterfaceDeclaration:
+					if push {
+						inInterfaceDepth++
+					} else {
+						inInterfaceDepth--
+					}
+
 				case *ast.FunctionDeclaration:
-					// Collect all parameter identifiers
-					for _, param := range decl.ParameterList.Parameters {
-						identifiers = append(
-							identifiers,
-							identifierToCheck{
-								identifier: param.Identifier,
-								kind:       identifierKindParameter,
-								parameter:  param,
-							},
-						)
+					// Skip parameters in interface functions,
+					// as they cannot have a body
+					if push && inInterfaceDepth == 0 {
+						// Collect all parameter identifiers
+						for _, param := range decl.ParameterList.Parameters {
+							identifiers = append(
+								identifiers,
+								identifierToCheck{
+									identifier: param.Identifier,
+									kind:       identifierKindParameter,
+									parameter:  param,
+								},
+							)
+						}
 					}
 
 				case *ast.VariableDeclaration:
-					// Collect all variable identifiers (at any nesting level)
-					identifiers = append(
-						identifiers,
-						identifierToCheck{
-							identifier: decl.Identifier,
-							kind:       identifierKindVariable,
-						},
-					)
+					if push {
+						// Collect all variable identifiers (at any nesting level)
+						identifiers = append(
+							identifiers,
+							identifierToCheck{
+								identifier: decl.Identifier,
+								kind:       identifierKindVariable,
+							},
+						)
+					}
 				}
+				return true
 			})
 
 			// Analyze each collected identifier for usage
