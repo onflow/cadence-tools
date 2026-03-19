@@ -66,6 +66,7 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 			var identifiers []identifierToCheck
 
 			var inInterfaceDepth int
+			var inFunctionDepth int
 
 			inspector.Elements(elementFilter, func(element ast.Element, push bool) bool {
 				switch decl := element.(type) {
@@ -77,6 +78,12 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 					}
 
 				case *ast.FunctionDeclaration:
+					if push {
+						inFunctionDepth++
+					} else {
+						inFunctionDepth--
+					}
+
 					// Collect all parameter identifiers,
 					// but ignore non-default interface functions
 					if push && (inInterfaceDepth == 0 ||
@@ -96,8 +103,9 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 					}
 
 				case *ast.VariableDeclaration:
-					if push {
-						// Collect all variable identifiers (at any nesting level)
+					// Ignore global/member variables with access(all),
+					// as they may be used externally.
+					if push && (inFunctionDepth > 0 || decl.Access != ast.AccessAll) {
 						identifiers = append(
 							identifiers,
 							identifierToCheck{

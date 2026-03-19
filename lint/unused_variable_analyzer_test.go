@@ -707,6 +707,116 @@ func TestUnusedVariableAnalyzer(t *testing.T) {
 		)
 	})
 
+	t.Run("unused access(all) global variable", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) let unused = 5
+
+              access(all) fun test() {
+                  log("hello")
+              }
+            `,
+			lint.UnusedVariableAnalyzer,
+		)
+
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("unused access(self) global variable", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(self) let unused = 5
+
+              access(all) fun test() {
+                  log("hello")
+              }
+            `,
+			lint.UnusedVariableAnalyzer,
+		)
+
+		require.Equal(t,
+			[]analysis.Diagnostic{
+				{
+					Range: ast.Range{
+						StartPos: ast.Position{Offset: 32, Line: 2, Column: 31},
+						EndPos:   ast.Position{Offset: 37, Line: 2, Column: 36},
+					},
+					Location: testLocation,
+					Category: lint.UnusedVariableCategory,
+					Message:  "variable 'unused' is declared but never used",
+					SuggestedFixes: []errors.SuggestedFix[ast.TextEdit]{
+						{
+							Message: "Prefix with underscore to mark as intentionally unused",
+							TextEdits: []ast.TextEdit{
+								{
+									Replacement: "_unused",
+									Range: ast.Range{
+										StartPos: ast.Position{Offset: 32, Line: 2, Column: 31},
+										EndPos:   ast.Position{Offset: 37, Line: 2, Column: 36},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
+	})
+
+	t.Run("unused contract member variable", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) contract Foo {
+                  access(all) let unused: Int
+                  init() {
+                      self.unused = 5
+                  }
+              }
+            `,
+			lint.UnusedVariableAnalyzer,
+		)
+
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("unused struct member variable", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) struct Foo {
+                  access(all) let unused: Int
+                  init() {
+                      self.unused = 5
+                  }
+              }
+            `,
+			lint.UnusedVariableAnalyzer,
+		)
+
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
 	t.Run("variable in loop", func(t *testing.T) {
 
 		t.Parallel()
