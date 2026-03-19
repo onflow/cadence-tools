@@ -657,6 +657,30 @@ func TestUnusedVariableAnalyzer(t *testing.T) {
 			[]analysis.Diagnostic{
 				{
 					Range: ast.Range{
+						StartPos: ast.Position{Offset: 88, Line: 3, Column: 38},
+						EndPos:   ast.Position{Offset: 90, Line: 3, Column: 40},
+					},
+					Location: testLocation,
+					Category: lint.UnusedVariableCategory,
+					Message:  "parameter 'baz' is declared but never used",
+					SuggestedFixes: []errors.SuggestedFix[ast.TextEdit]{
+						{
+							Message: "Add parameter name with underscore prefix",
+							TextEdits: []ast.TextEdit{
+								{
+									Replacement: "baz _baz",
+									Insertion:   "",
+									Range: ast.Range{
+										StartPos: ast.Position{Offset: 88, Line: 3, Column: 38},
+										EndPos:   ast.Position{Offset: 90, Line: 3, Column: 40},
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Range: ast.Range{
 						StartPos: ast.Position{Offset: 126, Line: 4, Column: 26},
 						EndPos:   ast.Position{Offset: 131, Line: 4, Column: 31},
 					},

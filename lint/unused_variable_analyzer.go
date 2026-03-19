@@ -77,9 +77,11 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 					}
 
 				case *ast.FunctionDeclaration:
-					// Skip parameters in interface functions,
-					// as they cannot have a body
-					if push && inInterfaceDepth == 0 {
+					// Collect all parameter identifiers,
+					// but ignore non-default interface functions
+					if push && (inInterfaceDepth == 0 ||
+						(inInterfaceDepth > 0 && decl.FunctionBlock.HasStatements())) {
+
 						// Collect all parameter identifiers
 						for _, param := range decl.ParameterList.Parameters {
 							identifiers = append(
