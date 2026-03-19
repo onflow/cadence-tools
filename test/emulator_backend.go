@@ -353,6 +353,9 @@ func NewEmulatorBackend(
 	// Ensure emulator has correct chain ID
 	opts = append(opts, emulator.WithChainID(selectedChain.ChainID()))
 
+	// Enable EVM test helpers
+	opts = append(opts, emulator.WithEVMTestHelpersEnabled(true))
+
 	// Create blockchain
 	blockchain := newBlockchain(opts...)
 
