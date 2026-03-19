@@ -740,8 +740,8 @@ func (e *EmulatorBackend) DeployContract(
 			txArgsBuilder.WriteString(", ")
 		}
 
-		txArgsBuilder.WriteString(fmt.Sprintf("arg%d: %s", i, cadenceArg.Type().ID()))
-		addArgsBuilder.WriteString(fmt.Sprintf(", arg%d", i))
+		fmt.Fprintf(&txArgsBuilder, "arg%d: %s", i, cadenceArg.Type().ID())
+		fmt.Fprintf(&addArgsBuilder, ", arg%d", i)
 
 		cadenceArgs = append(cadenceArgs, cadenceArg)
 	}
@@ -833,7 +833,7 @@ func (e *EmulatorBackend) Reset(height uint64) {
 		panic(err)
 	}
 	blockTime := time.UnixMilli(int64(latestBlock.Timestamp))
-	e.clock.TimeDelta = int64(blockTime.Sub(time.Now()).Seconds())
+	e.clock.TimeDelta = int64(time.Until(blockTime).Seconds())
 	e.blockchain.SetClock(e.clock)
 }
 
