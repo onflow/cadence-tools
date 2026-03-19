@@ -740,8 +740,8 @@ func (e *EmulatorBackend) DeployContract(
 			txArgsBuilder.WriteString(", ")
 		}
 
-		txArgsBuilder.WriteString(fmt.Sprintf("arg%d: %s", i, cadenceArg.Type().ID()))
-		addArgsBuilder.WriteString(fmt.Sprintf(", arg%d", i))
+		fmt.Fprintf(&txArgsBuilder, "arg%d: %s", i, cadenceArg.Type().ID())
+		fmt.Fprintf(&addArgsBuilder, ", arg%d", i)
 
 		cadenceArgs = append(cadenceArgs, cadenceArg)
 	}
@@ -824,6 +824,17 @@ func (e *EmulatorBackend) Reset(height uint64) {
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
+
+	// Sync the clock to the rolled-back block's timestamp so that subsequent
+	// blocks continue from that point in time rather than snapping back to the
+	// wall-clock offset that was in effect before the rollback.
+	latestBlock, err := e.blockchain.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+	blockTime := time.UnixMilli(int64(latestBlock.Timestamp))
+	e.clock.TimeDelta = int64(time.Until(blockTime).Seconds())
+	e.blockchain.SetClock(e.clock)
 }
 
 // Events returns all the emitted events up until the latest block,
