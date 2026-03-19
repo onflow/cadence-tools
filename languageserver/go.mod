@@ -10,7 +10,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v1.9.10
 	github.com/onflow/cadence-tools/lint v1.7.6
-	github.com/onflow/cadence-tools/test v1.11.3
+	github.com/onflow/cadence-tools/test v1.11.4
 	github.com/onflow/flow-go v0.47.0-ledger-service.1.0.20260318224013-f6e2e8f41961
 	github.com/onflow/flow-go-sdk v1.9.16
 	github.com/onflow/flowkit/v2 v2.11.2
