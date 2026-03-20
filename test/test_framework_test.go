@@ -5489,6 +5489,47 @@ func TestBlockchainReset(t *testing.T) {
 	require.NoError(t, result.Error)
 }
 
+func TestBlockchainResetPersistsTimeRollback(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+
+        access(all)
+        fun testBlockchainResetPersistsTimeRollback() {
+            let timestamp1 = getCurrentBlock().timestamp
+            let height1 = getCurrentBlock().height
+
+            // Move time forward
+            Test.moveTime(by: 1337.0)
+
+            // Reset back to original height
+            Test.reset(to: height1)
+
+            // Time immediately after reset should be back to original
+            let timestampAfterReset = getCurrentBlock().timestamp
+            Test.assert(
+                timestampAfterReset < timestamp1 + 2.0,
+                message: "Expected time to be ~timestamp1 after reset, got: ".concat(timestampAfterReset.toString())
+            )
+
+            // Time after committing a block should still be close to original
+            Test.commitBlock()
+            let timestampAfterCommit = getCurrentBlock().timestamp
+            Test.assert(
+                timestampAfterCommit < timestamp1 + 2.0,
+                message: "Expected time to remain ~timestamp1 after commitBlock, got: ".concat(timestampAfterCommit.toString())
+            )
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testBlockchainResetPersistsTimeRollback")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestTestFunctionValidSignature(t *testing.T) {
 	t.Parallel()
 

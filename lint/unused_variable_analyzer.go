@@ -32,6 +32,7 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 	elementFilter := []ast.Element{
 		(*ast.VariableDeclaration)(nil),
 		(*ast.FunctionDeclaration)(nil),
+		(*ast.InterfaceDeclaration)(nil),
 	}
 
 	return &analysis.Analyzer{
@@ -64,31 +65,57 @@ var UnusedVariableAnalyzer = (func() *analysis.Analyzer {
 
 			var identifiers []identifierToCheck
 
-			inspector.Preorder(elementFilter, func(element ast.Element) {
+			var inInterfaceDepth int
+			var inFunctionDepth int
+
+			inspector.Elements(elementFilter, func(element ast.Element, push bool) bool {
 				switch decl := element.(type) {
+				case *ast.InterfaceDeclaration:
+					if push {
+						inInterfaceDepth++
+					} else {
+						inInterfaceDepth--
+					}
+
 				case *ast.FunctionDeclaration:
-					// Collect all parameter identifiers
-					for _, param := range decl.ParameterList.Parameters {
-						identifiers = append(
-							identifiers,
-							identifierToCheck{
-								identifier: param.Identifier,
-								kind:       identifierKindParameter,
-								parameter:  param,
-							},
-						)
+					if push {
+						inFunctionDepth++
+					} else {
+						inFunctionDepth--
+					}
+
+					// Collect all parameter identifiers,
+					// but ignore non-default interface functions
+					if push && (inInterfaceDepth == 0 ||
+						(inInterfaceDepth > 0 && decl.FunctionBlock.HasStatements())) {
+
+						// Collect all parameter identifiers
+						for _, param := range decl.ParameterList.Parameters {
+							identifiers = append(
+								identifiers,
+								identifierToCheck{
+									identifier: param.Identifier,
+									kind:       identifierKindParameter,
+									parameter:  param,
+								},
+							)
+						}
 					}
 
 				case *ast.VariableDeclaration:
-					// Collect all variable identifiers (at any nesting level)
-					identifiers = append(
-						identifiers,
-						identifierToCheck{
-							identifier: decl.Identifier,
-							kind:       identifierKindVariable,
-						},
-					)
+					// Ignore global/member variables with access(all),
+					// as they may be used externally.
+					if push && (inFunctionDepth > 0 || decl.Access != ast.AccessAll) {
+						identifiers = append(
+							identifiers,
+							identifierToCheck{
+								identifier: decl.Identifier,
+								kind:       identifierKindVariable,
+							},
+						)
+					}
 				}
+				return true
 			})
 
 			// Analyze each collected identifier for usage
