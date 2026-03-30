@@ -1,0 +1,145 @@
+/*
+ * Cadence lint - The Cadence linter
+ *
+ * Copyright Flow Foundation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package lint
+
+import (
+	"fmt"
+
+	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/tools/analysis"
+)
+
+var PublicAccountParamAnalyzer = (func() *analysis.Analyzer {
+
+	return &analysis.Analyzer{
+		Description: "Detects public functions that accept authorized Account references as parameters",
+		Run: func(pass *analysis.Pass) interface{} {
+
+			report := pass.Report
+			program := pass.Program
+
+			for _, compositeDeclaration := range program.Program.CompositeDeclarations() {
+				compositeType := program.Checker.Elaboration.CompositeDeclarationType(compositeDeclaration)
+				if compositeType == nil {
+					continue
+				}
+
+				for _, functionDeclaration := range compositeDeclaration.Members.Functions() {
+					checkPublicFunctionAccountParams(
+						functionDeclaration,
+						compositeDeclaration.DeclarationKind(),
+						compositeType.QualifiedString(),
+						program.Location,
+						report,
+					)
+				}
+			}
+
+			return nil
+		},
+	}
+})()
+
+func checkPublicFunctionAccountParams(
+	functionDeclaration *ast.FunctionDeclaration,
+	parentKind common.DeclarationKind,
+	parentName string,
+	location common.Location,
+	report func(analysis.Diagnostic),
+) {
+	// Only check public functions
+	if functionDeclaration.Access != ast.AccessAll {
+		return
+	}
+
+	parameterList := functionDeclaration.ParameterList
+	if parameterList == nil {
+		return
+	}
+
+	funcName := functionDeclaration.Identifier.Identifier
+
+	for _, parameter := range parameterList.Parameters {
+		if !hasAuthAccountReference(parameter.TypeAnnotation) {
+			continue
+		}
+
+		report(
+			analysis.Diagnostic{
+				Location: location,
+				Range:    ast.NewRangeFromPositioned(nil, parameter),
+				Category: SecurityCategory,
+				Message: fmt.Sprintf(
+					"public function '%s' of %s '%s' accepts an authorized Account reference "+
+						"— this grants callers broad account access, consider using capabilities instead",
+					funcName,
+					parentKind.Name(),
+					parentName,
+				),
+			},
+		)
+	}
+}
+
+// hasAuthAccountReference checks if a type annotation contains an
+// authorized reference to the Account type (auth(...) &Account).
+func hasAuthAccountReference(annotation *ast.TypeAnnotation) bool {
+	if annotation == nil {
+		return false
+	}
+	return isAuthAccountReferenceType(annotation.Type)
+}
+
+func isAuthAccountReferenceType(ty ast.Type) bool {
+	switch t := ty.(type) {
+	case *ast.ReferenceType:
+		if isAccountType(t.Type) && hasEntitlements(t.Authorization) {
+			return true
+		}
+	case *ast.OptionalType:
+		return isAuthAccountReferenceType(t.Type)
+	}
+	return false
+}
+
+func isAccountType(ty ast.Type) bool {
+	nominalType, ok := ty.(*ast.NominalType)
+	if !ok {
+		return false
+	}
+	return nominalType.Identifier.Identifier == "Account"
+}
+
+func hasEntitlements(authorization ast.Authorization) bool {
+	switch authorization.(type) {
+	case ast.EntitlementSet:
+		return true
+	case *ast.MappedAccess:
+		return true
+	}
+	return false
+}
+
+func init() {
+	RegisterAnalyzer(
+		"public-account-param",
+		PublicAccountParamAnalyzer,
+	)
+}
