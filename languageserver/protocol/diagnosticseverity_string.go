@@ -19,9 +19,9 @@ const _DiagnosticSeverity_name = "SeverityErrorSeverityWarningSeverityInformatio
 var _DiagnosticSeverity_index = [...]uint8{0, 13, 28, 47, 59}
 
 func (i DiagnosticSeverity) String() string {
-	i -= 1
-	if i >= DiagnosticSeverity(len(_DiagnosticSeverity_index)-1) {
-		return "DiagnosticSeverity(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	idx := int(i) - 1
+	if i < 1 || idx >= len(_DiagnosticSeverity_index)-1 {
+		return "DiagnosticSeverity(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _DiagnosticSeverity_name[_DiagnosticSeverity_index[i]:_DiagnosticSeverity_index[i+1]]
+	return _DiagnosticSeverity_name[_DiagnosticSeverity_index[idx]:_DiagnosticSeverity_index[idx+1]]
 }

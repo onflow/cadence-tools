@@ -18,5 +18,5 @@
 
 package protocol
 
-//go:generate stringer -type=SymbolKind -output=symbolkind_string.go
-//go:generate stringer -type=DiagnosticSeverity -output=diagnosticseverity_string.go
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=SymbolKind -output=symbolkind_string.go
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=DiagnosticSeverity -output=diagnosticseverity_string.go

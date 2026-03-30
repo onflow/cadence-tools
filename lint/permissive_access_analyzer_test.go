@@ -53,7 +53,7 @@ func TestPermissiveAccessAnalyzer(t *testing.T) {
 		require.Equal(t, lint.SecurityCategory, diagnostics[0].Category)
 		require.Contains(t, diagnostics[0].Message, "balance")
 		require.Contains(t, diagnostics[0].Message, "access(all)")
-		require.Equal(t, 3, diagnostics[0].Range.StartPos.Line)
+		require.Equal(t, 3, diagnostics[0].StartPos.Line)
 	})
 
 	t.Run("access(all) let field", func(t *testing.T) {

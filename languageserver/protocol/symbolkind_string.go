@@ -41,9 +41,9 @@ const _SymbolKind_name = "FileModuleNamespacePackageClassMethodPropertyFieldCons
 var _SymbolKind_index = [...]uint8{0, 4, 10, 19, 26, 31, 37, 45, 50, 61, 65, 74, 82, 90, 98, 104, 110, 117, 122, 128, 131, 135, 145, 151, 156, 164, 177}
 
 func (i SymbolKind) String() string {
-	i -= 1
-	if i >= SymbolKind(len(_SymbolKind_index)-1) {
-		return "SymbolKind(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	idx := int(i) - 1
+	if i < 1 || idx >= len(_SymbolKind_index)-1 {
+		return "SymbolKind(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _SymbolKind_name[_SymbolKind_index[i]:_SymbolKind_index[i+1]]
+	return _SymbolKind_name[_SymbolKind_index[idx]:_SymbolKind_index[idx+1]]
 }
