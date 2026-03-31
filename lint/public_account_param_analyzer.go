@@ -26,31 +26,52 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
+// PublicAccountParamAnalyzer detects public (access(all)) functions that accept
+// authorized Account references (auth(...) &Account) as parameters.
+// Such functions expose broad account access to any caller, which is a significant
+// attack surface. Consider using capabilities to provide scoped access instead.
 var PublicAccountParamAnalyzer = (func() *analysis.Analyzer {
+
+	elementFilter := []ast.Element{
+		(*ast.CompositeDeclaration)(nil),
+	}
 
 	return &analysis.Analyzer{
 		Description: "Detects public functions that accept authorized Account references as parameters",
+		Requires: []*analysis.Analyzer{
+			analysis.InspectorAnalyzer,
+		},
 		Run: func(pass *analysis.Pass) interface{} {
+			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
 
 			report := pass.Report
 			program := pass.Program
+			elaboration := program.Checker.Elaboration
 
-			for _, compositeDeclaration := range program.Program.CompositeDeclarations() {
-				compositeType := program.Checker.Elaboration.CompositeDeclarationType(compositeDeclaration)
-				if compositeType == nil {
-					continue
-				}
+			inspector.Preorder(
+				elementFilter,
+				func(element ast.Element) {
+					compositeDeclaration, ok := element.(*ast.CompositeDeclaration)
+					if !ok {
+						return
+					}
 
-				for _, functionDeclaration := range compositeDeclaration.Members.Functions() {
-					checkPublicFunctionAccountParams(
-						functionDeclaration,
-						compositeDeclaration.DeclarationKind(),
-						compositeType.QualifiedString(),
-						program.Location,
-						report,
-					)
-				}
-			}
+					compositeType := elaboration.CompositeDeclarationType(compositeDeclaration)
+					if compositeType == nil {
+						return
+					}
+
+					for _, functionDeclaration := range compositeDeclaration.Members.Functions() {
+						checkPublicFunctionAccountParams(
+							functionDeclaration,
+							compositeDeclaration.DeclarationKind(),
+							compositeType.QualifiedString(),
+							compositeType.Location,
+							report,
+						)
+					}
+				},
+			)
 
 			return nil
 		},

@@ -21,6 +21,7 @@ package lint_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
@@ -31,13 +32,54 @@ func TestCapabilityPublishAnalyzer(t *testing.T) {
 
 	t.Parallel()
 
-	t.Run("capability publish call", func(t *testing.T) {
+	t.Run("entitled capability publish", func(t *testing.T) {
 
 		t.Parallel()
 
 		diagnostics := testAnalyzers(t,
 			`
-                access(all) fun main(acct: auth(Capabilities) &Account) {
+                access(all) entitlement E
+
+                access(all) fun main(acct: auth(Storage, Capabilities) &Account) {
+                    let cap = acct.capabilities.storage.issue<auth(E) &Int>(/storage/test)
+                    acct.capabilities.publish(cap, at: /public/test)
+                }
+            `,
+			lint.CapabilityPublishAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "entitled capability published — verify that the entitlements are intentional and scoped appropriately",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   6,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   6,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
+	})
+
+	t.Run("unentitled capability publish", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+                access(all) fun main(acct: auth(Storage, Capabilities) &Account) {
                     let cap = acct.capabilities.storage.issue<&Int>(/storage/test)
                     acct.capabilities.publish(cap, at: /public/test)
                 }
@@ -45,9 +87,12 @@ func TestCapabilityPublishAnalyzer(t *testing.T) {
 			lint.CapabilityPublishAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Equal(t, lint.SecurityCategory, diagnostics[0].Category)
-		require.Contains(t, diagnostics[0].Message, "capability published")
+		// Unentitled capability publish should not be flagged
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
 	})
 
 	t.Run("unrelated publish method", func(t *testing.T) {

@@ -21,6 +21,7 @@ package lint_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
@@ -44,10 +45,29 @@ func TestPublicAccountParamAnalyzer(t *testing.T) {
 			lint.PublicAccountParamAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Equal(t, lint.SecurityCategory, diagnostics[0].Category)
-		require.Contains(t, diagnostics[0].Message, "dangerousFunction")
-		require.Contains(t, diagnostics[0].Message, "authorized Account reference")
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "public function 'dangerousFunction' of contract 'MyContract' accepts an authorized Account reference — this grants callers broad account access, consider using capabilities instead",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 
 	t.Run("public function with multiple auth entitlements", func(t *testing.T) {
@@ -63,8 +83,29 @@ func TestPublicAccountParamAnalyzer(t *testing.T) {
 			lint.PublicAccountParamAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Contains(t, diagnostics[0].Message, "setup")
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "public function 'setup' of contract 'MyContract' accepts an authorized Account reference — this grants callers broad account access, consider using capabilities instead",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 
 	t.Run("public function with unentitled Account ref", func(t *testing.T) {
@@ -163,7 +204,68 @@ func TestPublicAccountParamAnalyzer(t *testing.T) {
 			lint.PublicAccountParamAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Contains(t, diagnostics[0].Message, "mixedParams")
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "public function 'mixedParams' of contract 'MyContract' accepts an authorized Account reference — this grants callers broad account access, consider using capabilities instead",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
+	})
+
+	t.Run("nested composite public function with auth Account param", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+                access(all) contract MyContract {
+                    access(all) struct Nested {
+                        access(all) fun setup(acct: auth(Storage) &Account) {}
+                    }
+                }
+            `,
+			lint.PublicAccountParamAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "public function 'setup' of structure 'MyContract.Nested' accepts an authorized Account reference — this grants callers broad account access, consider using capabilities instead",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   4,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   4,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 }

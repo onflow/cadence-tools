@@ -21,6 +21,7 @@ package lint_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
@@ -48,12 +49,29 @@ func TestPermissiveAccessAnalyzer(t *testing.T) {
 			lint.PermissiveAccessAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Equal(t, testLocation, diagnostics[0].Location)
-		require.Equal(t, lint.SecurityCategory, diagnostics[0].Category)
-		require.Contains(t, diagnostics[0].Message, "balance")
-		require.Contains(t, diagnostics[0].Message, "access(all)")
-		require.Equal(t, 3, diagnostics[0].StartPos.Line)
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "mutable field 'balance' of contract 'MyContract' has access(all), allowing public write access — consider restricting with entitlements",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 
 	t.Run("access(all) let field", func(t *testing.T) {
@@ -125,9 +143,46 @@ func TestPermissiveAccessAnalyzer(t *testing.T) {
 			lint.PermissiveAccessAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 2)
-		require.Contains(t, diagnostics[0].Message, "balance")
-		require.Contains(t, diagnostics[1].Message, "owner")
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "mutable field 'balance' of structure 'Token' has access(all), allowing public write access — consider restricting with entitlements",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "mutable field 'owner' of structure 'Token' has access(all), allowing public write access — consider restricting with entitlements",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[1].StartPos.Offset,
+							Line:   4,
+							Column: diagnostics[1].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[1].EndPos.Offset,
+							Line:   4,
+							Column: diagnostics[1].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 
 	t.Run("resource var field", func(t *testing.T) {
@@ -147,8 +202,72 @@ func TestPermissiveAccessAnalyzer(t *testing.T) {
 			lint.PermissiveAccessAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Contains(t, diagnostics[0].Message, "balance")
-		require.Contains(t, diagnostics[0].Message, "resource")
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "mutable field 'balance' of resource 'Vault' has access(all), allowing public write access — consider restricting with entitlements",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
+	})
+
+	t.Run("nested composite var field", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+                access(all) contract MyContract {
+                    access(all) struct Nested {
+                        access(all) var value: Int
+
+                        init() {
+                            self.value = 0
+                        }
+                    }
+                }
+            `,
+			lint.PermissiveAccessAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "mutable field 'value' of structure 'MyContract.Nested' has access(all), allowing public write access — consider restricting with entitlements",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   4,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   4,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 }

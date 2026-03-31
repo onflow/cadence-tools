@@ -24,6 +24,11 @@ import (
 	"github.com/onflow/cadence/tools/analysis"
 )
 
+// CapabilityPublishAnalyzer detects calls to Account.Capabilities.publish() where the
+// capability being published has an entitled borrow type.
+// Publishing an entitled capability makes the entitlements publicly accessible,
+// which may grant more authority than intended. Verify that the entitlements
+// on the published capability are intentional and scoped appropriately.
 var CapabilityPublishAnalyzer = (func() *analysis.Analyzer {
 
 	elementFilter := []ast.Element{
@@ -31,7 +36,7 @@ var CapabilityPublishAnalyzer = (func() *analysis.Analyzer {
 	}
 
 	return &analysis.Analyzer{
-		Description: "Detects capability publish calls — verify that proper entitlements guard the capability",
+		Description: "Detects capability publish calls where the capability has entitled access",
 		Requires: []*analysis.Analyzer{
 			analysis.InspectorAnalyzer,
 		},
@@ -79,12 +84,39 @@ var CapabilityPublishAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
+					// Check the type of the capability argument.
+					// Only flag when the capability's borrow type is entitled,
+					// as that grants more authority than a plain reference.
+					invocationTypes := elaboration.InvocationExpressionTypes(invocation)
+					if len(invocationTypes.ArgumentTypes) == 0 {
+						return
+					}
+
+					capType, ok := invocationTypes.ArgumentTypes[0].(*sema.CapabilityType)
+					if !ok {
+						return
+					}
+
+					// Check if the borrow type is an entitled reference
+					borrowRef, ok := capType.BorrowType.(*sema.ReferenceType)
+					if !ok {
+						return
+					}
+
+					switch borrowRef.Authorization.(type) {
+					case *sema.EntitlementMapAccess,
+						sema.EntitlementSetAccess:
+						// Entitled — flag it
+					default:
+						return
+					}
+
 					report(
 						analysis.Diagnostic{
 							Location: location,
 							Range:    ast.NewRangeFromPositioned(nil, invocation),
 							Category: SecurityCategory,
-							Message:  "capability published — verify that proper entitlements guard this capability",
+							Message:  "entitled capability published — verify that the entitlements are intentional and scoped appropriately",
 						},
 					)
 				},

@@ -20,13 +20,13 @@ package lint
 
 import (
 	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
-// minAddressHexDigits is the minimum number of hex digits for a literal
-// to be considered a potential hardcoded address.
-const minAddressHexDigits = 8
-
+// HardcodedAddressAnalyzer detects integer literals that are typed as Address values.
+// Hardcoded addresses reduce portability across networks (mainnet, testnet, emulator).
+// Consider using named address imports or configuration instead.
 var HardcodedAddressAnalyzer = (func() *analysis.Analyzer {
 
 	elementFilter := []ast.Element{
@@ -43,6 +43,7 @@ var HardcodedAddressAnalyzer = (func() *analysis.Analyzer {
 
 			program := pass.Program
 			location := program.Location
+			elaboration := program.Checker.Elaboration
 			report := pass.Report
 
 			inspector.Preorder(
@@ -53,14 +54,10 @@ var HardcodedAddressAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					// Only consider hex literals (base 16)
-					if intExpr.Base != 16 {
-						return
-					}
-
-					// Check if the hex literal is long enough to be an address.
-					// PositiveLiteral contains the literal bytes as written in source.
-					if len(intExpr.PositiveLiteral) < minAddressHexDigits {
+					// Use type information from the elaboration to determine
+					// whether this integer literal is typed as an Address.
+					typ := elaboration.IntegerExpressionType(intExpr)
+					if _, ok := typ.(*sema.AddressType); !ok {
 						return
 					}
 

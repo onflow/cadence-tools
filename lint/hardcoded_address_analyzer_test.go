@@ -21,6 +21,7 @@ package lint_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
@@ -44,9 +45,49 @@ func TestHardcodedAddressAnalyzer(t *testing.T) {
 			lint.HardcodedAddressAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 1)
-		require.Equal(t, lint.SecurityCategory, diagnostics[0].Category)
-		require.Contains(t, diagnostics[0].Message, "hardcoded address")
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "hardcoded address detected — consider using named address imports for portability",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
+	})
+
+	t.Run("hex literal typed as non-address not flagged", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+                access(all) fun main() {
+                    let x: UInt64 = 0x1234567890abcdef
+                }
+            `,
+			lint.HardcodedAddressAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
 	})
 
 	t.Run("short hex literal not flagged", func(t *testing.T) {
@@ -103,6 +144,45 @@ func TestHardcodedAddressAnalyzer(t *testing.T) {
 			lint.HardcodedAddressAnalyzer,
 		)
 
-		require.Len(t, diagnostics, 2)
+		require.Equal(
+			t,
+			[]analysis.Diagnostic{
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "hardcoded address detected — consider using named address imports for portability",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[0].StartPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[0].EndPos.Offset,
+							Line:   3,
+							Column: diagnostics[0].EndPos.Column,
+						},
+					},
+				},
+				{
+					Location: testLocation,
+					Category: lint.SecurityCategory,
+					Message:  "hardcoded address detected — consider using named address imports for portability",
+					Range: ast.Range{
+						StartPos: ast.Position{
+							Offset: diagnostics[1].StartPos.Offset,
+							Line:   4,
+							Column: diagnostics[1].StartPos.Column,
+						},
+						EndPos: ast.Position{
+							Offset: diagnostics[1].EndPos.Offset,
+							Line:   4,
+							Column: diagnostics[1].EndPos.Column,
+						},
+					},
+				},
+			},
+			diagnostics,
+		)
 	})
 }
