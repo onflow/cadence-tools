@@ -61,7 +61,7 @@ var CapabilityPublishAnalyzer = (func() *analysis.Analyzer {
 						return
 					}
 
-					if memberExpr.Identifier.Identifier != "publish" {
+					if memberExpr.Identifier.Identifier != sema.Account_CapabilitiesTypePublishFunctionName {
 						return
 					}
 
