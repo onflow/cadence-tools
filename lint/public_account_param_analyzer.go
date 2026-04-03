@@ -102,7 +102,7 @@ func checkPublicFunctionAccountParams(
 	funcName := functionDeclaration.Identifier.Identifier
 
 	for i, parameter := range functionType.Parameters {
-		if !isAuthAccountReferenceType(parameter.TypeAnnotation.Type) {
+		if !containsAuthAccountReferenceType(parameter.TypeAnnotation.Type) {
 			continue
 		}
 
@@ -123,9 +123,10 @@ func checkPublicFunctionAccountParams(
 	}
 }
 
-// isAuthAccountReferenceType checks if a type is an authorized reference
-// to the Account type (auth(...) &Account).
-func isAuthAccountReferenceType(ty sema.Type) bool {
+// containsAuthAccountReferenceType checks if a type is or contains an authorized
+// reference to the Account type (auth(...) &Account),
+// including inside container types like arrays, dictionaries, and optionals.
+func containsAuthAccountReferenceType(ty sema.Type) bool {
 	switch t := ty.(type) {
 	case *sema.ReferenceType:
 		if t.Type == sema.AccountType {
@@ -136,7 +137,14 @@ func isAuthAccountReferenceType(ty sema.Type) bool {
 			}
 		}
 	case *sema.OptionalType:
-		return isAuthAccountReferenceType(t.Type)
+		return containsAuthAccountReferenceType(t.Type)
+	case *sema.VariableSizedType:
+		return containsAuthAccountReferenceType(t.Type)
+	case *sema.ConstantSizedType:
+		return containsAuthAccountReferenceType(t.Type)
+	case *sema.DictionaryType:
+		return containsAuthAccountReferenceType(t.KeyType) ||
+			containsAuthAccountReferenceType(t.ValueType)
 	}
 	return false
 }
