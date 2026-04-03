@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/cadence/ast"
 	"github.com/onflow/cadence/common"
+	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
@@ -62,8 +63,10 @@ var PublicAccountParamAnalyzer = (func() *analysis.Analyzer {
 					}
 
 					for _, functionDeclaration := range compositeDeclaration.Members.Functions() {
+						functionType := elaboration.FunctionDeclarationFunctionType(functionDeclaration)
 						checkPublicFunctionAccountParams(
 							functionDeclaration,
+							functionType,
 							compositeDeclaration.DeclarationKind(),
 							compositeType.QualifiedString(),
 							compositeType.Location,
@@ -80,6 +83,7 @@ var PublicAccountParamAnalyzer = (func() *analysis.Analyzer {
 
 func checkPublicFunctionAccountParams(
 	functionDeclaration *ast.FunctionDeclaration,
+	functionType *sema.FunctionType,
 	parentKind common.DeclarationKind,
 	parentName string,
 	location common.Location,
@@ -91,21 +95,21 @@ func checkPublicFunctionAccountParams(
 	}
 
 	parameterList := functionDeclaration.ParameterList
-	if parameterList == nil {
+	if parameterList == nil || functionType == nil {
 		return
 	}
 
 	funcName := functionDeclaration.Identifier.Identifier
 
-	for _, parameter := range parameterList.Parameters {
-		if !hasAuthAccountReference(parameter.TypeAnnotation) {
+	for i, parameter := range functionType.Parameters {
+		if !isAuthAccountReferenceType(parameter.TypeAnnotation.Type) {
 			continue
 		}
 
 		report(
 			analysis.Diagnostic{
 				Location: location,
-				Range:    ast.NewRangeFromPositioned(nil, parameter),
+				Range:    ast.NewRangeFromPositioned(nil, parameterList.Parameters[i]),
 				Category: SecurityCategory,
 				Message: fmt.Sprintf(
 					"public function '%s' of %s '%s' accepts an authorized Account reference "+
@@ -119,41 +123,20 @@ func checkPublicFunctionAccountParams(
 	}
 }
 
-// hasAuthAccountReference checks if a type annotation contains an
-// authorized reference to the Account type (auth(...) &Account).
-func hasAuthAccountReference(annotation *ast.TypeAnnotation) bool {
-	if annotation == nil {
-		return false
-	}
-	return isAuthAccountReferenceType(annotation.Type)
-}
-
-func isAuthAccountReferenceType(ty ast.Type) bool {
+// isAuthAccountReferenceType checks if a type is an authorized reference
+// to the Account type (auth(...) &Account).
+func isAuthAccountReferenceType(ty sema.Type) bool {
 	switch t := ty.(type) {
-	case *ast.ReferenceType:
-		if isAccountType(t.Type) && hasEntitlements(t.Authorization) {
-			return true
+	case *sema.ReferenceType:
+		if t.Type == sema.AccountType {
+			switch t.Authorization.(type) {
+			case *sema.EntitlementMapAccess,
+				sema.EntitlementSetAccess:
+				return true
+			}
 		}
-	case *ast.OptionalType:
+	case *sema.OptionalType:
 		return isAuthAccountReferenceType(t.Type)
-	}
-	return false
-}
-
-func isAccountType(ty ast.Type) bool {
-	nominalType, ok := ty.(*ast.NominalType)
-	if !ok {
-		return false
-	}
-	return nominalType.Identifier.Identifier == "Account"
-}
-
-func hasEntitlements(authorization ast.Authorization) bool {
-	switch authorization.(type) {
-	case ast.EntitlementSet:
-		return true
-	case *ast.MappedAccess:
-		return true
 	}
 	return false
 }
