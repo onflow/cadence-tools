@@ -54,5 +54,19 @@ func RegisterAnalyzer(name string, analyzer *analysis.Analyzer) {
 
 	}
 
+	originalRun := analyzer.Run
+	analyzer.Run = func(pass *analysis.Pass) interface{} {
+		directives := parseDisableDirectives(pass.Program.Code)
+		if len(directives.directives) > 0 {
+			originalReport := pass.Report
+			pass.Report = func(d analysis.Diagnostic) {
+				if !directives.isDisabled(d.StartPos.Line, name) {
+					originalReport(d)
+				}
+			}
+		}
+		return originalRun(pass)
+	}
+
 	Analyzers[name] = analyzer
 }
