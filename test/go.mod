@@ -7,7 +7,7 @@ require (
 	github.com/onflow/atree v0.14.0
 	github.com/onflow/cadence v1.10.0
 	github.com/onflow/crypto v0.25.4
-	github.com/onflow/flow-emulator v1.18.1-0.20260321000651-f99016aec02f
+	github.com/onflow/flow-emulator v1.19.0
 	github.com/onflow/flow-go v0.47.0-ledger-service.1.0.20260320214141-968222a41c12
 	github.com/onflow/flow-go-sdk v1.10.0
 	github.com/onflow/flow/protobuf/go/flow v0.4.20
