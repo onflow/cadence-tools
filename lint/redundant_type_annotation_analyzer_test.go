@@ -181,4 +181,40 @@ func TestRedundantTypeAnnotationAnalyzer(t *testing.T) {
 			diagnostics,
 		)
 	})
+
+	t.Run("type annotation needed, nested empty dictionary", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) let foo: {Int: {String: AnyStruct}} = {1: {}}
+            `,
+			lint.RedundantTypeAnnotationAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("type annotation needed, nested empty array", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzers(t,
+			`
+              access(all) let foo: {Int: [String]} = {1: []}
+            `,
+			lint.RedundantTypeAnnotationAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
 }
