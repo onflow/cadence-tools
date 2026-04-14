@@ -5717,6 +5717,57 @@ func TestBlockchainMoveTime(t *testing.T) {
 	}
 }
 
+func TestBlockchainFreezeTime(t *testing.T) {
+	t.Parallel()
+
+	backend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
+
+	before := backend.clock.Now()
+	backend.FreezeTime()
+
+	// Simulate real time passing by moving the wall clock forward via MoveTime,
+	// then confirm the frozen clock does not advance on its own.
+	time.Sleep(10 * time.Millisecond)
+	after := backend.clock.Now()
+
+	assert.Equal(t, before.Unix(), after.Unix(),
+		"frozen clock should not advance with real time")
+}
+
+func TestBlockchainFreezeTimeWithMoveTime(t *testing.T) {
+	t.Parallel()
+
+	backend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
+	backend.FreezeTime()
+
+	before := backend.clock.Now()
+	const delta int64 = 1000
+	backend.MoveTime(delta)
+
+	after := backend.clock.Now()
+	assert.Equal(t, before.Unix()+delta, after.Unix(),
+		"MoveTime should still advance the frozen clock")
+}
+
+func TestBlockchainUnfreezeTimeContinuesFromFrozenMoment(t *testing.T) {
+	t.Parallel()
+
+	backend := NewEmulatorBackend(zerolog.Nop(), nil, nil, nil)
+	backend.FreezeTime()
+
+	const delta int64 = 500
+	backend.MoveTime(delta)
+	frozenNow := backend.clock.Now()
+
+	backend.UnfreezeTime()
+
+	// After unfreezing, Now() should resume from the frozen moment,
+	// not jump back to real wall-clock time.
+	resumedNow := backend.clock.Now()
+	assert.InDelta(t, frozenNow.Unix(), resumedNow.Unix(), 1,
+		"clock should resume from the frozen moment after UnfreezeTime")
+}
+
 func TestRandomizedTestExecution(t *testing.T) {
 	t.Parallel()
 
@@ -5905,6 +5956,179 @@ func TestScheduledTransactions(t *testing.T) {
 	for _, result := range results {
 		require.NoError(t, result.Error)
 	}
+}
+
+func TestScheduledTransactionsDoNotFireWithFrozenClock(t *testing.T) {
+	t.Parallel()
+
+	const handlerContract = `
+		import "FlowTransactionScheduler"
+		access(all) contract ScheduledHandler {
+			access(contract) var count: Int
+			access(all) view fun getCount(): Int { return self.count }
+			access(all) resource Handler: FlowTransactionScheduler.TransactionHandler {
+				access(FlowTransactionScheduler.Execute) fun executeTransaction(id: UInt64, data: AnyStruct?) {
+					ScheduledHandler.count = ScheduledHandler.count + 1
+				}
+			}
+			access(all) fun createHandler(): @Handler { return <- create Handler() }
+			init() { self.count = 0 }
+		}
+	`
+
+	// scheduleTx1s schedules 1 second in the future so that real wall-clock
+	// time would trigger it without a frozen clock.
+	const scheduleTx1s = `
+		import "FlowTransactionScheduler"
+		import "ScheduledHandler"
+		import "FungibleToken"
+		import "FlowToken"
+		transaction {
+			prepare(acct: auth(Storage, Capabilities) &Account) {
+				if acct.storage.borrow<&ScheduledHandler.Handler>(from: /storage/counterHandler) == nil {
+					let h <- ScheduledHandler.createHandler()
+					acct.storage.save(<-h, to: /storage/counterHandler)
+				}
+				let issued: Capability<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}> =
+					acct.capabilities.storage.issue<auth(FlowTransactionScheduler.Execute) &{FlowTransactionScheduler.TransactionHandler}>(/storage/counterHandler)
+				let estimate = FlowTransactionScheduler.estimate(
+					data: nil,
+					timestamp: getCurrentBlock().timestamp + 1.0,
+					priority: FlowTransactionScheduler.Priority.High,
+					executionEffort: UInt64(5000)
+				)
+				let feeAmount: UFix64 = estimate.flowFee ?? 0.001
+				let vaultRef = acct.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+					?? panic("missing FlowToken vault")
+				let fees <- (vaultRef.withdraw(amount: feeAmount) as! @FlowToken.Vault)
+				destroy <- FlowTransactionScheduler.schedule(
+					handlerCap: issued,
+					data: nil,
+					timestamp: getCurrentBlock().timestamp + 1.0,
+					priority: FlowTransactionScheduler.Priority.High,
+					executionEffort: UInt64(5000),
+					fees: <-fees
+				)
+			}
+		}
+	`
+
+	const verifyScript = `
+		import "ScheduledHandler"
+		access(all) fun main(): Int { return ScheduledHandler.getCount() }
+	`
+
+	// freezeAndScheduleCode deploys the contract, mints tokens, freezes the
+	// clock, then schedules a tx 1 second in the future — all from Cadence.
+	// Freezing before scheduling means the schedule threshold is set against
+	// the frozen base, which the clock can never reach on its own.
+	const freezeAndScheduleCode = `
+		import Test
+		import BlockchainHelpers
+
+		access(all)
+		let account = Test.getAccount(0x0000000000000006)
+
+		access(all)
+		fun setup() {
+			let err = Test.deployContract(
+				name: "ScheduledHandler",
+				path: "ScheduledHandler.cdc",
+				arguments: []
+			)
+			Test.expect(err, Test.beNil())
+
+			let mintResult = mintFlow(to: account, amount: 1.0)
+			Test.expect(mintResult, Test.beSucceeded())
+		}
+
+		access(all)
+		fun testFreezeAndSchedule() {
+			Test.freezeTime()
+
+			let code = Test.readFile("schedule_callback_1s.cdc")
+			let tx = Test.Transaction(
+				code: code,
+				authorizers: [account.address],
+				signers: [account],
+				arguments: []
+			)
+			let transactionResult = Test.executeTransaction(tx)
+			Test.expect(transactionResult, Test.beSucceeded())
+		}
+	`
+
+	// assertCode has no setup so it reuses the existing blockchain state.
+	const assertCode = `
+		import Test
+
+		access(all)
+		fun testCountIsStillZero() {
+			Test.commitBlock()
+			Test.commitBlock()
+
+			let verify = Test.readFile("verify_counter.cdc")
+			var scriptResult = Test.executeScript(verify, [])
+			Test.expect(scriptResult, Test.beSucceeded())
+			Test.assertEqual(0, scriptResult.returnValue! as! Int)
+
+			// Now move time past the threshold — the scheduled tx must fire.
+			Test.moveTime(by: 2.0)
+			Test.commitBlock()
+
+			scriptResult = Test.executeScript(verify, [])
+			Test.expect(scriptResult, Test.beSucceeded())
+			Test.assertEqual(1, scriptResult.returnValue! as! Int)
+		}
+	`
+
+	fileResolver := func(path string) (string, error) {
+		switch path {
+		case "ScheduledHandler.cdc":
+			return handlerContract, nil
+		case "schedule_callback_1s.cdc":
+			return scheduleTx1s, nil
+		case "verify_counter.cdc":
+			return verifyScript, nil
+		default:
+			return "", fmt.Errorf("cannot find file path: %s", path)
+		}
+	}
+
+	importResolver := func(location common.Location) (string, error) {
+		switch location := location.(type) {
+		case common.AddressLocation:
+			if location.Name == "ScheduledHandler" {
+				return handlerContract, nil
+			}
+		case common.StringLocation:
+			if location == "ScheduledHandler.cdc" {
+				return handlerContract, nil
+			}
+		}
+		return "", fmt.Errorf("cannot find import location: %s", location.ID())
+	}
+
+	runner := NewTestRunner().
+		WithFileResolver(fileResolver).
+		WithImportResolver(simpleImportResolver(func(location common.Location) (string, error) { return importResolver(location) })).
+		WithContractAddressResolver(contractsToResolver(map[string]common.Address{
+			"ScheduledHandler": firstAccountAddress,
+		}))
+
+	// Step 1: deploy, mint, freeze clock, and schedule — all from Cadence.
+	result, err := runner.RunTest(freezeAndScheduleCode, "testFreezeAndSchedule")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+
+	// Step 2: sleep past the 1-second threshold in real wall-clock time.
+	time.Sleep(2 * time.Second)
+
+	// Step 3: commit blocks — frozen clock means timestamps never reach the
+	// threshold, so the scheduled tx must not fire.
+	result, err = runner.RunTest(assertCode, "testCountIsStillZero")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
 }
 
 func TestReferenceDeployedContractTypes(t *testing.T) {
