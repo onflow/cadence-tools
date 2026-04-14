@@ -5489,6 +5489,87 @@ func TestBlockchainReset(t *testing.T) {
 	require.NoError(t, result.Error)
 }
 
+func TestBlockchainResetToCurrentHeight(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+
+        access(all)
+        fun testBlockchainResetToCurrentHeight() {
+            let height = getCurrentBlock().height
+			Test.reset(to: height)
+            Test.assertEqual(height, getCurrentBlock().height)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testBlockchainResetToCurrentHeight")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
+func TestBlockchainResetToCurrentHeightWithPendingTransaction(t *testing.T) {
+	t.Parallel()
+
+	const testCode = `
+        import Test
+        import BlockchainHelpers
+
+        access(all)
+        fun testBlockchainResetToCurrentHeightWithPendingTransaction() {
+            let account = Test.createAccount()
+            var balance = getFlowBalance(account: account)
+            Test.assertEqual(0.0, balance)
+
+            let height = getCurrentBlockHeight()
+
+            // Queue a mint transaction but do NOT execute it
+            let code = Test.readFile("\u{0}helper/mint_flow.cdc")
+            let tx = Test.Transaction(
+                code: code,
+                authorizers: [Test.serviceAccount().address],
+                signers: [],
+                arguments: [account.address, 1500.0]
+            )
+            Test.addTransaction(tx)
+
+            // pending transaction must be discarded
+            Test.reset(to: height)
+			Test.executeNextTransaction()
+            Test.commitBlock()
+
+            // balance unchanged (mint never ran), only one empty block committed
+            balance = getFlowBalance(account: account)
+            Test.assertEqual(0.0, balance)
+            Test.assertEqual(getCurrentBlockHeight(), height + 1)
+
+			Test.reset(to: height)
+
+			// Queue a mint transaction execute it but don't commit it
+            Test.addTransaction(tx)
+			Test.executeNextTransaction()
+
+            // pending transaction must be discarded
+            Test.reset(to: height)
+			Test.executeNextTransaction()
+            Test.commitBlock()
+
+            // balance unchanged (mint never ran), only one empty block committed
+            balance = getFlowBalance(account: account)
+            Test.assertEqual(0.0, balance)
+            Test.assertEqual(getCurrentBlockHeight(), height + 1)
+        }
+	`
+
+	runner := NewTestRunner()
+
+	result, err := runner.RunTest(testCode, "testBlockchainResetToCurrentHeightWithPendingTransaction")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestBlockchainResetPersistsTimeRollback(t *testing.T) {
 	t.Parallel()
 
