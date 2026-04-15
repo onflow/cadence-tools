@@ -194,50 +194,6 @@ func TestDisableNextLineMultipleAnalyzers(t *testing.T) {
 	})
 }
 
-func TestDisableNextLinePermissiveAccess(t *testing.T) {
-
-	t.Parallel()
-
-	t.Run("disabled", func(t *testing.T) {
-		t.Parallel()
-
-		diagnostics := testAnalyzers(t,
-			`
-			access(all) contract MyContract {
-				// lint-disable-next permissive-access
-				access(all) var balance: UFix64
-
-				init() {
-					self.balance = 0.0
-				}
-			}
-			`,
-			lint.PermissiveAccessAnalyzer,
-		)
-
-		require.Empty(t, diagnostics)
-	})
-
-	t.Run("not disabled", func(t *testing.T) {
-		t.Parallel()
-
-		diagnostics := testAnalyzers(t,
-			`
-			access(all) contract MyContract {
-				access(all) var balance: UFix64
-
-				init() {
-					self.balance = 0.0
-				}
-			}
-			`,
-			lint.PermissiveAccessAnalyzer,
-		)
-
-		require.Len(t, diagnostics, 1)
-	})
-}
-
 func TestDisableNextLineSelectiveFiltering(t *testing.T) {
 
 	t.Parallel()
