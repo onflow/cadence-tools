@@ -26,7 +26,7 @@ import (
 const lintDisableNextLinePrefix = "// lint-disable-next"
 
 type disableDirective struct {
-	analyzerNames []string // nil/empty = disable all
+	analyzerNames map[string]struct{} // nil/empty = disable all
 }
 
 type disableDirectives struct {
@@ -53,12 +53,15 @@ func parseDisableDirectives(code []byte) disableDirectives {
 		rest := string(trimmed[len(lintDisableNextLinePrefix):])
 		rest = strings.TrimSpace(rest)
 
-		var names []string
+		var names map[string]struct{}
 		if rest != "" {
 			for _, name := range strings.Split(rest, ",") {
 				name = strings.TrimSpace(name)
 				if name != "" {
-					names = append(names, name)
+					if names == nil {
+						names = map[string]struct{}{}
+					}
+					names[name] = struct{}{}
 				}
 			}
 		}
@@ -91,11 +94,6 @@ func (d disableDirectives) isDisabled(line int, analyzerName string) bool {
 		return true
 	}
 
-	for _, name := range directive.analyzerNames {
-		if name == analyzerName {
-			return true
-		}
-	}
-
-	return false
+	_, ok = directive.analyzerNames[analyzerName]
+	return ok
 }
