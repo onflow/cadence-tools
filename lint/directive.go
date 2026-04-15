@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-const lintDisableNextLinePrefix = "// lint-disable-next-line"
+const lintDisableNextLinePrefix = "// lint-disable-next"
 
 type disableDirective struct {
 	analyzerNames []string // nil/empty = disable all
@@ -34,7 +34,7 @@ type disableDirectives struct {
 	directives map[int]disableDirective
 }
 
-// parseDisableDirectives scans source code for // lint-disable-next-line comments.
+// parseDisableDirectives scans source code for // lint-disable-next comments.
 // Returns directives keyed by the line number they apply to (the line after the comment).
 func parseDisableDirectives(code []byte) disableDirectives {
 	if len(code) == 0 {

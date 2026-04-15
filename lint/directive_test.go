@@ -38,7 +38,7 @@ func TestDisableNextLineAll(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line
+					// lint-disable-next
 					let y = x!
 				}
 			}
@@ -80,7 +80,7 @@ func TestDisableNextLineSpecificMatch(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line unnecessary-force
+					// lint-disable-next unnecessary-force
 					let y = x!
 				}
 			}
@@ -122,7 +122,7 @@ func TestDisableNextLineSpecificNoMatch(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line redundant-cast
+					// lint-disable-next redundant-cast
 					let y = x!
 				}
 			}
@@ -164,7 +164,7 @@ func TestDisableNextLineMultipleAnalyzers(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line redundant-cast, unnecessary-force
+					// lint-disable-next redundant-cast, unnecessary-force
 					let y = x!
 				}
 			}
@@ -204,7 +204,7 @@ func TestDisableNextLinePermissiveAccess(t *testing.T) {
 		diagnostics := testAnalyzers(t,
 			`
 			access(all) contract MyContract {
-				// lint-disable-next-line permissive-access
+				// lint-disable-next permissive-access
 				access(all) var balance: UFix64
 
 				init() {
@@ -272,7 +272,7 @@ func TestDisableNextLineSelectiveFiltering(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line unnecessary-force
+					// lint-disable-next unnecessary-force
 					let y = x! as Int
 				}
 			}
@@ -293,7 +293,7 @@ func TestDisableNextLineSelectiveFiltering(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line redundant-cast
+					// lint-disable-next redundant-cast
 					let y = x! as Int
 				}
 			}
@@ -314,7 +314,7 @@ func TestDisableNextLineSelectiveFiltering(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line unnecessary-force, redundant-cast
+					// lint-disable-next unnecessary-force, redundant-cast
 					let y = x! as Int
 				}
 			}
@@ -334,7 +334,7 @@ func TestDisableNextLineSelectiveFiltering(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line
+					// lint-disable-next
 					let y = x! as Int
 				}
 			}
@@ -359,7 +359,7 @@ func TestDisableNextLineDoesNotAffectOtherLines(t *testing.T) {
 			access(all) contract Test {
 				access(all) fun test() {
 					let x = 3
-					// lint-disable-next-line
+					// lint-disable-next
 					let y = x!
 					let z = x!
 				}
