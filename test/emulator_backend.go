@@ -820,18 +820,31 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 }
 
 func (e *EmulatorBackend) Reset(height uint64) {
-	err := e.blockchain.RollbackToBlockHeight(height)
+	latestBlock, err := e.blockchain.GetLatestBlock()
 	if err != nil {
 		panic(err)
+	}
+
+	if height == latestBlock.Height {
+		err = e.blockchain.ResetPendingBlock()
+		if err != nil {
+			panic(err)
+		}
+		return
 	}
 
 	// Reset the transaction offset.
 	e.blockOffset = 0
 
+	err = e.blockchain.RollbackToBlockHeight(height)
+	if err != nil {
+		panic(err)
+	}
+
 	// Sync the clock to the rolled-back block's timestamp so that subsequent
 	// blocks continue from that point in time rather than snapping back to the
 	// wall-clock offset that was in effect before the rollback.
-	latestBlock, err := e.blockchain.GetLatestBlock()
+	latestBlock, err = e.blockchain.GetLatestBlock()
 	if err != nil {
 		panic(err)
 	}
