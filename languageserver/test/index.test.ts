@@ -292,7 +292,7 @@ describe("diagnostics", () => {
                 getAccount(0x1)
             }
           `,
-      ["hardcoded address detected — consider using named address imports for portability", "unused result"]
+      ["unused result", "hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("InternalEVM contract exists", async () =>
