@@ -119,7 +119,7 @@ var UnusedImportAnalyzer = (func() *analysis.Analyzer {
 					}
 				},
 			)
-
+			// TODO: Remove the below section once https://github.com/onflow/cadence/issues/4470 is fixed.
 			// The Walk methods for composite, interface, and attachment declarations
 			// do not recurse into conformance lists, attachment base types, or
 			// entitlement access specifiers, so the inspector never visits the
