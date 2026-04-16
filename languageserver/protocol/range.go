@@ -23,6 +23,13 @@ func (r Range) Overlaps(other Range) bool {
 		r.End.Compare(other.Start) >= 0
 }
 
+func (r Range) Compare(other Range) int {
+	if c := r.Start.Compare(other.Start); c != 0 {
+		return c
+	}
+	return r.End.Compare(other.End)
+}
+
 func (p Position) Compare(other Position) int {
 	if p.Line < other.Line {
 		return -1
