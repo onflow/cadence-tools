@@ -92,15 +92,37 @@ const defaultNetworkLabel = "testing"
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
 type systemClock struct {
+	base      time.Time
+	frozen    bool
 	TimeDelta int64
 }
 
-func (sc systemClock) Now() time.Time {
-	return time.Now().Add(time.Second * time.Duration(sc.TimeDelta)).UTC()
+func (s *systemClock) Now() time.Time {
+	base := time.Now()
+	if s.frozen {
+		base = s.base
+	}
+	return base.Add(time.Second * time.Duration(s.TimeDelta)).UTC()
+}
+
+func (s *systemClock) FreezeTime() {
+	s.base = time.Now()
+	s.frozen = true
+}
+
+func (s *systemClock) UnfreezeTime() {
+	// Adjust TimeDelta so real-time Now() continues from the frozen moment.
+	s.TimeDelta = int64(time.Until(s.Now()).Seconds())
+	s.frozen = false
 }
 
 func newSystemClock() *systemClock {
-	return &systemClock{}
+	c := &systemClock{
+		base:      time.Time{},
+		frozen:    false,
+		TimeDelta: 0,
+	}
+	return c
 }
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
@@ -939,6 +961,20 @@ func (e *EmulatorBackend) MoveTime(timeDelta int64) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// FreezeTime Freezes the time of the Blockchain's clock, it will no longer
+// advance in real time. Calls to MoveTime still work.
+func (e *EmulatorBackend) FreezeTime() {
+	e.clock.FreezeTime()
+	e.blockchain.SetClock(e.clock)
+}
+
+// UnfreezeTime Unfreezes the time of the Blockchain's clock, it will advance
+// in real time again.
+func (e *EmulatorBackend) UnfreezeTime() {
+	e.clock.UnfreezeTime()
+	e.blockchain.SetClock(e.clock)
 }
 
 // CreateSnapshot Creates a snapshot of the blockchain, at the
