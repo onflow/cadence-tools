@@ -709,11 +709,14 @@ func (e *EmulatorBackend) ExecuteNextTransaction() *stdlib.TransactionResult {
 
 	if result.Error != nil {
 		return &stdlib.TransactionResult{
-			Error: result.Error,
+			Error:           result.Error,
+			ComputationUsed: result.ComputationUsed,
 		}
 	}
 
-	return &stdlib.TransactionResult{}
+	return &stdlib.TransactionResult{
+		ComputationUsed: result.ComputationUsed,
+	}
 }
 
 func (e *EmulatorBackend) CommitBlock() error {

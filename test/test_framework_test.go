@@ -2065,6 +2065,35 @@ func TestExecutingTransactions(t *testing.T) {
 	})
 }
 
+func TestTransactionComputationUsed(t *testing.T) {
+	t.Parallel()
+
+	const code = `
+        import Test
+
+        access(all)
+        fun test() {
+            let account = Test.createAccount()
+
+            let tx = Test.Transaction(
+                code: "transaction { execute{ var i = 0; while i < 100 { i = i + 1 } } }",
+                authorizers: [],
+                signers: [account],
+                arguments: [],
+            )
+
+            let result = Test.executeTransaction(tx)
+            Test.expect(result, Test.beSucceeded())
+            assert(result.computationUsed > 0, message: "computationUsed should be greater than 0")
+        }
+	`
+
+	runner := NewTestRunner()
+	result, err := runner.RunTest(code, "test")
+	require.NoError(t, err)
+	require.NoError(t, result.Error)
+}
+
 func TestSetupAndTearDown(t *testing.T) {
 	t.Parallel()
 
