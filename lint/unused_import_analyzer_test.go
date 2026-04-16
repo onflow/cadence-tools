@@ -505,6 +505,96 @@ func TestUnusedImportAnalyzer(t *testing.T) {
 		)
 	})
 
+	t.Run("used only in composite conformance list", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+			import Bar from 0x01
+
+			access(all) resource Foo: Bar.Interface {}
+		`
+
+		diagnostics := testAnalyzersWithImports(t, code, lint.UnusedImportAnalyzer)
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("used only in interface conformance list", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+			import Bar from 0x01
+
+			access(all) resource interface MyInterface: Bar.Interface {}
+		`
+
+		diagnostics := testAnalyzersWithImports(t, code, lint.UnusedImportAnalyzer)
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("used only in attachment base type", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+			import Bar from 0x01
+
+			access(all) attachment MyAttachment for Bar.Resource {}
+		`
+
+		diagnostics := testAnalyzersWithImports(t, code, lint.UnusedImportAnalyzer)
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("used only in entitlement access on function member", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+			import Bar from 0x01
+
+			access(all) resource Foo {
+				access(Bar.Entitlement) fun method(): Int {
+					return 1
+				}
+			}
+		`
+
+		diagnostics := testAnalyzersWithImports(t, code, lint.UnusedImportAnalyzer)
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
+	t.Run("used only in entitlement access on field member", func(t *testing.T) {
+		t.Parallel()
+
+		const code = `
+			import Bar from 0x01
+
+			access(all) resource Foo {
+				access(Bar.Entitlement) let value: Int
+
+				init() {
+					self.value = 0
+				}
+			}
+		`
+
+		diagnostics := testAnalyzersWithImports(t, code, lint.UnusedImportAnalyzer)
+		require.Equal(t,
+			[]analysis.Diagnostic(nil),
+			diagnostics,
+		)
+	})
+
 	t.Run("no imports", func(t *testing.T) {
 		t.Parallel()
 
@@ -559,6 +649,12 @@ func testAnalyzersWithImports(t *testing.T, code string, analyzers ...*analysis.
 
 	barContract := `
 		access(all) contract Bar {
+			access(all) entitlement Entitlement
+
+			access(all) resource interface Interface {}
+
+			access(all) resource Resource {}
+
 			access(all) struct SomeStruct {}
 
 			access(all) fun doSomething() {}

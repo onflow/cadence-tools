@@ -119,6 +119,64 @@ var UnusedImportAnalyzer = (func() *analysis.Analyzer {
 					}
 				},
 			)
+			// TODO: Remove the below section once https://github.com/onflow/cadence/issues/4470 is fixed.
+			// The Walk methods for composite, interface, and attachment declarations
+			// do not recurse into conformance lists, attachment base types, or
+			// entitlement access specifiers, so the inspector never visits the
+			// NominalType nodes there. Check those positions explicitly.
+
+			markNominalTypeUsed := func(t *ast.NominalType) {
+				name := t.Identifier.Identifier
+				if _, isImported := importedNames[name]; isImported {
+					usedImports[name] = struct{}{}
+				}
+			}
+
+			markEntitlementAccessUsed := func(access ast.Access) {
+				entAccess, ok := access.(ast.EntitlementAccess)
+				if !ok {
+					return
+				}
+				for _, e := range entAccess.EntitlementSet.Entitlements() {
+					markNominalTypeUsed(e)
+				}
+			}
+
+			inspector.Preorder(
+				[]ast.Element{
+					(*ast.CompositeDeclaration)(nil),
+					(*ast.InterfaceDeclaration)(nil),
+					(*ast.AttachmentDeclaration)(nil),
+					(*ast.FunctionDeclaration)(nil),
+					(*ast.FieldDeclaration)(nil),
+				},
+				func(element ast.Element) {
+					switch decl := element.(type) {
+					case *ast.CompositeDeclaration:
+						markEntitlementAccessUsed(decl.Access)
+						for _, c := range decl.Conformances {
+							markNominalTypeUsed(c)
+						}
+					case *ast.InterfaceDeclaration:
+						markEntitlementAccessUsed(decl.Access)
+						for _, c := range decl.Conformances {
+							markNominalTypeUsed(c)
+						}
+					case *ast.AttachmentDeclaration:
+						markEntitlementAccessUsed(decl.Access)
+						if decl.BaseType != nil {
+							markNominalTypeUsed(decl.BaseType)
+						}
+						for _, c := range decl.Conformances {
+							markNominalTypeUsed(c)
+						}
+					case *ast.FunctionDeclaration:
+						markEntitlementAccessUsed(decl.Access)
+					case *ast.FieldDeclaration:
+						markEntitlementAccessUsed(decl.Access)
+					}
+				},
+			)
 
 			// Collect unused imports.
 			// For implicit imports, we only report if ALL imports from that declaration are unused
