@@ -518,7 +518,11 @@ func (e *EmulatorBackend) RunScript(
 		arguments = append(arguments, encodedArg)
 	}
 
-	code = e.replaceImports(code)
+	var replaceErr error
+	code, replaceErr = e.replaceImports(code)
+	if replaceErr != nil {
+		return &stdlib.ScriptResult{Error: replaceErr}
+	}
 
 	result, err := e.blockchain.ExecuteScript([]byte(code), arguments)
 	if err != nil {
@@ -658,7 +662,11 @@ func (e *EmulatorBackend) AddTransaction(
 	signers []*stdlib.Account,
 	args []interpreter.Value,
 ) error {
-	code = e.replaceImports(code)
+	var err error
+	code, err = e.replaceImports(code)
+	if err != nil {
+		return err
+	}
 
 	tx := e.newTransaction(code, authorizers)
 
@@ -674,7 +682,7 @@ func (e *EmulatorBackend) AddTransaction(
 		}
 	}
 
-	err := e.signTransaction(tx, signers)
+	err = e.signTransaction(tx, signers)
 	if err != nil {
 		return err
 	}
@@ -750,7 +758,10 @@ func (e *EmulatorBackend) DeployContract(
 	if err != nil {
 		panic(err)
 	}
-	code = e.replaceImports(code)
+	code, err = e.replaceImports(code)
+	if err != nil {
+		return fmt.Errorf("failed to parse contract %q: %w", name, err)
+	}
 
 	hexEncodedCode := hex.EncodeToString([]byte(code))
 
@@ -1097,10 +1108,10 @@ func (e *EmulatorBackend) signTransaction(
 	return nil
 }
 
-func (e *EmulatorBackend) replaceImports(code string) string {
+func (e *EmulatorBackend) replaceImports(code string) (string, error) {
 	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	sb := strings.Builder{}
@@ -1160,7 +1171,7 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 	sb.WriteString(code[importDeclEnd:])
 
-	return sb.String()
+	return sb.String(), nil
 }
 
 // wrapWithBuiltins wraps a user-provided resolver with fallback to built-in contracts.

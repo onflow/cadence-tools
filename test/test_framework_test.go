@@ -3816,7 +3816,8 @@ func TestReplaceImports(t *testing.T) {
         fun main() {}
 	`
 
-	replacedCode := emulatorBackend.replaceImports(code)
+	replacedCode, err := emulatorBackend.replaceImports(code)
+	require.NoError(t, err)
 
 	assert.Equal(t, expected, replacedCode)
 }
