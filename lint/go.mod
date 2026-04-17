@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.10.2
+	github.com/onflow/cadence v1.10.3-0.20260416181305-e8fe69bc408a
 	github.com/onflow/flow-go-sdk v1.10.2
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.79.3
