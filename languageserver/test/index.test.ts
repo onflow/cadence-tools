@@ -13,6 +13,9 @@ import {
   TextDocumentItem,
   Trace,
   Tracer,
+  CodeLensRequest,
+  Position,
+  CompletionItem
 } from "vscode-languageserver-protocol";
 
 import { execSync, spawn } from "child_process";
@@ -343,7 +346,7 @@ describe("diagnostics", () => {
             notification: notification,
           });
 
-          await connection.sendNotification(
+          connection.sendNotification(
             DidOpenTextDocumentNotification.type,
             {
               textDocument: TextDocumentItem.create(
@@ -799,7 +802,6 @@ describe("contracts", () => {
 });
 
 describe("codelenses", () => {
-  const codelensRequest = "textDocument/codeLens";
 
   test("contract codelensss", async () => {
     await withConnection(async (connection) => {
@@ -812,11 +814,11 @@ describe("codelenses", () => {
         code.toString()
       );
 
-      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+      connection.sendNotification(DidOpenTextDocumentNotification.type, {
         textDocument: document,
       });
 
-      let codelens = await connection.sendRequest(codelensRequest, {
+      let codelens = await connection.sendRequest(CodeLensRequest.type, {
         textDocument: document,
       });
 
@@ -839,11 +841,11 @@ describe("codelenses", () => {
         code.toString()
       );
 
-      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+      connection.sendNotification(DidOpenTextDocumentNotification.type, {
         textDocument: document,
       });
 
-      let codelens = await connection.sendRequest(codelensRequest, {
+      let codelens = await connection.sendRequest(CodeLensRequest.type, {
         textDocument: document,
       });
 
@@ -866,11 +868,11 @@ describe("codelenses", () => {
         code.toString()
       );
 
-      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+      connection.sendNotification(DidOpenTextDocumentNotification.type, {
         textDocument: document,
       });
 
-      let codelens = await connection.sendRequest(codelensRequest, {
+      let codelens = await connection.sendRequest(CodeLensRequest.type, {
         textDocument: document,
       });
 
@@ -882,3 +884,134 @@ describe("codelenses", () => {
     }, true);
   });
 });
+
+function sortCompletionItems(items: CompletionItem[]) {
+  items.sort((a, b) => {
+    let aLabel = a?.sortText ?? a.label;
+    let bLabel = b?.sortText ?? b.label;
+    return aLabel.localeCompare(bLabel);
+  });
+}
+
+describe("completion", () => {
+  async function testCode(code: string, position: Position, expectedCompletions: CompletionItem[]) {
+    return withConnection(async (connection) => {
+
+      const uri = await createTestDocument(connection, code);
+
+      const result= await connection.sendRequest("textDocument/completion", {
+        textDocument: { uri: uri },
+        position,
+      });
+
+      sortCompletionItems(result as CompletionItem[]);
+      sortCompletionItems(expectedCompletions);
+
+      expect(result).toEqual(expectedCompletions);
+    });
+  }
+
+  test("no char", async () =>
+    testCode(
+      `
+        access(all) struct S {
+            access(all) let foo: Int
+
+            access(all) init(foo: Int) {
+                self.foo = foo
+            }
+        }
+
+        access(all) fun main() {
+            let s = S(foo: 42)
+            s.
+        }
+      `,
+      { line: 11, character: 14 },
+      [
+        {
+          label: 'foo',
+          kind: 5,
+          commitCharacters: [ '.' ],
+          data: { uri: 'file:///test.cdc', id: 'foo' }
+        },
+        {
+          label: 'isInstance',
+          kind: 3,
+          insertText: 'isInstance(${1:type})',
+          insertTextFormat: 2,
+          command: { title: '', command: 'editor.action.triggerParameterHints' },
+          data: { uri: 'file:///test.cdc', id: 'isInstance' }
+        },
+        {
+          label: 'getType',
+          kind: 3,
+          insertText: 'getType()',
+          insertTextFormat: 2,
+          command: { title: '', command: 'editor.action.triggerParameterHints' },
+          data: { uri: 'file:///test.cdc', id: 'getType' }
+        },
+        {
+          label: 'forEachAttachment',
+          kind: 3,
+          insertText: 'forEachAttachment(${1:f})',
+          insertTextFormat: 2,
+          command: { title: '', command: 'editor.action.triggerParameterHints' },
+          data: { uri: 'file:///test.cdc', id: 'forEachAttachment' }
+        }
+      ]
+    )
+  )
+
+  test("one char", async () =>
+    testCode(
+      `
+        access(all) struct S {
+            access(all) let foo: Int
+
+            access(all) init(foo: Int) {
+                self.foo = foo
+            }
+        }
+
+        access(all) fun main() {
+            let s = S(foo: 42)
+            s.f
+        }
+      `,
+      { line: 11, character: 15 },
+      [
+        {
+          label: 'foo',
+          kind: 5,
+          commitCharacters: [ '.' ],
+          data: { uri: 'file:///test.cdc', id: 'foo' }
+        },
+        {
+          label: 'isInstance',
+          kind: 3,
+          insertText: 'isInstance(${1:type})',
+          insertTextFormat: 2,
+          command: { title: '', command: 'editor.action.triggerParameterHints' },
+          data: { uri: 'file:///test.cdc', id: 'isInstance' }
+        },
+        {
+          label: 'getType',
+          kind: 3,
+          insertText: 'getType()',
+          insertTextFormat: 2,
+          command: { title: '', command: 'editor.action.triggerParameterHints' },
+          data: { uri: 'file:///test.cdc', id: 'getType' }
+        },
+        {
+          label: 'forEachAttachment',
+          kind: 3,
+          insertText: 'forEachAttachment(${1:f})',
+          insertTextFormat: 2,
+          command: { title: '', command: 'editor.action.triggerParameterHints' },
+          data: { uri: 'file:///test.cdc', id: 'forEachAttachment' }
+        }
+      ]
+    )
+  )
+})
