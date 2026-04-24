@@ -124,9 +124,9 @@ func TestCompletionDocString(t *testing.T) {
 
 		uri := protocol.DocumentURI("file:///completion_range.cdc")
 		server.documents[uri] = Document{Text: code, Version: 1}
-		_, err = server.getDiagnostics(uri, code, 1, func(*protocol.LogMessageParams) {})
 		// There will be checker errors since "ad" is not a valid expression,
 		// but we only need the ranges to be populated.
+		_, _ = server.getDiagnostics(uri, code, 1, func(*protocol.LogMessageParams) {})
 
 		items, err := server.Completion(
 			nil,
