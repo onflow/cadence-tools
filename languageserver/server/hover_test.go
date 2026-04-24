@@ -30,42 +30,98 @@ import (
 func TestHover(t *testing.T) {
 	t.Parallel()
 
-	server, err := NewServer()
-	require.NoError(t, err)
+	t.Run("no docstring", func(t *testing.T) {
+		server, err := NewServer()
+		require.NoError(t, err)
 
-	const code = `
-      access(all) fun test() {
-          let foo = 1
-      }
-    `
+		const code = `
+          access(all) fun test() {
+              let foo = 1
+          }
+        `
 
-	uri := protocol.DocumentURI("file:///test.cdc")
+		uri := protocol.DocumentURI("file:///test.cdc")
 
-	_, err = server.getDiagnostics(uri, code, 1, func(*protocol.LogMessageParams) {})
-	require.NoError(t, err)
+		_, err = server.getDiagnostics(uri, code, 1, func(*protocol.LogMessageParams) {})
+		require.NoError(t, err)
 
-	hover, err := server.Hover(
-		nil,
-		&protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
-			Position:     protocol.Position{Line: 2, Character: 15},
-		},
-	)
-	require.NoError(t, err)
-	require.NotNil(t, hover)
-
-	assert.Equal(
-		t,
-		&protocol.Hover{
-			Range: protocol.Range{
-				Start: protocol.Position{Line: 2, Character: 14},
-				End:   protocol.Position{Line: 2, Character: 17},
+		hover, err := server.Hover(
+			nil,
+			&protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				Position:     protocol.Position{Line: 2, Character: 19},
 			},
-			Contents: protocol.MarkupContent{
-				Kind:  protocol.Markdown,
-				Value: "**Type**\n\n```cadence\nInt\n```\n",
+		)
+		require.NoError(t, err)
+		require.NotNil(t, hover)
+
+		assert.Equal(
+			t,
+			&protocol.Hover{
+				Range: protocol.Range{
+					Start: protocol.Position{Line: 2, Character: 18},
+					End:   protocol.Position{Line: 2, Character: 21},
+				},
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.Markdown,
+					Value: "**Type**\n\n```cadence\nInt\n```\n",
+				},
 			},
-		},
-		hover,
-	)
+			hover,
+		)
+	})
+
+	t.Run("docstring with param and return annotations", func(t *testing.T) {
+		server, err := NewServer()
+		require.NoError(t, err)
+
+		const code = `
+          /// Adds two numbers.
+          ///
+          /// @param a: The first number
+          /// @param b: The second number
+          /// @return The sum
+          access(all) fun add(a: Int, b: Int): Int {
+              return a + b
+          }
+
+          access(all) fun test() {
+              let result = add(a: 1, b: 2)
+          }
+        `
+
+		uri := protocol.DocumentURI("file:///test2.cdc")
+
+		_, err = server.getDiagnostics(uri, code, 1, func(*protocol.LogMessageParams) {})
+		require.NoError(t, err)
+
+		// Hover over the `add` call
+		// Line 11 (0-indexed): "              let result = add(a: 1, b: 2)"
+		// "add" starts at column 27
+		hover, err := server.Hover(
+			nil,
+			&protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+				Position:     protocol.Position{Line: 11, Character: 27},
+			},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, hover)
+
+		assert.Equal(
+			t,
+			protocol.MarkupContent{
+				Kind: protocol.Markdown,
+				Value: "**Type**\n\n```cadence\n" +
+					"fun (a: Int, b: Int): Int\n```\n" +
+					"\n**Documentation**\n\n" +
+					"Adds two numbers.\n\n" +
+					"**Parameters**\n\n" +
+					"- `a`: The first number\n" +
+					"- `b`: The second number\n\n" +
+					"**Returns** The sum\n",
+			},
+			hover.Contents,
+		)
+	})
 }
