@@ -857,7 +857,7 @@ func (s *Server) Hover(
 		documentType(occurrence.Origin.Type),
 	)
 
-	docString := occurrence.Origin.DocString
+	docString := formatDocString(occurrence.Origin.DocString)
 	if docString != "" {
 		_, _ = fmt.Fprintf(
 			&markup,
@@ -1965,7 +1965,7 @@ func (s *Server) maybeResolveMember(uri protocol.DocumentURI, id string, result 
 	result.Documentation = &protocol.Or_CompletionItem_documentation{
 		Value: protocol.MarkupContent{
 			Kind:  "markdown",
-			Value: member.DocString,
+			Value: formatDocString(member.DocString),
 		},
 	}
 
@@ -2045,7 +2045,7 @@ func (s *Server) maybeResolveRange(uri protocol.DocumentURI, id string, result *
 	}
 
 	result.Documentation = &protocol.Or_CompletionItem_documentation{
-		Value: r.DocString,
+		Value: formatDocString(r.DocString),
 	}
 
 	return true
