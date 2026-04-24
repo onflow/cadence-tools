@@ -92,15 +92,37 @@ const defaultNetworkLabel = "testing"
 var _ stdlib.Blockchain = &EmulatorBackend{}
 
 type systemClock struct {
+	base      time.Time
+	frozen    bool
 	TimeDelta int64
 }
 
-func (sc systemClock) Now() time.Time {
-	return time.Now().Add(time.Second * time.Duration(sc.TimeDelta)).UTC()
+func (s *systemClock) Now() time.Time {
+	base := time.Now()
+	if s.frozen {
+		base = s.base
+	}
+	return base.Add(time.Second * time.Duration(s.TimeDelta)).UTC()
+}
+
+func (s *systemClock) FreezeTime() {
+	s.base = time.Now()
+	s.frozen = true
+}
+
+func (s *systemClock) UnfreezeTime() {
+	// Adjust TimeDelta so real-time Now() continues from the frozen moment.
+	s.TimeDelta = int64(time.Until(s.Now()).Seconds())
+	s.frozen = false
 }
 
 func newSystemClock() *systemClock {
-	return &systemClock{}
+	c := &systemClock{
+		base:      time.Time{},
+		frozen:    false,
+		TimeDelta: 0,
+	}
+	return c
 }
 
 // EmulatorBackend is the emulator-backed implementation of the interpreter.TestFramework.
@@ -353,6 +375,9 @@ func NewEmulatorBackend(
 	// Ensure emulator has correct chain ID
 	opts = append(opts, emulator.WithChainID(selectedChain.ChainID()))
 
+	// Enable EVM test helpers
+	opts = append(opts, emulator.WithEVMTestHelpersEnabled(true))
+
 	// Create blockchain
 	blockchain := newBlockchain(opts...)
 
@@ -493,7 +518,11 @@ func (e *EmulatorBackend) RunScript(
 		arguments = append(arguments, encodedArg)
 	}
 
-	code = e.replaceImports(code)
+	var replaceErr error
+	code, replaceErr = e.replaceImports(code)
+	if replaceErr != nil {
+		return &stdlib.ScriptResult{Error: replaceErr}
+	}
 
 	result, err := e.blockchain.ExecuteScript([]byte(code), arguments)
 	if err != nil {
@@ -633,7 +662,11 @@ func (e *EmulatorBackend) AddTransaction(
 	signers []*stdlib.Account,
 	args []interpreter.Value,
 ) error {
-	code = e.replaceImports(code)
+	var err error
+	code, err = e.replaceImports(code)
+	if err != nil {
+		return err
+	}
 
 	tx := e.newTransaction(code, authorizers)
 
@@ -649,7 +682,7 @@ func (e *EmulatorBackend) AddTransaction(
 		}
 	}
 
-	err := e.signTransaction(tx, signers)
+	err = e.signTransaction(tx, signers)
 	if err != nil {
 		return err
 	}
@@ -684,11 +717,14 @@ func (e *EmulatorBackend) ExecuteNextTransaction() *stdlib.TransactionResult {
 
 	if result.Error != nil {
 		return &stdlib.TransactionResult{
-			Error: result.Error,
+			Error:           result.Error,
+			ComputationUsed: result.ComputationUsed,
 		}
 	}
 
-	return &stdlib.TransactionResult{}
+	return &stdlib.TransactionResult{
+		ComputationUsed: result.ComputationUsed,
+	}
 }
 
 func (e *EmulatorBackend) CommitBlock() error {
@@ -722,7 +758,10 @@ func (e *EmulatorBackend) DeployContract(
 	if err != nil {
 		panic(err)
 	}
-	code = e.replaceImports(code)
+	code, err = e.replaceImports(code)
+	if err != nil {
+		return fmt.Errorf("failed to parse contract %q: %w", name, err)
+	}
 
 	hexEncodedCode := hex.EncodeToString([]byte(code))
 
@@ -740,8 +779,8 @@ func (e *EmulatorBackend) DeployContract(
 			txArgsBuilder.WriteString(", ")
 		}
 
-		txArgsBuilder.WriteString(fmt.Sprintf("arg%d: %s", i, cadenceArg.Type().ID()))
-		addArgsBuilder.WriteString(fmt.Sprintf(", arg%d", i))
+		fmt.Fprintf(&txArgsBuilder, "arg%d: %s", i, cadenceArg.Type().ID())
+		fmt.Fprintf(&addArgsBuilder, ", arg%d", i)
 
 		cadenceArgs = append(cadenceArgs, cadenceArg)
 	}
@@ -817,13 +856,37 @@ func (e *EmulatorBackend) StandardLibraryHandler() stdlib.StandardLibraryHandler
 }
 
 func (e *EmulatorBackend) Reset(height uint64) {
-	err := e.blockchain.RollbackToBlockHeight(height)
+	latestBlock, err := e.blockchain.GetLatestBlock()
 	if err != nil {
 		panic(err)
 	}
 
+	if height == latestBlock.Height {
+		err = e.blockchain.ResetPendingBlock()
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
+
 	// Reset the transaction offset.
 	e.blockOffset = 0
+
+	err = e.blockchain.RollbackToBlockHeight(height)
+	if err != nil {
+		panic(err)
+	}
+
+	// Sync the clock to the rolled-back block's timestamp so that subsequent
+	// blocks continue from that point in time rather than snapping back to the
+	// wall-clock offset that was in effect before the rollback.
+	latestBlock, err = e.blockchain.GetLatestBlock()
+	if err != nil {
+		panic(err)
+	}
+	blockTime := time.UnixMilli(int64(latestBlock.Timestamp))
+	e.clock.TimeDelta = int64(time.Until(blockTime).Seconds())
+	e.blockchain.SetClock(e.clock)
 }
 
 // Events returns all the emitted events up until the latest block,
@@ -912,6 +975,20 @@ func (e *EmulatorBackend) MoveTime(timeDelta int64) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// FreezeTime Freezes the time of the Blockchain's clock, it will no longer
+// advance in real time. Calls to MoveTime still work.
+func (e *EmulatorBackend) FreezeTime() {
+	e.clock.FreezeTime()
+	e.blockchain.SetClock(e.clock)
+}
+
+// UnfreezeTime Unfreezes the time of the Blockchain's clock, it will advance
+// in real time again.
+func (e *EmulatorBackend) UnfreezeTime() {
+	e.clock.UnfreezeTime()
+	e.blockchain.SetClock(e.clock)
 }
 
 // CreateSnapshot Creates a snapshot of the blockchain, at the
@@ -1031,10 +1108,10 @@ func (e *EmulatorBackend) signTransaction(
 	return nil
 }
 
-func (e *EmulatorBackend) replaceImports(code string) string {
+func (e *EmulatorBackend) replaceImports(code string) (string, error) {
 	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	sb := strings.Builder{}
@@ -1094,7 +1171,7 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 	sb.WriteString(code[importDeclEnd:])
 
-	return sb.String()
+	return sb.String(), nil
 }
 
 // wrapWithBuiltins wraps a user-provided resolver with fallback to built-in contracts.

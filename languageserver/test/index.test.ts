@@ -237,7 +237,7 @@ describe("diagnostics", () => {
   test("script auth account", async () =>
     testCode(
       `access(all) fun main() { log(getAuthAccount<&Account>(0x01)) }`,
-      []
+      ["hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("transaction", async () =>
@@ -281,7 +281,7 @@ describe("diagnostics", () => {
                 log(get)
             }
           `,
-      []
+      ["hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("unused result", async () =>
@@ -292,7 +292,7 @@ describe("diagnostics", () => {
                 getAccount(0x1)
             }
           `,
-      ["unused result"]
+      ["unused result", "hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("InternalEVM contract exists", async () =>

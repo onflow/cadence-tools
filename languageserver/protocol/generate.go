@@ -18,32 +18,5 @@
 
 package protocol
 
-func (r Range) Overlaps(other Range) bool {
-	return r.Start.Compare(other.End) <= 0 &&
-		r.End.Compare(other.Start) >= 0
-}
-
-func (r Range) Compare(other Range) int {
-	if c := r.Start.Compare(other.Start); c != 0 {
-		return c
-	}
-	return r.End.Compare(other.End)
-}
-
-func (p Position) Compare(other Position) int {
-	if p.Line < other.Line {
-		return -1
-	}
-
-	if p.Line > other.Line {
-		return 1
-	}
-
-	if p.Character < other.Character {
-		return -1
-	} else if p.Character > other.Character {
-		return 1
-	}
-
-	return 0
-}
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=SymbolKind -output=symbolkind_string.go
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=DiagnosticSeverity -output=diagnosticseverity_string.go

@@ -425,7 +425,7 @@ func (r *TestRunner) GetTests(script string) ([]string, error) {
 	return tests, nil
 }
 
-func (r *TestRunner) replaceImports(code string) string {
+func (r *TestRunner) replaceImports(code string) (string, error) {
 	return r.backend.replaceImports(code)
 }
 
@@ -541,7 +541,10 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 		}
 	}
 
-	script = r.replaceImports(script)
+	script, err = r.replaceImports(script)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	program, err := env.ParseAndCheckProgram([]byte(script), ctx.Location, false)
 	if err != nil {
@@ -952,7 +955,10 @@ func (r *TestRunner) parseAndCheckImport(
 
 	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
-	code = r.replaceImports(code)
+	code, err = r.replaceImports(code)
+	if err != nil {
+		return nil, nil, err
+	}
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
 	if err != nil {

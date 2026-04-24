@@ -24,8 +24,10 @@ import (
 	json2 "encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,7 +46,6 @@ import (
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/cadence/tools/analysis"
-	"golang.org/x/exp/maps"
 
 	"github.com/onflow/cadence-tools/languageserver/conversion"
 	"github.com/onflow/cadence-tools/languageserver/jsonrpc2"
@@ -2245,7 +2246,7 @@ func (*Server) Exit(_ protocol.Conn) error {
 
 const filePrefix = "file://"
 
-var lintingAnalyzers = maps.Values(linter.Analyzers)
+var lintingAnalyzers = slices.Collect(maps.Values(linter.Analyzers))
 
 // decideCheckerConfig based on the program type
 //
@@ -2371,7 +2372,24 @@ func (s *Server) getDiagnostics(
 
 	analysisProgram.Run(lintingAnalyzers, report)
 
+	// Sort all diagnostics by position for deterministic ordering.
+	slices.SortFunc(diagnostics, compareDiagnostics)
+
 	return
+}
+
+// compareDiagnostics compares two diagnostics by range, then by message.
+func compareDiagnostics(a, b protocol.Diagnostic) int {
+	if c := a.Range.Compare(b.Range); c != 0 {
+		return c
+	}
+	if a.Message < b.Message {
+		return -1
+	}
+	if a.Message > b.Message {
+		return 1
+	}
+	return 0
 }
 
 // getDiagnosticsForParentError unpacks all child errors and converts each to

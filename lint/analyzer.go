@@ -31,6 +31,7 @@ const (
 	UnnecessaryCastCategory           = "unnecessary-cast-hint"
 	UnnecessaryTypeAnnotationCategory = "unnecessary-type-annotation-hint"
 	UnusedResultCategory              = "unused-result-hint"
+	UnusedImportCategory              = "unused-import-hint"
 	UnusedVariableCategory            = "unused-variable-hint"
 	DeprecatedCategory                = "deprecated"
 	CadenceV1Category                 = "cadence-v1"
@@ -51,6 +52,20 @@ func RegisterAnalyzer(name string, analyzer *analysis.Analyzer) {
 	if !analyzerNamePattern.MatchString(name) {
 		panic(fmt.Errorf("invalid analyzer name: %s", name))
 
+	}
+
+	originalRun := analyzer.Run
+	analyzer.Run = func(pass *analysis.Pass) interface{} {
+		directives := parseDisableDirectives(pass.Program.Code)
+		if len(directives.directives) > 0 {
+			originalReport := pass.Report
+			pass.Report = func(d analysis.Diagnostic) {
+				if !directives.isDisabled(d.StartPos.Line, name) {
+					originalReport(d)
+				}
+			}
+		}
+		return originalRun(pass)
 	}
 
 	Analyzers[name] = analyzer

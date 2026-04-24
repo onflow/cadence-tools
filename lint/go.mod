@@ -5,10 +5,10 @@ go 1.25.0
 require (
 	github.com/itchyny/gojq v0.12.18
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/onflow/cadence v1.9.10
-	github.com/onflow/flow-go-sdk v1.9.16
+	github.com/onflow/cadence v1.10.2
+	github.com/onflow/flow-go-sdk v1.10.2
 	github.com/stretchr/testify v1.11.1
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 )
 
 require (
@@ -19,7 +19,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/ethereum/go-ethereum v1.16.7 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.1-0.20251019205732-39888e6be013 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.2-0.20260331174317-a78e92ec038e // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
@@ -31,7 +31,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/onflow/atree v0.12.1 // indirect
+	github.com/onflow/atree v0.16.0 // indirect
 	github.com/onflow/crypto v0.25.3 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.19 // indirect
