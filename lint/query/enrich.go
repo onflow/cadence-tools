@@ -243,7 +243,7 @@ func enrichMapNode(node map[string]any, enrichments map[string]enrichment) {
 	}
 
 	if info.expressionEnrichment != nil {
-		node["ActualType"] = info.expressionEnrichment.ActualType
+		node["ActualType"] = info.ActualType
 	}
 }
 

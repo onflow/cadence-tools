@@ -120,7 +120,7 @@ func TestQueryFindFailableCasts(t *testing.T) {
 					"Operation":  "as?",
 					"SourceType": "AnyStruct",
 					"TargetType": "Int",
-					"ActualType": "Int?",
+					"ActualType": "(Int)?",
 				},
 				Code: []byte(code),
 			},
