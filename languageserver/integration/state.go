@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flowkit/v2"
+	"github.com/onflow/flowkit/v2/config"
 )
 
 //go:generate go run github.com/vektra/mockery/cmd/mockery --name flowState --filename mock_state_test.go --inpkg
@@ -30,6 +31,7 @@ type flowState interface {
 	Load(configPath string) error
 	Reload() error
 	GetCodeByName(name string) (string, error)
+	GetPathByName(name string) (string, error)
 	IsLoaded() bool
 	getConfigPath() string
 	getState() *flowkit.State
@@ -67,21 +69,34 @@ func (s *flowkitState) Reload() error {
 	return s.Load(s.configPath)
 }
 
-func (s *flowkitState) GetCodeByName(name string) (string, error) {
+// GetContract returns the contract configuration for the given contract identifier,
+// resolved through the project's flow.json contract mapping.
+func (s *flowkitState) GetContract(name string) (*config.Contract, error) {
 	// Check if the state is initialized
 	if !s.IsLoaded() {
-		return "", fmt.Errorf("state is not initialized")
+		return nil, fmt.Errorf("state is not initialized")
 	}
 
 	// Try to find the contract by name
 	contract, err := s.state.Contracts().ByName(name)
 	if err != nil {
-		return "", fmt.Errorf("couldn't find the contract by import identifier: %s", name)
+		return nil, fmt.Errorf("couldn't find the contract by import identifier: %s", name)
 	}
 
 	// If no location is set, return an error
 	if contract.Location == "" {
-		return "", fmt.Errorf("source file could not be found for import identifier: %s", name)
+		return nil, fmt.Errorf("source file could not be found for import identifier: %s", name)
+	}
+
+	return contract, nil
+}
+
+// GetCodeByName returns the source code of the contract with the given identifier,
+// resolved through the project's flow.json contract mapping.
+func (s *flowkitState) GetCodeByName(name string) (string, error) {
+	contract, err := s.GetContract(name)
+	if err != nil {
+		return "", err
 	}
 
 	// Resolve the contract source code from file location
@@ -89,7 +104,20 @@ func (s *flowkitState) GetCodeByName(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return code, nil
+}
+
+// GetPathByName returns the absolute on-disk path of the source file for the given contract identifier,
+// resolved through the project's flow.json contract mapping.
+func (s *flowkitState) GetPathByName(name string) (string, error) {
+	contract, err := s.GetContract(name)
+	if err != nil {
+		return "", err
+	}
+
+	// Resolve the contract source file path from file location
+	return filepath.Join(filepath.Dir(s.configPath), contract.Location), nil
 }
 
 func (s *flowkitState) IsLoaded() bool {

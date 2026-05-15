@@ -146,6 +146,13 @@ type AddressImportResolver func(projectID string, location common.AddressLocatio
 // AddressContractNamesResolver is a function that is used to resolve contract names of an address
 type AddressContractNamesResolver func(address common.Address) ([]string, error)
 
+// LocationToURIResolver maps an imported program's common.Location to
+// the document URI of its on-disk source. Used by go-to-definition to
+// jump across files when the imported file isn't currently open in the
+// editor. Returns an empty URI if the location can't be mapped (the
+// server falls back to scanning open documents in that case).
+type LocationToURIResolver func(projectID string, location common.Location) protocol.DocumentURI
+
 // StringImportResolver resolves string imports, scoped by project ID
 // projectID identifies the project configuration (e.g., flow.json path)
 type StringImportResolver func(projectID string, location common.StringLocation) (string, error)
@@ -185,6 +192,9 @@ type Server struct {
 	resolveStringImport StringImportResolver
 	// resolveIdentifierImport is the optional function that is used to resolve identifier imports (scoped by project)
 	resolveIdentifierImport func(projectID string, location common.IdentifierLocation) (string, error)
+	// resolveLocationToURI is the optional function that maps an imported
+	// program's location back to its on-disk URI for go-to-definition.
+	resolveLocationToURI LocationToURIResolver
 	// codeLensProviders are the functions that are used to provide code lenses for a checker
 	codeLensProviders []CodeLensProvider
 	// diagnosticProviders are the functions that are used to provide diagnostics for a checker
@@ -368,6 +378,20 @@ func WithStringImportResolver(resolver StringImportResolver) Option {
 func WithIdentifierImportResolver(resolver func(projectID string, location common.IdentifierLocation) (string, error)) Option {
 	return func(s *Server) error {
 		s.resolveIdentifierImport = resolver
+		return nil
+	}
+}
+
+// WithLocationToURIResolver returns a server option that sets the
+// function used by go-to-definition to map an imported program's
+// common.Location back to its on-disk document URI. Without it,
+// cross-file go-to-definition only works for locations whose on-disk
+// path the LSP can recover by itself (open documents, .cdc file
+// imports). flow.json-driven setups should provide one to make
+// identifier-style imports navigable.
+func WithLocationToURIResolver(resolver LocationToURIResolver) Option {
+	return func(s *Server) error {
+		s.resolveLocationToURI = resolver
 		return nil
 	}
 }
@@ -849,15 +873,27 @@ func (s *Server) Hover(
 		return nil, nil
 	}
 
+	origin := occurrence.Origin
+
 	var markup strings.Builder
 
 	_, _ = fmt.Fprintf(
 		&markup,
 		"**Type**\n\n```cadence\n%s\n```\n",
-		documentType(occurrence.Origin.Type),
+		documentType(origin.Type),
 	)
 
-	docString := occurrence.Origin.DocString
+	docString := origin.DocString
+	// If the docstring is empty and the type lives in a different file,
+	// fetch the declaration's docstring from that file's checker.
+	// This covers qualified references like `A.S` where `A` is imported:
+	// the nested type's declaration is not in the current elaboration.
+	if docString == "" {
+		_, decl, _ := s.foreignDeclaration(uri, origin.Type)
+		if decl != nil {
+			docString = decl.DeclarationDocString()
+		}
+	}
 	if docString != "" {
 		_, _ = fmt.Fprintf(
 			&markup,
@@ -938,7 +974,40 @@ func (s *Server) Definition(
 	}
 
 	origin := occurrence.Origin
-	if origin == nil || origin.StartPos == nil || origin.EndPos == nil {
+	if origin == nil {
+		return nil, nil
+	}
+
+	// If the origin's type is located in a different file,
+	// attempt to resolve the declaration in that file's checker.
+	// This handles cross-file go-to-definition for both top-level imported types
+	// (e.g. `A` where A is imported) and qualified nested type references (e.g. `S` in `A.S`).
+	//
+	// When the type lives elsewhere, the origin's same-file StartPos/EndPos are not trustworthy:
+	// for imported variables the checker records ast.EmptyPosition (0:0),
+	// which would otherwise point go-to-def at the top of the current document.
+	//
+	// Return nil if the cross-file lookup can't produce a URI rather than the misleading same-file range.
+	if foreignURI, decl, crossFile := s.foreignDeclaration(uri, origin.Type); crossFile {
+		if decl == nil || foreignURI == "" {
+			return nil, nil
+		}
+
+		declIdentifier := decl.DeclarationIdentifier()
+		if declIdentifier == nil {
+			return nil, nil
+		}
+
+		return &protocol.Location{
+			URI: foreignURI,
+			Range: conversion.ASTToProtocolRange(
+				declIdentifier.StartPosition(),
+				declIdentifier.EndPosition(nil),
+			),
+		}, nil
+	}
+
+	if origin.StartPos == nil || origin.EndPos == nil {
 		return nil, nil
 	}
 
@@ -949,6 +1018,90 @@ func (s *Server) Definition(
 			*origin.EndPos,
 		),
 	}, nil
+}
+
+// foreignDeclaration returns the URI and declaration AST node for the given type,
+// if it is declared in a different file than uri.
+// crossFile reports whether the type lives in another file at all
+// (regardless of whether the declaration was actually resolvable) —
+// callers can use this to distinguish "look up failed, give up"
+// from "the type is local, fall through to local handling".
+func (s *Server) foreignDeclaration(
+	uri protocol.DocumentURI,
+	ty sema.Type,
+) (foreignURI protocol.DocumentURI, decl ast.Declaration, crossFile bool) {
+	locatedType, ok := ty.(sema.LocatedType)
+	if !ok {
+		return "", nil, false
+	}
+
+	typeLocation := locatedType.GetLocation()
+	if typeLocation == nil || typeLocation == uriToLocation(uri) {
+		return "", nil, false
+	}
+
+	foreignURI, decl = s.resolveCrossFileDeclaration(uri, typeLocation, ty)
+	return foreignURI, decl, true
+}
+
+// resolveCrossFileDeclaration looks up the declaration AST node for the given type residing in another file.
+// Returns a URI for the foreign file when one is known, an empty URI otherwise
+// (e.g. for identifier-style imports like  `import "Foo"` where the on-disk path isn't directly derivable).
+func (s *Server) resolveCrossFileDeclaration(
+	parentURI protocol.DocumentURI,
+	typeLocation common.Location,
+	ty sema.Type,
+) (protocol.DocumentURI, ast.Declaration) {
+	projectID := s.projectIdentity.ProjectIDForURI(parentURI)
+
+	foreignChecker := s.checkerForLocation(projectID, typeLocation)
+	if foreignChecker == nil {
+		return "", nil
+	}
+
+	decl := foreignChecker.Elaboration.DeclarationForType(ty)
+	if decl == nil {
+		return "", nil
+	}
+
+	return s.uriForLocation(parentURI, typeLocation), decl
+}
+
+// checkerForLocation looks up a cached checker by location for the given project ID.
+func (s *Server) checkerForLocation(projectID string, location common.Location) *sema.Checker {
+	checker, ok := s.checkerCache.Get(CheckerKey{ProjectID: projectID, Location: location})
+	if !ok {
+		return nil
+	}
+
+	return checker
+}
+
+// uriForLocation maps a common.Location to a document URI.
+// Order:
+// (1) a user-supplied LocationToURIResolver
+// (2) the inverse of uriToLocation for path-style locations //
+// (3) a scan of currently-open documents
+
+// Returns "" if no mapping is found.
+func (s *Server) uriForLocation(parentURI protocol.DocumentURI, location common.Location) protocol.DocumentURI {
+	if s.resolveLocationToURI != nil {
+		projectID := s.projectIdentity.ProjectIDForURI(parentURI)
+		if uri := s.resolveLocationToURI(projectID, location); uri != "" {
+			return uri
+		}
+	}
+
+	if isPathLocation(location) {
+		return locationToURI(location)
+	}
+
+	for uri := range s.documents {
+		if uriToLocation(uri) == location {
+			return uri
+		}
+	}
+	return ""
 }
 
 func (s *Server) SignatureHelp(
@@ -2737,11 +2890,7 @@ func (s *Server) convertError(
 		switch ty := err.Type.(type) {
 		case *sema.CompositeType:
 			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
-				decl, ok := elaboration.CompositeTypeDeclaration(ty)
-				if !ok {
-					return nil
-				}
-				return decl
+				return elaboration.CompositeTypeDeclaration(ty)
 			}
 
 		case *sema.InterfaceType:

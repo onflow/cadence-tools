@@ -19,7 +19,6 @@
 package integration
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -327,33 +326,35 @@ func (m *ConfigManager) IsSameProject(projectID string, absPath string) bool {
 	return absDst == cfgPath
 }
 
-// GetContractSourceForProject reads the project's flow.json and returns the code for the given contract name if mapped
+// GetContractSourceForProject reads the project's flow.json and returns the code
+// for the given contract name if mapped
 func (m *ConfigManager) GetContractSourceForProject(projectID string, name string) (string, error) {
-	cfgPath := m.ConfigPathForProject(projectID)
-	if cfgPath == "" || name == "" {
-		return "", nil
-	}
-	data, err := m.loader.ReadFile(cfgPath)
-	if err != nil {
+	path, err := m.GetContractPathForProject(projectID, name)
+	if err != nil || path == "" {
 		return "", err
 	}
-	var parsed struct {
-		Contracts map[string]string `json:"contracts"`
-	}
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		return "", err
-	}
-	rel, ok := parsed.Contracts[name]
-	if !ok || rel == "" {
-		return "", nil
-	}
-	dir := filepath.Dir(cfgPath)
-	path := filepath.Join(dir, rel)
+
 	code, err := m.loader.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
+
 	return string(code), nil
+}
+
+// GetContractPathForProject reads the project's flow.json and returns the absolute on-disk path
+// for the given contract name if mapped
+func (m *ConfigManager) GetContractPathForProject(projectID string, name string) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+
+	st, err := m.ResolveStateForProject(projectID)
+	if err != nil || st == nil {
+		return "", err
+	}
+
+	return st.GetPathByName(name)
 }
 
 // ResolveStateForProject returns the state associated with the given project ID (flow.json path)
