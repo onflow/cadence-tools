@@ -889,7 +889,7 @@ func (s *Server) Hover(
 	// This covers qualified references like `A.S` where `A` is imported:
 	// the nested type's declaration is not in the current elaboration.
 	if docString == "" {
-		_, decl, _ := s.foreignDeclaration(uri, origin.Type)
+		_, decl, _ := s.foreignDeclaration(uri, origin)
 		if decl != nil {
 			docString = decl.DeclarationDocString()
 		}
@@ -988,7 +988,7 @@ func (s *Server) Definition(
 	// which would otherwise point go-to-def at the top of the current document.
 	//
 	// Return nil if the cross-file lookup can't produce a URI rather than the misleading same-file range.
-	if foreignURI, decl, crossFile := s.foreignDeclaration(uri, origin.Type); crossFile {
+	if foreignURI, decl, crossFile := s.foreignDeclaration(uri, origin); crossFile {
 		if decl == nil || foreignURI == "" {
 			return nil, nil
 		}
@@ -1011,27 +1011,67 @@ func (s *Server) Definition(
 		return nil, nil
 	}
 
+	protocolRange := conversion.ASTToProtocolRange(
+		*origin.StartPos,
+		*origin.EndPos,
+	)
+
+	// Member access might be on a value whose type lives in another file
+	if memberAccess := checker.PositionInfo.MemberAccesses.Find(position); memberAccess != nil {
+		if foreignURI := s.foreignURIForType(uri, memberAccess.AccessedType); foreignURI != "" {
+			return &protocol.Location{
+				URI:   foreignURI,
+				Range: protocolRange,
+			}, nil
+		}
+	}
+
 	return &protocol.Location{
-		URI: uri,
-		Range: conversion.ASTToProtocolRange(
-			*origin.StartPos,
-			*origin.EndPos,
-		),
+		URI:   uri,
+		Range: protocolRange,
 	}, nil
 }
 
-// foreignDeclaration returns the URI and declaration AST node for the given type,
-// if it is declared in a different file than uri.
-// crossFile reports whether the type lives in another file at all
-// (regardless of whether the declaration was actually resolvable) —
-// callers can use this to distinguish "look up failed, give up"
-// from "the type is local, fall through to local handling".
+// foreignURIForType returns the document URI for the given type's
+// source file when that file is different from parentURI.
+// Returns "" when the type isn't file-located or lives in parentURI's file.
+// Reference and optional wrappers are stripped so member access on `&T`
+// resolves through to T's location.
+func (s *Server) foreignURIForType(parentURI protocol.DocumentURI, ty sema.Type) protocol.DocumentURI {
+	locatedType := unwrapToLocatedType(ty)
+	if locatedType == nil {
+		return ""
+	}
+
+	typeLocation := locatedType.GetLocation()
+	if typeLocation == nil || typeLocation == uriToLocation(parentURI) {
+		return ""
+	}
+
+	return s.uriForLocation(parentURI, typeLocation)
+}
+
+// foreignDeclaration returns the URI and declaration AST node for the given
+// origin's type, if it is a type-declaration reference (struct, contract, interface, ...)
+// declared in a different file than uri.
+//
+// crossFile reports whether the origin should be treated as a cross-file type reference.
+// Callers use it to distinguish "the lookup applies but failed"
+// from "the origin isn't a cross-file type reference at all".
 func (s *Server) foreignDeclaration(
 	uri protocol.DocumentURI,
-	ty sema.Type,
-) (foreignURI protocol.DocumentURI, decl ast.Declaration, crossFile bool) {
-	locatedType, ok := ty.(sema.LocatedType)
-	if !ok {
+	origin *sema.Origin,
+) (
+	foreignURI protocol.DocumentURI,
+	decl ast.Declaration,
+	crossFile bool,
+) {
+	if origin == nil || !origin.DeclarationKind.IsTypeDeclaration() {
+		return "", nil, false
+	}
+
+	locatedType := unwrapToLocatedType(origin.Type)
+	if locatedType == nil {
 		return "", nil, false
 	}
 
@@ -1040,8 +1080,24 @@ func (s *Server) foreignDeclaration(
 		return "", nil, false
 	}
 
-	foreignURI, decl = s.resolveCrossFileDeclaration(uri, typeLocation, ty)
+	foreignURI, decl = s.resolveCrossFileDeclaration(uri, typeLocation, locatedType)
 	return foreignURI, decl, true
+}
+
+// unwrapToLocatedType strips potential reference and optional wrappers
+func unwrapToLocatedType(ty sema.Type) sema.LocatedType {
+	for {
+		switch t := ty.(type) {
+		case *sema.ReferenceType:
+			ty = t.Type
+		case *sema.OptionalType:
+			ty = t.Type
+		case sema.LocatedType:
+			return t
+		default:
+			return nil
+		}
+	}
 }
 
 // resolveCrossFileDeclaration looks up the declaration AST node for the given type residing in another file.

@@ -214,3 +214,88 @@ func TestHoverTypeImported(t *testing.T) {
 		hoverS.Contents,
 	)
 }
+
+func TestHoverMemberImported(t *testing.T) {
+	t.Parallel()
+
+	const fooCode = `
+      // docstring for Foo
+      access(all) contract Foo {
+
+          /// docstring for a
+          access(all) let a: Int
+
+          access(all) struct S {
+
+              /// docstring for foo
+              access(all) fun foo() {}
+          }
+
+          init() {
+              self.a = 1
+          }
+      }
+    `
+
+	const counterCode = `
+      import "Foo"
+
+      access(all) contract Counter {
+          access(all) fun run() {
+              let a = Foo.a
+              let s = Foo.S()
+              s.foo()
+          }
+      }
+    `
+
+	server, err := NewServer()
+	require.NoError(t, err)
+
+	err = server.SetOptions(
+		WithStringImportResolver(func(_ string, location common.StringLocation) (string, error) {
+			if location == "Foo" {
+				return fooCode, nil
+			}
+			return "", nil
+		}),
+	)
+	require.NoError(t, err)
+
+	server.projectIdentity = staticProjectIdentity("foobar")
+
+	counterURI := protocol.DocumentURI("file:///Foobar/cadence/contracts/Counter.cdc")
+	_, err = server.getDiagnostics(counterURI, counterCode, 1, func(*protocol.LogMessageParams) {})
+	require.NoError(t, err)
+
+	getHover := func(line, character uint32) *protocol.Hover {
+		t.Helper()
+
+		h, herr := server.Hover(
+			nil,
+			&protocol.TextDocumentPositionParams{
+				TextDocument: protocol.TextDocumentIdentifier{URI: counterURI},
+				Position:     protocol.Position{Line: line, Character: character},
+			},
+		)
+		require.NoError(t, herr)
+		require.NotNil(t, h)
+		return h
+	}
+
+	assert.Equal(t,
+		protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: "**Type**\n\n```cadence\nInt\n```\n\n**Documentation**\n\n docstring for a\n",
+		},
+		getHover(5, 27).Contents,
+	)
+
+	assert.Equal(t,
+		protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: "**Type**\n\n```cadence\nfun ()\n```\n\n**Documentation**\n\n docstring for foo\n",
+		},
+		getHover(7, 17).Contents,
+	)
+}
