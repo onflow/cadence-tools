@@ -2943,15 +2943,10 @@ func (s *Server) convertError(
 	case *sema.NotDeclaredMemberError:
 		var declarationGetter func(elaboration *sema.Elaboration) ast.Declaration
 
-		switch ty := err.Type.(type) {
-		case *sema.CompositeType:
+		switch err.Type.(type) {
+		case *sema.CompositeType, *sema.InterfaceType:
 			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
-				return elaboration.CompositeTypeDeclaration(ty)
-			}
-
-		case *sema.InterfaceType:
-			declarationGetter = func(elaboration *sema.Elaboration) ast.Declaration {
-				return elaboration.InterfaceTypeDeclaration(ty)
+				return elaboration.DeclarationForType(err.Type)
 			}
 		}
 
