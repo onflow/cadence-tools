@@ -19,6 +19,7 @@
 package integration
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -326,19 +327,37 @@ func (m *ConfigManager) IsSameProject(projectID string, absPath string) bool {
 	return absDst == cfgPath
 }
 
-// GetContractSourceForProject reads the project's flow.json and returns the code
-// for the given contract name if mapped
+// GetContractSourceForProject reads the project's flow.json and returns the
+// code for the given contract name if mapped. This is a flowkit-independent
+// fallback used by resolveStringIdentifierImport when flowkit fails to load
+// the project state (e.g. because the flow.json has inconsistencies flowkit
+// rejects). It only handles the simple `"Contract": "./path.cdc"` shape; the
+// verbose shape is the flowkit path's responsibility.
 func (m *ConfigManager) GetContractSourceForProject(projectID string, name string) (string, error) {
-	path, err := m.GetContractPathForProject(projectID, name)
-	if err != nil || path == "" {
+	cfgPath := m.ConfigPathForProject(projectID)
+	if cfgPath == "" || name == "" {
+		return "", nil
+	}
+	data, err := m.loader.ReadFile(cfgPath)
+	if err != nil {
 		return "", err
 	}
-
+	var parsed struct {
+		Contracts map[string]string `json:"contracts"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return "", err
+	}
+	rel, ok := parsed.Contracts[name]
+	if !ok || rel == "" {
+		return "", nil
+	}
+	dir := filepath.Dir(cfgPath)
+	path := filepath.Join(dir, rel)
 	code, err := m.loader.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
-
 	return string(code), nil
 }
 
