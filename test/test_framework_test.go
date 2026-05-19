@@ -2499,7 +2499,10 @@ func TestLoadingProgramsFromLocalFile(t *testing.T) {
 		result, err := runner.RunTest(code, "test")
 		require.NoError(t, err)
 		require.Error(t, result.Error)
-		assert.ErrorAs(t, result.Error, &FileResolverNotProvidedError{})
+		assert.ErrorContains(t,
+			result.Error,
+			`cannot read file "./sample/script.cdc": file resolver not provided`,
+		)
 	})
 }
 
@@ -4468,6 +4471,7 @@ func TestCoverageReportForUnitTests(t *testing.T) {
 			"A.0000000000000001.IFlowEVMTokenBridge",
 			"A.0000000000000001.FlowTransactionScheduler",
 			"A.0000000000000001.FlowTransactionSchedulerUtils",
+			"A.0000000000000001.FlowEVMBridgeCustomAssociations",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
@@ -4720,6 +4724,7 @@ func TestCoverageReportForIntegrationTests(t *testing.T) {
 			"A.0000000000000001.IFlowEVMTokenBridge",
 			"A.0000000000000001.FlowTransactionScheduler",
 			"A.0000000000000001.FlowTransactionSchedulerUtils",
+			"A.0000000000000001.FlowEVMBridgeCustomAssociations",
 		},
 		coverageReport.ExcludedLocationIDs(),
 	)
