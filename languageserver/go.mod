@@ -10,10 +10,10 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/cadence v1.10.3
 	github.com/onflow/cadence-tools/lint v1.11.1
-	github.com/onflow/cadence-tools/test v1.13.1
-	github.com/onflow/flow-go v0.48.1-evm-cache-block.0.20260518173711-5b9fa9c8352e
+	github.com/onflow/cadence-tools/test v1.13.2
+	github.com/onflow/flow-go v0.48.1-evm-cache-block.0.20260602223212-19c6bdbbe069
 	github.com/onflow/flow-go-sdk v1.10.3
-	github.com/onflow/flowkit/v2 v2.14.0
+	github.com/onflow/flowkit/v2 v2.14.1
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/pflag v1.0.9
@@ -21,8 +21,8 @@ require (
 )
 
 require (
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.2
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.10.2 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.10.3
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.10.3 // indirect
 )
 
 require (
@@ -157,7 +157,7 @@ require (
 	github.com/onflow/atree v0.16.0 // indirect
 	github.com/onflow/crypto v0.25.4 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
-	github.com/onflow/flow-emulator v1.21.0 // indirect
+	github.com/onflow/flow-emulator v1.21.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.2.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.1.1 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.1.1 // indirect
