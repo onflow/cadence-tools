@@ -19,7 +19,10 @@
 package lint
 
 import (
+	"strings"
+
 	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/sema"
 	"github.com/onflow/cadence/tools/analysis"
 )
@@ -39,10 +42,18 @@ var HardcodedAddressAnalyzer = (func() *analysis.Analyzer {
 			analysis.InspectorAnalyzer,
 		},
 		Run: func(pass *analysis.Pass) interface{} {
-			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
-
 			program := pass.Program
 			location := program.Location
+
+			// Skip test files — hardcoded addresses are expected in tests.
+			if stringLoc, ok := location.(common.StringLocation); ok {
+				if strings.HasSuffix(string(stringLoc), "_test.cdc") {
+					return nil
+				}
+			}
+
+			inspector := pass.ResultOf[analysis.InspectorAnalyzer].(*ast.Inspector)
+
 			elaboration := program.Checker.Elaboration
 			report := pass.Report
 

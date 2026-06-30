@@ -184,54 +184,55 @@ func systemAddressLocationsForChain(ch flow.Chain) []common.AddressLocation {
 	chainContracts := systemcontracts.SystemContractsForChain(ch.ChainID())
 	serviceAddress := ch.ServiceAddress().HexWithPrefix()
 	contracts := map[string]string{
-		"FlowServiceAccount":             serviceAddress,
-		"FlowToken":                      chainContracts.FlowToken.Address.HexWithPrefix(),
-		"FungibleToken":                  chainContracts.FungibleToken.Address.HexWithPrefix(),
-		"FungibleTokenMetadataViews":     chainContracts.FungibleToken.Address.HexWithPrefix(),
-		"FlowFees":                       chainContracts.FlowFees.Address.HexWithPrefix(),
-		"FlowStorageFees":                serviceAddress,
-		"FlowClusterQC":                  serviceAddress,
-		"FlowDKG":                        serviceAddress,
-		"FlowEpoch":                      serviceAddress,
-		"FlowIDTableStaking":             serviceAddress,
-		"FlowStakingCollection":          serviceAddress,
-		"LockedTokens":                   serviceAddress,
-		"NodeVersionBeacon":              serviceAddress,
-		"StakingProxy":                   serviceAddress,
-		"NonFungibleToken":               serviceAddress,
-		"MetadataViews":                  serviceAddress,
-		"ViewResolver":                   serviceAddress,
-		"RandomBeaconHistory":            serviceAddress,
-		"EVM":                            serviceAddress,
-		"FungibleTokenSwitchboard":       chainContracts.FungibleToken.Address.HexWithPrefix(),
-		"Burner":                         serviceAddress,
-		"Crypto":                         serviceAddress,
-		"NFTStorefrontV2":                chainContracts.NonFungibleToken.Address.HexWithPrefix(),
-		"USDCFlow":                       chainContracts.FungibleToken.Address.HexWithPrefix(),
-		"FlowExecutionParameters":        chainContracts.ExecutionParametersAccount.Address.HexWithPrefix(),
-		"Migration":                      chainContracts.Migration.Address.HexWithPrefix(),
-		"CrossVMMetadataViews":           serviceAddress,
-		"CrossVMNFT":                     serviceAddress,
-		"CrossVMToken":                   serviceAddress,
-		"FlowEVMBridge":                  serviceAddress,
-		"FlowEVMBridgeAccessor":          serviceAddress,
-		"FlowEVMBridgeConfig":            serviceAddress,
-		"FlowEVMBridgeHandlerInterfaces": serviceAddress,
-		"FlowEVMBridgeHandlers":          serviceAddress,
-		"FlowEVMBridgeNFTEscrow":         serviceAddress,
-		"FlowEVMBridgeResolver":          serviceAddress,
-		"FlowEVMBridgeTemplates":         serviceAddress,
-		"FlowEVMBridgeTokenEscrow":       serviceAddress,
-		"FlowEVMBridgeUtils":             serviceAddress,
-		"IBridgePermissions":             serviceAddress,
-		"ICrossVM":                       serviceAddress,
-		"ICrossVMAsset":                  serviceAddress,
-		"IEVMBridgeNFTMinter":            serviceAddress,
-		"IEVMBridgeTokenMinter":          serviceAddress,
-		"IFlowEVMNFTBridge":              serviceAddress,
-		"IFlowEVMTokenBridge":            serviceAddress,
-		"FlowTransactionScheduler":       serviceAddress,
-		"FlowTransactionSchedulerUtils":  serviceAddress,
+		"FlowServiceAccount":              serviceAddress,
+		"FlowToken":                       chainContracts.FlowToken.Address.HexWithPrefix(),
+		"FungibleToken":                   chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"FungibleTokenMetadataViews":      chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"FlowFees":                        chainContracts.FlowFees.Address.HexWithPrefix(),
+		"FlowStorageFees":                 serviceAddress,
+		"FlowClusterQC":                   serviceAddress,
+		"FlowDKG":                         serviceAddress,
+		"FlowEpoch":                       serviceAddress,
+		"FlowIDTableStaking":              serviceAddress,
+		"FlowStakingCollection":           serviceAddress,
+		"LockedTokens":                    serviceAddress,
+		"NodeVersionBeacon":               serviceAddress,
+		"StakingProxy":                    serviceAddress,
+		"NonFungibleToken":                serviceAddress,
+		"MetadataViews":                   serviceAddress,
+		"ViewResolver":                    serviceAddress,
+		"RandomBeaconHistory":             serviceAddress,
+		"EVM":                             serviceAddress,
+		"FungibleTokenSwitchboard":        chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"Burner":                          serviceAddress,
+		"Crypto":                          serviceAddress,
+		"NFTStorefrontV2":                 chainContracts.NonFungibleToken.Address.HexWithPrefix(),
+		"USDCFlow":                        chainContracts.FungibleToken.Address.HexWithPrefix(),
+		"FlowExecutionParameters":         chainContracts.ExecutionParametersAccount.Address.HexWithPrefix(),
+		"Migration":                       chainContracts.Migration.Address.HexWithPrefix(),
+		"CrossVMMetadataViews":            serviceAddress,
+		"CrossVMNFT":                      serviceAddress,
+		"CrossVMToken":                    serviceAddress,
+		"FlowEVMBridge":                   serviceAddress,
+		"FlowEVMBridgeAccessor":           serviceAddress,
+		"FlowEVMBridgeConfig":             serviceAddress,
+		"FlowEVMBridgeHandlerInterfaces":  serviceAddress,
+		"FlowEVMBridgeHandlers":           serviceAddress,
+		"FlowEVMBridgeNFTEscrow":          serviceAddress,
+		"FlowEVMBridgeResolver":           serviceAddress,
+		"FlowEVMBridgeTemplates":          serviceAddress,
+		"FlowEVMBridgeTokenEscrow":        serviceAddress,
+		"FlowEVMBridgeUtils":              serviceAddress,
+		"IBridgePermissions":              serviceAddress,
+		"ICrossVM":                        serviceAddress,
+		"ICrossVMAsset":                   serviceAddress,
+		"IEVMBridgeNFTMinter":             serviceAddress,
+		"IEVMBridgeTokenMinter":           serviceAddress,
+		"IFlowEVMNFTBridge":               serviceAddress,
+		"IFlowEVMTokenBridge":             serviceAddress,
+		"FlowTransactionScheduler":        serviceAddress,
+		"FlowTransactionSchedulerUtils":   serviceAddress,
+		"FlowEVMBridgeCustomAssociations": serviceAddress,
 	}
 
 	locations := make([]common.AddressLocation, 0)
@@ -518,7 +519,11 @@ func (e *EmulatorBackend) RunScript(
 		arguments = append(arguments, encodedArg)
 	}
 
-	code = e.replaceImports(code)
+	var replaceErr error
+	code, replaceErr = e.replaceImports(code)
+	if replaceErr != nil {
+		return &stdlib.ScriptResult{Error: replaceErr}
+	}
 
 	result, err := e.blockchain.ExecuteScript([]byte(code), arguments)
 	if err != nil {
@@ -658,7 +663,11 @@ func (e *EmulatorBackend) AddTransaction(
 	signers []*stdlib.Account,
 	args []interpreter.Value,
 ) error {
-	code = e.replaceImports(code)
+	var err error
+	code, err = e.replaceImports(code)
+	if err != nil {
+		return err
+	}
 
 	tx := e.newTransaction(code, authorizers)
 
@@ -674,7 +683,7 @@ func (e *EmulatorBackend) AddTransaction(
 		}
 	}
 
-	err := e.signTransaction(tx, signers)
+	err = e.signTransaction(tx, signers)
 	if err != nil {
 		return err
 	}
@@ -750,7 +759,10 @@ func (e *EmulatorBackend) DeployContract(
 	if err != nil {
 		panic(err)
 	}
-	code = e.replaceImports(code)
+	code, err = e.replaceImports(code)
+	if err != nil {
+		return fmt.Errorf("failed to parse contract %q: %w", name, err)
+	}
 
 	hexEncodedCode := hex.EncodeToString([]byte(code))
 
@@ -1097,10 +1109,10 @@ func (e *EmulatorBackend) signTransaction(
 	return nil
 }
 
-func (e *EmulatorBackend) replaceImports(code string) string {
+func (e *EmulatorBackend) replaceImports(code string) (string, error) {
 	program, err := parser.ParseProgram(nil, []byte(code), parser.Config{})
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	sb := strings.Builder{}
@@ -1160,7 +1172,7 @@ func (e *EmulatorBackend) replaceImports(code string) string {
 
 	sb.WriteString(code[importDeclEnd:])
 
-	return sb.String()
+	return sb.String(), nil
 }
 
 // wrapWithBuiltins wraps a user-provided resolver with fallback to built-in contracts.

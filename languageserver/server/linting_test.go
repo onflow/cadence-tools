@@ -130,6 +130,14 @@ func TestLinting(t *testing.T) {
 			[]protocol.Diagnostic{
 				{
 					Range: protocol.Range{
+						Start: protocol.Position{Line: 1, Character: 11},
+						End:   protocol.Position{Line: 1, Character: 24},
+					},
+					Severity: protocol.SeverityWarning,
+					Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
+				},
+				{
+					Range: protocol.Range{
 						Start: protocol.Position{Line: 2, Character: 17},
 						End:   protocol.Position{Line: 2, Character: 18},
 					},
@@ -139,14 +147,6 @@ func TestLinting(t *testing.T) {
 					CodeDescription: &protocol.CodeDescription{
 						Href: "https://cadence-lang.org/docs/language/values-and-types",
 					},
-				},
-				{
-					Range: protocol.Range{
-						Start: protocol.Position{Line: 1, Character: 11},
-						End:   protocol.Position{Line: 1, Character: 24},
-					},
-					Severity: protocol.SeverityWarning,
-					Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
 				},
 			},
 			diagnostics,

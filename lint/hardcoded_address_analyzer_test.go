@@ -22,11 +22,42 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/ast"
+	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/tools/analysis"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence-tools/lint"
 )
+
+func testAnalyzersWithLocation(
+	t *testing.T,
+	location common.Location,
+	code string,
+	analyzers ...*analysis.Analyzer,
+) []analysis.Diagnostic {
+	config := analysis.NewSimpleConfig(
+		lint.LoadMode,
+		map[common.Location][]byte{
+			location: []byte(code),
+		},
+		nil,
+		nil,
+	)
+
+	programs, err := analysis.Load(config, location)
+	require.NoError(t, err)
+
+	var diagnostics []analysis.Diagnostic
+
+	programs.Get(location).Run(
+		analyzers,
+		func(diagnostic analysis.Diagnostic) {
+			diagnostics = append(diagnostics, diagnostic)
+		},
+	)
+
+	return diagnostics
+}
 
 func TestHardcodedAddressAnalyzer(t *testing.T) {
 
@@ -182,6 +213,27 @@ func TestHardcodedAddressAnalyzer(t *testing.T) {
 					},
 				},
 			},
+			diagnostics,
+		)
+	})
+
+	t.Run("hardcoded address in test file not flagged", func(t *testing.T) {
+
+		t.Parallel()
+
+		diagnostics := testAnalyzersWithLocation(t,
+			common.StringLocation("my_contract_test.cdc"),
+			`
+                access(all) fun main() {
+                    let addr: Address = 0x1234567890abcdef
+                }
+            `,
+			lint.HardcodedAddressAnalyzer,
+		)
+
+		require.Equal(
+			t,
+			[]analysis.Diagnostic(nil),
 			diagnostics,
 		)
 	})
