@@ -187,7 +187,7 @@ func (standardLibrary) RecordContractRemoval(_ common.AddressLocation) {
 	panic(errors.NewUnreachableError())
 }
 
-func (standardLibrary) CreateAccount(_ common.Address) (address common.Address, err error) {
+func (standardLibrary) CreateAccount(_ common.Address, _ interpreter.InvocationContext) (address common.Address, err error) {
 	// Implementation should never be called,
 	// only its definition is used for type-checking
 	panic(errors.NewUnreachableError())

@@ -4,12 +4,12 @@ go 1.25.1
 
 require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
-	github.com/onflow/atree v0.16.0
-	github.com/onflow/cadence v1.10.3
+	github.com/onflow/atree v0.16.1
+	github.com/onflow/cadence v1.10.5
 	github.com/onflow/crypto v0.25.4
 	github.com/onflow/flow-emulator v1.21.1
-	github.com/onflow/flow-go v0.48.1-evm-cache-block.0.20260602223212-19c6bdbbe069
-	github.com/onflow/flow-go-sdk v1.10.3
+	github.com/onflow/flow-go v0.50.1-0.20260727121002-7305484aa748
+	github.com/onflow/flow-go-sdk v1.10.5
 	github.com/onflow/flow/protobuf/go/flow v0.4.20
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1

@@ -8,11 +8,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/cadence v1.10.3
+	github.com/onflow/cadence v1.10.5
 	github.com/onflow/cadence-tools/lint v1.11.1
 	github.com/onflow/cadence-tools/test v1.13.2
-	github.com/onflow/flow-go v0.48.1-evm-cache-block.0.20260602223212-19c6bdbbe069
-	github.com/onflow/flow-go-sdk v1.10.3
+	github.com/onflow/flow-go v0.50.1-0.20260727121002-7305484aa748
+	github.com/onflow/flow-go-sdk v1.10.5
 	github.com/onflow/flowkit/v2 v2.14.1
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/afero v1.15.0
@@ -154,7 +154,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.16.0 // indirect
+	github.com/onflow/atree v0.16.1 // indirect
 	github.com/onflow/crypto v0.25.4 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-emulator v1.21.1 // indirect
