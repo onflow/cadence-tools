@@ -780,14 +780,17 @@ func (r *TestRunner) interpreterContractValueHandler(
 					inter,
 					runtime.StorageConfig{},
 				)
-				storageMap := blockchainStorage.GetDomainStorageMap(
+				blockchainStorageMap := blockchainStorage.GetDomainStorageMap(
 					inter,
 					location.Address,
 					common.StorageDomainContract,
 					false,
 				)
-				if storageMap != nil {
-					storedValue = storageMap.ReadValue(
+				if blockchainStorageMap != nil {
+					// Read the contract value,
+					// so that its slabs get loaded into `blockchainStorage`,
+					// and get copied to the current environment's storage below.
+					blockchainStorageMap.ReadValue(
 						inter,
 						interpreter.StringStorageMapKey(location.Name),
 					)
@@ -816,6 +819,31 @@ func (r *TestRunner) interpreterContractValueHandler(
 				err = storage.Commit(inter, true)
 				if err != nil {
 					panic(err)
+				}
+
+				// The contract value must be read from the current environment's storage,
+				// and must NOT be read from `blockchainStorage`:
+				// Each storage has its own atree slab ID generator,
+				// so the two storages generate clashing atree value IDs
+				// for the values they create for the transient address 0x0.
+				// The interpreter caches the Cadence values it creates for atree containers,
+				// keyed by atree value ID, so a clash results in the wrong Cadence value.
+				//
+				// Drop the cached values for the values that were read from
+				// `blockchainStorage` above, for the same reason.
+				inter.ClearAllCanonicalAtreeContainers()
+
+				storageMap := storage.GetDomainStorageMap(
+					inter,
+					location.Address,
+					common.StorageDomainContract,
+					false,
+				)
+				if storageMap != nil {
+					storedValue = storageMap.ReadValue(
+						inter,
+						interpreter.StringStorageMapKey(location.Name),
+					)
 				}
 			}
 
