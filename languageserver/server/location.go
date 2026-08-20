@@ -69,3 +69,15 @@ func uriToLocation(uri protocol.DocumentURI) common.StringLocation {
 		strings.TrimPrefix(string(uri), filePrefix),
 	)
 }
+
+// locationToURI is the inverse of uriToLocation: it converts a file-backed
+// common.Location to a document URI. Returns an empty URI for non-file
+// locations (e.g. AddressLocation), which have no corresponding source file
+// the language server can resolve.
+func locationToURI(location common.Location) protocol.DocumentURI {
+	stringLocation, ok := location.(common.StringLocation)
+	if !ok {
+		return ""
+	}
+	return protocol.DocumentURI(filePrefix + string(stringLocation))
+}

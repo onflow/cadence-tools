@@ -173,6 +173,7 @@ func NewFlowIntegration(s *server.Server, enableFlowClient bool) (*FlowIntegrati
 	options := []server.Option{
 		server.WithDiagnosticProvider(diagnostics),
 		server.WithStringImportResolver(resolve.stringImport),
+		server.WithLocationToURIResolver(resolve.locationToURI),
 		server.WithInitializationOptionsHandler(integration.initialize),
 		server.WithExtendedStandardLibraryValues(FVMStandardLibraryValues()...),
 		server.WithIdentifierImportResolver(resolve.identifierImportProject),

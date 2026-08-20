@@ -29,6 +29,8 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 func Test_FileImport(t *testing.T) {
@@ -145,6 +147,11 @@ func Test_SimpleImport(t *testing.T) {
 		resolved, err := resolver.stringImport("/p/flow.json", common.StringLocation("Foo"))
 		assert.Error(t, err)
 		assert.Empty(t, resolved)
+	})
+
+	t.Run("locationToURI resolves identifier import to file URI", func(t *testing.T) {
+		uri := resolver.locationToURI("/p/flow.json", common.StringLocation("Test"))
+		assert.Equal(t, protocol.DocumentURI("file:///p/test.cdc"), uri)
 	})
 }
 
