@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/cadence-tools/lint"
+	"github.com/onflow/cadence-tools/lint/query"
 )
 
 var csvPathFlag = flag.String("csv", "", "analyze all programs in the given CSV file")
@@ -43,6 +44,8 @@ var colorFlag = flag.Bool("color", true, "format using colors")
 var fixAllFlag = flag.Bool("fix-all", false, "automatically apply all suggested fixes")
 var cyclomaticThresholdFlag = flag.Int("cyclo-threshold", 10, "minimum cyclomatic complexity to report (0 = report all)")
 var cyclomaticCountLogicalFlag = flag.Bool("cyclo-count-logical", true, "count && and || as complexity points")
+var queryFlag = flag.String("query", "", "run a jq query on the type-checked AST (e.g., '.. | select(.Type == \"CastingExpression\" and .Operation == \"as!\")')")
+var queryJSONFlag = flag.Bool("query-json", false, "output query results as JSON")
 var analyzersFlag stringSliceFlag
 var pluginsFlag stringSliceFlag
 
@@ -90,6 +93,36 @@ func main() {
 
 	loadPlugins()
 
+	queryStr := *queryFlag
+
+	// Query mode: run jq query on enriched AST instead of lint analyzers
+	if queryStr != "" {
+		var outputFormat query.OutputFormat
+		if *queryJSONFlag {
+			outputFormat = query.OutputJSON
+		}
+
+		var matches []query.Match
+		queryAnalyzer, err := query.NewQueryAnalyzer(queryStr, func(m query.Match) {
+			matches = append(matches, m)
+		})
+		if err != nil {
+			log.Fatalf("Failed to compile query: %s", err)
+		}
+
+		linter := lint.NewLinter(lint.Config{
+			Analyzers: []*analysis.Analyzer{queryAnalyzer},
+			Silent:    true,
+		})
+
+		runLinter(linter)
+
+		if err := query.FormatMatches(os.Stdout, matches, outputFormat); err != nil {
+			log.Fatalf("Failed to format results: %s", err)
+		}
+		return
+	}
+
 	var enabledAnalyzers []*analysis.Analyzer
 
 	loadOnly := *loadOnlyFlag
@@ -118,14 +151,18 @@ func main() {
 		FixAll:    *fixAllFlag,
 	})
 
+	if *fixAllFlag && *directoryPathFlag == "" {
+		log.Println("Warning: -fix-all only works with -directory mode")
+	}
+
+	runLinter(linter)
+}
+
+func runLinter(linter *lint.Linter) {
 	cvsPath := *csvPathFlag
 	directoryPath := *directoryPathFlag
 	address := *addressFlag
 	transaction := *transactionFlag
-
-	if *fixAllFlag && directoryPath == "" {
-		log.Println("Warning: -fix-all only works with -directory mode")
-	}
 
 	switch {
 	case cvsPath != "":
