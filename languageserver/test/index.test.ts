@@ -802,7 +802,6 @@ describe("contracts", () => {
 });
 
 describe("codelenses", () => {
-
   test("contract codelensss", async () => {
     await withConnection(async (connection) => {
       let code = fs.readFileSync("./foo.cdc");
