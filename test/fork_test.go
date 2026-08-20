@@ -90,7 +90,11 @@ func TestForkTestnet_FlowTokenSupply(t *testing.T) {
 			}
 			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
-		WithFork(ForkConfig{ForkHost: testnetForkURL, ChainID: flowmodel.Testnet.Chain().ChainID(), ForkHeight: blockHeight})
+		WithFork(ForkConfig{
+			ForkHost:   testnetForkURL,
+			ChainID:    flowmodel.Testnet.Chain().ChainID(),
+			ForkHeight: blockHeight,
+		})
 
 	result, err := runner.RunTest(`
         import Test
@@ -128,7 +132,11 @@ func TestForkMainnet_WriteAndReadState(t *testing.T) {
 			}
 			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
+		WithFork(ForkConfig{
+			ForkHost:   mainnetForkURL,
+			ChainID:    flowmodel.Mainnet.Chain().ChainID(),
+			ForkHeight: blockHeight,
+		})
 
 	// Test: Write value to storage, commit, read it back
 	result, err := runner.RunTest(`
@@ -219,7 +227,11 @@ func TestForkMainnet_DeployAndCallContract(t *testing.T) {
 				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 			}
 		}).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
+		WithFork(ForkConfig{
+			ForkHost:   mainnetForkURL,
+			ChainID:    flowmodel.Mainnet.Chain().ChainID(),
+			ForkHeight: blockHeight,
+		})
 
 	// Test: Deploy contract, call increment, verify count
 	result, err := runner.RunTest(`
@@ -346,7 +358,11 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 			}
 		}).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
+		WithFork(ForkConfig{
+			ForkHost:   mainnetForkURL,
+			ChainID:    flowmodel.Mainnet.Chain().ChainID(),
+			ForkHeight: blockHeight,
+		})
 
 	// Test: Deploy V1, use it, then update to V2 and use the new function
 	result, err := runner.RunTest(`
@@ -411,7 +427,11 @@ func TestForkMainnet_ContractUpdate(t *testing.T) {
 				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 			}
 		}).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
+		WithFork(ForkConfig{
+			ForkHost:   mainnetForkURL,
+			ChainID:    flowmodel.Mainnet.Chain().ChainID(),
+			ForkHeight: blockHeight,
+		})
 
 	result2, err2 := runner2.RunTest(`
         import Test
@@ -501,7 +521,11 @@ func TestForkMainnet_ArbitraryAccount(t *testing.T) {
 				return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 			}
 		}).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: blockHeight})
+		WithFork(ForkConfig{
+			ForkHost:   mainnetForkURL,
+			ChainID:    flowmodel.Mainnet.Chain().ChainID(),
+			ForkHeight: blockHeight,
+		})
 
 	// Test: Get arbitrary account, deploy contract, execute transactions
 	result, err := runner.RunTest(`
@@ -642,7 +666,11 @@ func TestFork_PragmaOverridesWithFork(t *testing.T) {
 			}
 			return common.Address{}, fmt.Errorf("unknown contract: %s", name)
 		}).
-		WithFork(ForkConfig{ForkHost: mainnetForkURL, ChainID: flowmodel.Mainnet.Chain().ChainID(), ForkHeight: 0}).
+		WithFork(ForkConfig{
+			ForkHost:   mainnetForkURL,
+			ChainID:    flowmodel.Mainnet.Chain().ChainID(),
+			ForkHeight: 0,
+		}).
 		RunTest(script, "test")
 
 	require.NoError(t, err)

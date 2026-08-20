@@ -44,6 +44,7 @@ func TestLinting(t *testing.T) {
 
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = Int8(-1)
+			log(x)
 		}`)
 
 		require.Equal(t, 1, len(diagnostics))
@@ -71,6 +72,7 @@ func TestLinting(t *testing.T) {
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = 3
 			let y = x!
+			log(y)
 		}`)
 
 		require.Equal(t, 1, len(diagnostics))
@@ -97,6 +99,7 @@ func TestLinting(t *testing.T) {
 
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = true as! Bool
+			log(x)
 		}`)
 
 		require.Equal(t, 1, len(diagnostics))
@@ -119,10 +122,20 @@ func TestLinting(t *testing.T) {
 		diagnostics := checkProgram(t, `access(all) fun test() {
 			let x = true as! Bool
 			let y: Bool = 3
+			log(x)
+			log(y)
 		}`)
 
 		require.Equal(t,
 			[]protocol.Diagnostic{
+				{
+					Range: protocol.Range{
+						Start: protocol.Position{Line: 1, Character: 11},
+						End:   protocol.Position{Line: 1, Character: 24},
+					},
+					Severity: protocol.SeverityWarning,
+					Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
+				},
 				{
 					Range: protocol.Range{
 						Start: protocol.Position{Line: 2, Character: 17},
@@ -134,14 +147,6 @@ func TestLinting(t *testing.T) {
 					CodeDescription: &protocol.CodeDescription{
 						Href: "https://cadence-lang.org/docs/language/values-and-types",
 					},
-				},
-				{
-					Range: protocol.Range{
-						Start: protocol.Position{Line: 1, Character: 11},
-						End:   protocol.Position{Line: 1, Character: 24},
-					},
-					Severity: protocol.SeverityWarning,
-					Message:  "force cast ('as!') from `Bool` to `Bool` always succeeds",
 				},
 			},
 			diagnostics,

@@ -40,12 +40,13 @@ import (
 	grpcAccess "github.com/onflow/flow-go-sdk/access/grpc"
 )
 
-const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration
+const LoadMode = analysis.NeedTypes | analysis.NeedExtendedElaboration | analysis.NeedPositionInfo
 
 type Config struct {
 	Analyzers  []*analysis.Analyzer
 	Silent     bool
 	UseColor   bool
+	FixAll     bool
 	PrintError func(*Linter, error, common.Location)
 }
 
@@ -53,6 +54,7 @@ type Linter struct {
 	Config             Config
 	errorPrettyPrinter pretty.ErrorPrettyPrinter
 	Codes              map[common.Location][]byte
+	directory          string
 }
 
 func NewLinter(config Config) *Linter {
@@ -219,6 +221,8 @@ func (l *Linter) AnalyzeDirectory(directory string) {
 		panic(err)
 	}
 
+	l.directory = directory
+
 	locations, contractNames := l.readDirectoryEntries(directory, entries)
 	analysisConfig := analysis.NewSimpleConfig(
 		LoadMode,
@@ -251,6 +255,10 @@ func (l *Linter) readDirectoryEntries(
 		location, qualifiedIdentifier, err := common.DecodeTypeID(nil, typeID)
 		if err != nil {
 			panic(fmt.Errorf("invalid location in file %q: %w", name, err))
+		}
+
+		if location == nil {
+			panic(fmt.Errorf("invalid location in file %q: missing location", name))
 		}
 
 		identifierParts := strings.Split(qualifiedIdentifier, ".")
@@ -307,7 +315,10 @@ func (l *Linter) analyze(
 		}
 	}
 
-	var reportLock sync.Mutex
+	var (
+		reportLock  sync.Mutex
+		diagnostics []analysis.Diagnostic
+	)
 
 	report := func(diagnostic analysis.Diagnostic) {
 		reportLock.Lock()
@@ -318,6 +329,8 @@ func (l *Linter) analyze(
 			diagnosticErr{diagnostic},
 			diagnostic.Location,
 		)
+
+		diagnostics = append(diagnostics, diagnostic)
 	}
 
 	analyzers := l.Config.Analyzers
@@ -333,6 +346,21 @@ func (l *Linter) analyze(
 			program.Run(analyzers, report)
 		}
 	}
+
+	if l.Config.FixAll {
+		l.applyFixes(diagnostics)
+	}
+}
+
+func (l *Linter) applyFixes(diagnostics []analysis.Diagnostic) {
+	log.Println("Applying fixes ...")
+
+	err := ApplyFixes(diagnostics, l)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Println("Done")
 }
 
 func (l *Linter) readCSV(
@@ -384,4 +412,27 @@ func (l *Linter) readCSV(
 	}
 
 	return
+}
+
+func (l *Linter) ReadCode(location common.Location) ([]byte, error) {
+	code, ok := l.Codes[location]
+	if !ok {
+		return nil, fmt.Errorf("code not found for location: %s", location.Description())
+	}
+
+	return code, nil
+}
+
+func (l *Linter) WriteCode(location common.Location, code []byte) error {
+	if l.directory == "" {
+		return fmt.Errorf("cannot write code for location %q: no directory specified", location.Description())
+	}
+
+	filePath := path.Join(l.directory, location.ID()+".cdc")
+	err := os.WriteFile(filePath, code, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to write file %q: %w", filePath, err)
+	}
+
+	return nil
 }

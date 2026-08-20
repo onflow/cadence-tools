@@ -233,24 +233,24 @@ describe("diagnostics", () => {
   }
 
   test("script", async () =>
-    testCode(`access(all) fun main() { let x = X }`, [
+    testCode(`access(all) fun main() { log(X) }`, [
       "cannot find variable in this scope: `X`. not found in this scope; check for typos or declare it",
     ]));
 
   test("script auth account", async () =>
     testCode(
-      `access(all) fun main() { let account = getAuthAccount<&Account>(0x01) }`,
-      []
+      `access(all) fun main() { log(getAuthAccount<&Account>(0x01)) }`,
+      ["hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("transaction", async () =>
-    testCode(`transaction() { execute { let x = X } }`, [
+    testCode(`transaction() { execute { log(X) } }`, [
       "cannot find variable in this scope: `X`. not found in this scope; check for typos or declare it",
     ]));
 
   test("transaction auth account", async () =>
     testCode(
-      `transaction() { execute { let account = getAuthAccount<&Account>(0x01) } }`,
+      `transaction() { execute { log(getAuthAccount<&Account>(0x01)) } }`,
       [
         "cannot find variable in this scope: `getAuthAccount`. not found in this scope; check for typos or declare it",
       ]
@@ -268,7 +268,7 @@ describe("diagnostics", () => {
             access(all)
             fun main() {
                 let r <- create R()
-                let a = r[A]
+                log(r[A])
                 destroy r
             }
           `,
@@ -281,9 +281,10 @@ describe("diagnostics", () => {
             access(all)
             fun main() {
                 let get = getAccount(0x1).capabilities.get
+                log(get)
             }
           `,
-      []
+      ["hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("unused result", async () =>
@@ -294,7 +295,7 @@ describe("diagnostics", () => {
                 getAccount(0x1)
             }
           `,
-      ["unused result"]
+      ["unused result", "hardcoded address detected — consider using named address imports for portability"]
     ));
 
   test("InternalEVM contract exists", async () =>

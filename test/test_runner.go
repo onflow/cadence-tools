@@ -36,6 +36,8 @@ import (
 	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
+	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
+	fvmRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 
@@ -423,7 +425,7 @@ func (r *TestRunner) GetTests(script string) ([]string, error) {
 	return tests, nil
 }
 
-func (r *TestRunner) replaceImports(code string) string {
+func (r *TestRunner) replaceImports(code string) (string, error) {
 	return r.backend.replaceImports(code)
 }
 
@@ -539,7 +541,10 @@ func (r *TestRunner) parseCheckAndInterpret(script string) (
 		}
 	}
 
-	script = r.replaceImports(script)
+	script, err = r.replaceImports(script)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	program, err := env.ParseAndCheckProgram([]byte(script), ctx.Location, false)
 	if err != nil {
@@ -640,6 +645,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 	r.backend = backend
 
 	fvmEnv := r.backend.blockchain.NewScriptEnvironment()
+	env.DeclareValue(fvmRuntime.TransactionIndexDeclaration(fvmEnv), testScriptLocation)
 	ctx := runtime.Context{
 		Interface:   fvmEnv,
 		Location:    testScriptLocation,
@@ -674,9 +680,7 @@ func (r *TestRunner) initializeEnvironment(astProgram *ast.Program) (
 		nil,
 	)
 
-	if err = setupEVMEnvironment(r.backend.chain, fvmEnv, env); err != nil {
-		return nil, runtime.Context{}, err
-	}
+	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
 
 	return env, ctx, nil
 }
@@ -776,14 +780,17 @@ func (r *TestRunner) interpreterContractValueHandler(
 					inter,
 					runtime.StorageConfig{},
 				)
-				storageMap := blockchainStorage.GetDomainStorageMap(
+				blockchainStorageMap := blockchainStorage.GetDomainStorageMap(
 					inter,
 					location.Address,
 					common.StorageDomainContract,
 					false,
 				)
-				if storageMap != nil {
-					storedValue = storageMap.ReadValue(
+				if blockchainStorageMap != nil {
+					// Read the contract value,
+					// so that its slabs get loaded into `blockchainStorage`,
+					// and get copied to the current environment's storage below.
+					blockchainStorageMap.ReadValue(
 						inter,
 						interpreter.StringStorageMapKey(location.Name),
 					)
@@ -812,6 +819,31 @@ func (r *TestRunner) interpreterContractValueHandler(
 				err = storage.Commit(inter, true)
 				if err != nil {
 					panic(err)
+				}
+
+				// The contract value must be read from the current environment's storage,
+				// and must NOT be read from `blockchainStorage`:
+				// Each storage has its own atree slab ID generator,
+				// so the two storages generate clashing atree value IDs
+				// for the values they create for the transient address 0x0.
+				// The interpreter caches the Cadence values it creates for atree containers,
+				// keyed by atree value ID, so a clash results in the wrong Cadence value.
+				//
+				// Drop the cached values for the values that were read from
+				// `blockchainStorage` above, for the same reason.
+				inter.ClearAllCanonicalAtreeContainers()
+
+				storageMap := storage.GetDomainStorageMap(
+					inter,
+					location.Address,
+					common.StorageDomainContract,
+					false,
+				)
+				if storageMap != nil {
+					storedValue = storageMap.ReadValue(
+						inter,
+						interpreter.StringStorageMapKey(location.Name),
+					)
 				}
 			}
 
@@ -946,12 +978,15 @@ func (r *TestRunner) parseAndCheckImport(
 	if !ok {
 		panic(fmt.Errorf("failed to retrieve FVM Environment"))
 	}
-	err = setupEVMEnvironment(r.backend.chain, fvmEnv, env)
-	if err != nil {
-		panic(err)
-	}
 
-	code = r.replaceImports(code)
+	env.DeclareValue(fvmRuntime.TransactionIndexDeclaration(fvmEnv), location)
+
+	setupEVMEnvironment(r.backend.chain, fvmEnv, env)
+
+	code, err = r.replaceImports(code)
+	if err != nil {
+		return nil, nil, err
+	}
 	program, err := r.testRuntime.ParseAndCheckProgram([]byte(code), ctx)
 
 	if err != nil {
@@ -962,14 +997,17 @@ func (r *TestRunner) parseAndCheckImport(
 }
 
 func setupEVMEnvironment(
-	ch flow.Chain,
+	chain flow.Chain,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
-) error {
-	return evm.SetupEnvironment(
-		ch.ChainID(),
-		fvmEnv,
+) {
+	chainID := chain.ChainID()
+	evmInternalContractValue := fvmRuntime.EVMInternalEVMContractValue(chainID, fvmEnv)
+	evmContractAddress := evm.ContractAccountAddress(chainID)
+	evmStdlib.SetupEnvironment(
 		runtimeEnv,
+		evmInternalContractValue,
+		evmContractAddress,
 	)
 }
 
