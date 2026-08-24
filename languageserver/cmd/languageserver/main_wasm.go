@@ -32,8 +32,7 @@ import (
 	"github.com/onflow/cadence/stdlib"
 
 	"github.com/onflow/cadence-tools/languageserver/server"
-
-	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/cadence-tools/lint"
 )
 
 const globalFunctionNamePrefix = "CADENCE_LANGUAGE_SERVER"
@@ -190,7 +189,13 @@ func start(id int) {
 
 	identifierImportResolver := func(_ string, location common.IdentifierLocation) (code string, err error) {
 		if location == stdlib.CryptoContractLocation {
-			return string(coreContracts.Crypto()), nil
+			// The Crypto contract is loaded from the linter,
+			// instead of from the flow-core-contracts Go package,
+			// like it is for the non-WASM build,
+			// because that package depends on the Flow Go SDK,
+			// which transitively depends on github.com/onflow/crypto,
+			// which requires cgo, which is not available for WASM.
+			return lint.CryptoContractCode, nil
 		}
 		return "", fmt.Errorf("CLS %d: unknown identifier location: %s", id, location)
 	}
