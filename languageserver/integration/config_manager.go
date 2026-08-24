@@ -327,7 +327,12 @@ func (m *ConfigManager) IsSameProject(projectID string, absPath string) bool {
 	return absDst == cfgPath
 }
 
-// GetContractSourceForProject reads the project's flow.json and returns the code for the given contract name if mapped
+// GetContractSourceForProject reads the project's flow.json and returns the
+// code for the given contract name if mapped. This is a flowkit-independent
+// fallback used by resolveStringIdentifierImport when flowkit fails to load
+// the project state (e.g. because the flow.json has inconsistencies flowkit
+// rejects). It only handles the simple `"Contract": "./path.cdc"` shape; the
+// verbose shape is the flowkit path's responsibility.
 func (m *ConfigManager) GetContractSourceForProject(projectID string, name string) (string, error) {
 	cfgPath := m.ConfigPathForProject(projectID)
 	if cfgPath == "" || name == "" {
@@ -354,6 +359,21 @@ func (m *ConfigManager) GetContractSourceForProject(projectID string, name strin
 		return "", err
 	}
 	return string(code), nil
+}
+
+// GetContractPathForProject reads the project's flow.json and returns the absolute on-disk path
+// for the given contract name if mapped
+func (m *ConfigManager) GetContractPathForProject(projectID string, name string) (string, error) {
+	if name == "" {
+		return "", nil
+	}
+
+	st, err := m.ResolveStateForProject(projectID)
+	if err != nil || st == nil {
+		return "", err
+	}
+
+	return st.GetPathByName(name)
 }
 
 // ResolveStateForProject returns the state associated with the given project ID (flow.json path)

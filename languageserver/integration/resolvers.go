@@ -33,6 +33,8 @@ import (
 	"github.com/onflow/flowkit/v2"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+
+	"github.com/onflow/cadence-tools/languageserver/protocol"
 )
 
 // networkContractMap maps network name -> contract name -> address
@@ -144,6 +146,51 @@ func (r *resolvers) addressImport(projectID string, location common.AddressLocat
 	}
 
 	return string(account.Contracts[location.Name]), nil
+}
+
+// locationToURI maps a common.Location to the document URI of its on-disk source,
+// when one is knowable from project state. Used by e.g. cross-file go-to-definition.
+// Returns "" if the location isn't file backed (e.g. address locations resolved over the network).
+func (r *resolvers) locationToURI(projectID string, location common.Location) protocol.DocumentURI {
+	if r.cfgManager == nil {
+		return ""
+	}
+
+	stringLoc, ok := location.(common.StringLocation)
+	if !ok {
+		return ""
+	}
+
+	name := string(stringLoc)
+	if isContractName(name) {
+		path, err := r.cfgManager.GetContractPathForProject(projectID, name)
+		if err != nil || path == "" {
+			return ""
+		}
+		return pathToURI(path)
+	}
+
+	// File-style import (`import "./Foo.cdc"`) resolved relative to the project root by resolveFileImport above.
+	filename := deURI(cleanWindowsPath(name))
+	if filepath.IsAbs(filename) {
+		return pathToURI(filename)
+	}
+
+	if projectID != "" {
+		if cfg := r.cfgManager.ConfigPathForProject(projectID); cfg != "" {
+			return pathToURI(filepath.Join(filepath.Dir(cfg), filename))
+		}
+	}
+
+	return ""
+}
+
+func pathToURI(path string) protocol.DocumentURI {
+	if path == "" {
+		return ""
+	}
+
+	return protocol.DocumentURI("file://" + path)
 }
 
 // identifierImport resolves the code for an identifier location.
