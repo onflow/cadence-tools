@@ -30,6 +30,7 @@ import (
 
 	"github.com/onflow/cadence/common"
 	"github.com/onflow/cadence/pretty"
+	"github.com/onflow/cadence/stdlib"
 	"github.com/onflow/cadence/tools/analysis"
 )
 
@@ -168,9 +169,16 @@ func (l *Linter) analyze(
 	config *analysis.Config,
 	locations []common.Location,
 ) {
+	// The Crypto contract is a built-in contract,
+	// so it cannot be resolved like the other imported programs.
+	// Provide its code, so that programs which import it can be analyzed.
+	l.Codes[stdlib.CryptoContractLocation] = []byte(CryptoContractCode)
+
 	programs := analysis.Programs{
 		Programs: make(map[common.Location]*analysis.Program, len(locations)),
-		// TODO: crypto contract elaboration
+		CryptoContractLocation: func() common.Location {
+			return stdlib.CryptoContractLocation
+		},
 	}
 
 	log.Println("Loading ...")
