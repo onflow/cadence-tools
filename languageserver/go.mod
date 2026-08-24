@@ -1,6 +1,6 @@
 module github.com/onflow/cadence-tools/languageserver
 
-go 1.25.1
+go 1.26.0
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
@@ -54,7 +54,7 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/pebble/v2 v2.0.6 // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
-	github.com/cockroachdb/swiss v0.0.0-20250624142022-d6e517c1d961 // indirect
+	github.com/cockroachdb/swiss v0.0.0-20251224182025-b0f6560f979b // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -155,7 +155,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.16.0 // indirect
-	github.com/onflow/crypto v0.25.4 // indirect
+	github.com/onflow/crypto v0.26.0 // indirect
 	github.com/onflow/fixed-point v0.1.1 // indirect
 	github.com/onflow/flow-emulator v1.21.1 // indirect
 	github.com/onflow/flow-evm-bridge v0.2.1 // indirect
