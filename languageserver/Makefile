@@ -25,7 +25,7 @@ PATH := $(PATH):$(GOPATH)/bin
 .PHONY: build
 build:
 	go build -o ./cmd/languageserver/languageserver ./cmd/languageserver
-	GOARCH=wasm GOOS=js go build -o ./cmd/languageserver/languageserver.wasm -tags no_cgo ./cmd/languageserver
+	GOARCH=wasm GOOS=js go build -o ./cmd/languageserver/languageserver.wasm ./cmd/languageserver
 
 .PHONY: generate
 generate:
